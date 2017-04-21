@@ -69,7 +69,7 @@ if(a>10){if(abs(Q[a]-Q[a-10])<1E-5) break}
 Amax<-max(log(matrix(rep(pi,times=n),nrow=k))+l)
 logdenom=Amax+log(colSums(exp(log(matrix(rep(pi,times=n),nrow=k))+l-Amax)))
   for(c in 1:k){
-wts[k,]<-exp(log(pi[k])+l[k,]-logdenom)
+wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
   }
 }
 
