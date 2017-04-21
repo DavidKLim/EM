@@ -68,10 +68,9 @@ if(a>10){if(abs(Q[a]-Q[a-10])<1E-5) break}
 # update on weights [RECODE THIS]
 Amax<-max(log(matrix(rep(pi,times=n),nrow=k))+l)
 logdenom=Amax+log(colSums(exp(log(matrix(rep(pi,times=n),nrow=k))+l-Amax)))
-wts[1,]<-exp(log(pi[1])+l[1,]-logdenom)
-wts[2,]<-exp(log(pi[2])+l[2,]-logdenom)
-wts[3,]<-exp(log(pi[3])+l[3,]-logdenom)
-
+  for(c in 1:k){
+wts[k,]<-exp(log(pi[k])+l[k,]-logdenom)
+  }
 }
 
 result<-list(pi=pi,coefs=coefs,Q=Q)
