@@ -29,7 +29,6 @@ maxit = 200
 coefs<-matrix(rep(0,times=g*k),nrow=g)
 pi<-rep(0,times=k)
 Q<-rep(0,times=maxit)
-crit=1
 
 for(a in 1:maxit){
 
