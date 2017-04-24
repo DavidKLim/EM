@@ -18,5 +18,3 @@ b[101:180,]<-mvrnorm(80,mu=c(2,4,5),sigma)
 b[181:200,]<-mvrnorm(20,mu=c(1,1,1),sigma) # nondiscriminatory
 
 X<-EM(n,k,g,pi,b)
-
-# I think the initialization already does EM --> Q function is already maximized
