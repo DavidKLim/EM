@@ -1,0 +1,271 @@
+setwd("/netscr/deelim")
+#setwd("C:/Users/David/Desktop/Research/Coding EM")
+source("EM with elastic penalty.R")
+library(MASS)
+
+n=20
+k=3
+g=200
+pi=c(1/3,1/3,1/3)
+sigma=diag(k)
+b=matrix(rep(0,times=k*g),nrow=g,byrow=TRUE) # initialize betas
+
+b[1:100,]<-mvrnorm(100,mu=c(1,2,3),sigma)
+b[101:200,]<-mvrnorm(100,mu=c(2,2,2),sigma) # 50% nondiscriminatory
+
+
+##### SIMULATIONS #####
+# cluster proportions 1/3 #
+sim=100
+temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
+temp_coefs<-list()
+ARI<-rep(0,times=sim)
+
+
+#grid search
+alpha_search=seq(0,1,by=0.1)
+lambda_search=seq(0,5,by=0.5)
+list_BIC=matrix(rep(0,times=length(alpha_search)*length(lambda_search)),nrow=length(alpha_search)) #matrix of BIC's: alpha x lambda
+
+for(aa in 1:length(alpha_search)){
+  for(ll in 1:length(lambda_search)){
+    list_BIC[aa,ll]<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=alpha_search[aa],lambda=lambda_search[ll])$BIC
+  }
+}
+
+max_index<-which(list_BIC==max(list_BIC),arr.ind=TRUE)
+
+max_alpha<-alpha_search[max_index[1]]
+max_lambda<-lambda_search[max_index[2]]
+
+num_nondiscr<-rep(0,times=sim)
+
+#simulations
+for(i in 1:sim){
+  X<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=max_alpha,lambda=max_lambda)
+  temp_pi[i,]<-X$pi
+  temp_coefs[[i]]<-X$coefs
+  ARI[i]<-X$ARI
+  num_nondiscr[i]<-X$nondiscriminatory
+}
+
+mean_pi<-colSums(t(apply(temp_pi,1,sort)))/sim # sort in increasing order, then mean #
+mean_pi<-mean_pi[order(mean_pi)][rank(pi)] # order of true pi
+
+# array of gxk matrices (100 (numsims) of them) of coefficients
+sorted_coefs<-list()
+for(i in 1:sim){
+  sorted_coefs[[i]]<-temp_coefs[[i]][,order(temp_pi[i,])] # sort by increasing order of pi (to align --> take mean) #
+}   # trickier when varying each gene mean
+
+mean_coefs<-Reduce('+',sorted_coefs)/sim # gxk matrix of mean coef's across simulations #
+sorted_means<-matrix(rep(0,times=g*k),nrow=g)
+for(j in 1:g){
+  sorted_means[j,]<-mean_coefs[j,rank(pi)] # order each row according to order of true pi #
+}
+coef1_means<-colSums(sorted_means[1:100,])/nrow(sorted_means[1:100,])
+coef2_means<-colSums(sorted_means[101:200,])/nrow(sorted_means[101:200,])
+
+mean_ARI<-mean(ARI)
+
+SSE_estims<-sum((pi-mean_pi)^2)+sum((b-sorted_means)^2)
+
+# output #
+sink("elastic net 2.txt",append=FALSE)
+print("CASE 1: Even cluster allocation p = 1/3")
+print(paste("n =",n,", k =",k,", g =",g,", pi =",pi[1],pi[2],pi[3]))
+print(paste("simulated cluster means: first 100: MVN(mu=(1,2,3),sigma=I), next 100: MVN(mu=(2,2,2),sigma=I)"))
+print(paste("mean_pi =",mean_pi[1],mean_pi[2],mean_pi[3])) # mean of estimated pi
+print(paste("mean_coefs1 =",coef1_means[1],coef1_means[2],coef1_means[3])) # in varying means, needs work
+print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
+print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
+print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
+print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
+print(paste("final (alpha,lambda) =",max_alpha,max_lambda))
+sink()
+
+
+
+
+
+
+
+
+
+
+
+
+n=20
+k=3
+g=200
+pi=c(0.45,0.45,0.1)
+sigma=diag(k)
+b=matrix(rep(0,times=k*g),nrow=g,byrow=TRUE) # initialize betas
+
+b[1:100,]<-mvrnorm(100,mu=c(1,2,3),sigma)
+b[101:200,]<-mvrnorm(100,mu=c(2,2,2),sigma) # 50% nondiscriminatory
+
+
+##### SIMULATIONS #####
+# Two large, one small proportions #
+sim=100
+temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
+temp_coefs<-list()
+ARI<-rep(0,times=sim)
+
+
+#grid search
+alpha_search=seq(0,1,by=0.1)
+lambda_search=seq(0,5,by=0.5)
+list_BIC=matrix(rep(0,times=length(alpha_search)*length(lambda_search)),nrow=length(alpha_search)) #matrix of BIC's: alpha x lambda
+
+for(aa in 1:length(alpha_search)){
+  for(ll in 1:length(lambda_search)){
+    list_BIC[aa,ll]<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=alpha_search[aa],lambda=lambda_search[ll])$BIC
+  }
+}
+
+max_index<-which(list_BIC==max(list_BIC),arr.ind=TRUE)
+
+max_alpha<-alpha_search[max_index[1]]
+max_lambda<-lambda_search[max_index[2]]
+
+num_nondiscr<-rep(0,times=sim)
+
+#simulations
+for(i in 1:sim){
+  X<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=max_alpha,lambda=max_lambda)
+  temp_pi[i,]<-X$pi
+  temp_coefs[[i]]<-X$coefs
+  ARI[i]<-X$ARI
+  num_nondiscr[i]<-X$nondiscriminatory
+}
+
+mean_pi<-colSums(t(apply(temp_pi,1,sort)))/sim # sort in increasing order, then mean #
+mean_pi<-mean_pi[order(mean_pi)][rank(pi)] # order of true pi
+
+# array of gxk matrices (100 (numsims) of them) of coefficients
+sorted_coefs<-list()
+for(i in 1:sim){
+  sorted_coefs[[i]]<-temp_coefs[[i]][,order(temp_pi[i,])] # sort by increasing order of pi (to align --> take mean) #
+}   # trickier when varying each gene mean
+
+mean_coefs<-Reduce('+',sorted_coefs)/sim # gxk matrix of mean coef's across simulations #
+sorted_means<-matrix(rep(0,times=g*k),nrow=g)
+for(j in 1:g){
+  sorted_means[j,]<-mean_coefs[j,rank(pi)] # order each row according to order of true pi #
+}
+coef1_means<-colSums(sorted_means[1:100,])/nrow(sorted_means[1:100,])
+coef2_means<-colSums(sorted_means[101:200,])/nrow(sorted_means[101:200,])
+
+mean_ARI<-mean(ARI)
+
+SSE_estims<-sum((pi-mean_pi)^2)+sum((b-sorted_means)^2)
+
+# output #
+sink("elastic net 2.txt",append=TRUE)
+print("CASE 2: One Small Allocation, Two large allocation")
+print(paste("n =",n,", k =",k,", g =",g,", pi =",pi[1],pi[2],pi[3]))
+print(paste("simulated cluster means: first 100: MVN(mu=(1,2,3),sigma=I), next 100: MVN(mu=(2,2,2),sigma=I)"))
+print(paste("mean_pi =",mean_pi[1],mean_pi[2],mean_pi[3])) # mean of estimated pi
+print(paste("mean_coefs1 =",coef1_means[1],coef1_means[2],coef1_means[3])) # in varying means, needs work
+print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
+print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
+print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
+print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
+print(paste("final (alpha,lambda) =",max_alpha,max_lambda))
+sink()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+n=20
+k=3
+g=200
+pi=c(0.8,0.1,0.1)
+sigma=diag(k)
+b=matrix(rep(0,times=k*g),nrow=g,byrow=TRUE) # initialize betas
+
+b[1:100,]<-mvrnorm(100,mu=c(1,2,3),sigma)
+b[101:200,]<-mvrnorm(100,mu=c(2,2,2),sigma) # 50% nondiscriminatory
+
+
+##### SIMULATIONS #####
+# Two large, one small proportions #
+sim=100
+temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
+temp_coefs<-list()
+ARI<-rep(0,times=sim)
+
+
+#grid search
+alpha_search=seq(0,1,by=0.1)
+lambda_search=seq(0,5,by=0.5)
+list_BIC=matrix(rep(0,times=length(alpha_search)*length(lambda_search)),nrow=length(alpha_search)) #matrix of BIC's: alpha x lambda
+
+for(aa in 1:length(alpha_search)){
+  for(ll in 1:length(lambda_search)){
+    list_BIC[aa,ll]<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=alpha_search[aa],lambda=lambda_search[ll])$BIC
+  }
+}
+
+max_index<-which(list_BIC==max(list_BIC),arr.ind=TRUE)
+
+max_alpha<-alpha_search[max_index[1]]
+max_lambda<-lambda_search[max_index[2]]
+
+num_nondiscr<-rep(0,times=sim)
+
+#simulations
+for(i in 1:sim){
+  X<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=max_alpha,lambda=max_lambda)
+  temp_pi[i,]<-X$pi
+  temp_coefs[[i]]<-X$coefs
+  ARI[i]<-X$ARI
+  num_nondiscr[i]<-X$nondiscriminatory
+}
+
+mean_pi<-colSums(t(apply(temp_pi,1,sort)))/sim # sort in increasing order, then mean #
+mean_pi<-mean_pi[order(mean_pi)][rank(pi)] # order of true pi
+
+# array of gxk matrices (100 (numsims) of them) of coefficients
+sorted_coefs<-list()
+for(i in 1:sim){
+  sorted_coefs[[i]]<-temp_coefs[[i]][,order(temp_pi[i,])] # sort by increasing order of pi (to align --> take mean) #
+}   # trickier when varying each gene mean
+
+mean_coefs<-Reduce('+',sorted_coefs)/sim # gxk matrix of mean coef's across simulations #
+sorted_means<-matrix(rep(0,times=g*k),nrow=g)
+for(j in 1:g){
+  sorted_means[j,]<-mean_coefs[j,rank(pi)] # order each row according to order of true pi #
+}
+coef1_means<-colSums(sorted_means[1:100,])/nrow(sorted_means[1:100,])
+coef2_means<-colSums(sorted_means[101:200,])/nrow(sorted_means[101:200,])
+
+mean_ARI<-mean(ARI)
+
+SSE_estims<-sum((pi-mean_pi)^2)+sum((b-sorted_means)^2)
+
+# output #
+sink("elastic net 2.txt",append=TRUE)
+print("CASE 3: Two Small Allocation, One large allocation")
+print(paste("n =",n,", k =",k,", g =",g,", pi =",pi[1],pi[2],pi[3]))
+print(paste("simulated cluster means: first 100: MVN(mu=(1,2,3),sigma=I), next 100: MVN(mu=(2,2,2),sigma=I)"))
+print(paste("mean_pi =",mean_pi[1],mean_pi[2],mean_pi[3])) # mean of estimated pi
+print(paste("mean_coefs1 =",coef1_means[1],coef1_means[2],coef1_means[3])) # in varying means, needs work
+print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
+print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
+print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
+print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
+print(paste("final (alpha,lambda) =",max_alpha,max_lambda))
+sink()
