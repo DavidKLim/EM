@@ -1,7 +1,9 @@
 setwd("/netscr/deelim")
-#setwd("C:/Users/David/Desktop/Research/Coding EM")
+#setwd("C:/Users/David/Desktop/Research/GitHub/EM")
 source("EM.R")
 library(MASS)
+
+set.seed(24)
 
 n=20
 k=3

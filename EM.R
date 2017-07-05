@@ -205,7 +205,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     for(c in 1:k){
       wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
     }
-    print(log(pi))
+    print(pi)
     
   }
   

@@ -1,7 +1,9 @@
 setwd("/netscr/deelim")
-#setwd("C:/Users/David/Desktop/Research/Coding EM")
-source("EM with elastic penalty.R")
+#setwd("C:/Users/David/Desktop/Research/GitHub/EM")
+source("EM.R")
 library(MASS)
+
+set.seed(24)
 
 n=20
 k=3
@@ -23,26 +25,32 @@ ARI<-rep(0,times=sim)
 
 
 #grid search
-alpha_search=seq(0,1,by=0.1)
-lambda_search=seq(0,5,by=0.5)
-list_BIC=matrix(rep(0,times=length(alpha_search)*length(lambda_search)),nrow=length(alpha_search)) #matrix of BIC's: alpha x lambda
+alpha_search=seq(0,1,by=0.25) # 5 elts
+lambda1_search=seq(0.1,1,by=0.1) #lambda1 can't = 0. 10 elts
+lambda2_search=c(0.01,0.05,0.1,0.2,1) # 5 elts
 
-for(aa in 1:length(alpha_search)){
-  for(ll in 1:length(lambda_search)){
-    list_BIC[aa,ll]<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=alpha_search[aa],lambda=lambda_search[ll])$BIC
-  }
+list_BIC=matrix(0,nrow=length(alpha_search)*length(lambda1_search)*length(lambda2_search),ncol=4) #matrix of BIC's: alpha x lambda
+
+list_BIC[,1]=rep(alpha_search,each=length(lambda1_search)*length(lambda2_search))
+list_BIC[,2]=rep(rep(lambda1_search,each=length(lambda2_search)),times=length(alpha_search))
+list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search))
+
+for(aa in 1:nrow(list_BIC)){
+  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
+  print(list_BIC[aa,])
 }
 
-max_index<-which(list_BIC==max(list_BIC),arr.ind=TRUE)
+max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
 
-max_alpha<-alpha_search[max_index[1]]
-max_lambda<-lambda_search[max_index[2]]
+max_alpha<-list_BIC[max_index,1]
+max_lambda1<-list_BIC[max_index,2]
+max_lambda2<-list_BIC[max_index,3]
 
 num_nondiscr<-rep(0,times=sim)
 
 #simulations
 for(i in 1:sim){
-  X<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=max_alpha,lambda=max_lambda)
+  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
@@ -81,7 +89,7 @@ print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
 print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
-print(paste("final (alpha,lambda) =",max_alpha,max_lambda))
+print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
 sink()
 
 
@@ -115,26 +123,34 @@ ARI<-rep(0,times=sim)
 
 
 #grid search
-alpha_search=seq(0,1,by=0.1)
-lambda_search=seq(0,5,by=0.5)
-list_BIC=matrix(rep(0,times=length(alpha_search)*length(lambda_search)),nrow=length(alpha_search)) #matrix of BIC's: alpha x lambda
+alpha_search=seq(0,1,by=0.25) # 5 elts
+lambda1_search=seq(0.1,1,by=0.1) #lambda1 can't = 0. 10 elts
+lambda2_search=c(0.01,0.05,0.1,0.2,1) # 5 elts
 
-for(aa in 1:length(alpha_search)){
-  for(ll in 1:length(lambda_search)){
-    list_BIC[aa,ll]<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=alpha_search[aa],lambda=lambda_search[ll])$BIC
-  }
+list_BIC=matrix(0,nrow=length(alpha_search)*length(lambda1_search)*length(lambda2_search),ncol=4) #matrix of BIC's: alpha x lambda
+
+list_BIC[,1]=rep(alpha_search,each=length(lambda1_search)*length(lambda2_search))
+list_BIC[,2]=rep(rep(lambda1_search,each=length(lambda2_search)),times=length(alpha_search))
+list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search))
+
+for(aa in 1:nrow(list_BIC)){
+  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
+  print(list_BIC[aa,])
 }
 
-max_index<-which(list_BIC==max(list_BIC),arr.ind=TRUE)
+max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
 
-max_alpha<-alpha_search[max_index[1]]
-max_lambda<-lambda_search[max_index[2]]
+max_alpha<-list_BIC[max_index,1]
+max_lambda1<-list_BIC[max_index,2]
+max_lambda2<-list_BIC[max_index,3]
 
 num_nondiscr<-rep(0,times=sim)
 
+
+
 #simulations
 for(i in 1:sim){
-  X<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=max_alpha,lambda=max_lambda)
+  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
@@ -173,7 +189,7 @@ print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
 print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
-print(paste("final (alpha,lambda) =",max_alpha,max_lambda))
+print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
 sink()
 
 
@@ -209,26 +225,33 @@ ARI<-rep(0,times=sim)
 
 
 #grid search
-alpha_search=seq(0,1,by=0.1)
-lambda_search=seq(0,5,by=0.5)
-list_BIC=matrix(rep(0,times=length(alpha_search)*length(lambda_search)),nrow=length(alpha_search)) #matrix of BIC's: alpha x lambda
+alpha_search=seq(0,1,by=0.25) # 5 elts
+lambda1_search=seq(0.1,1,by=0.1) #lambda1 can't = 0. 10 elts
+lambda2_search=c(0.01,0.05,0.1,0.2,1) # 5 elts
 
-for(aa in 1:length(alpha_search)){
-  for(ll in 1:length(lambda_search)){
-    list_BIC[aa,ll]<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=alpha_search[aa],lambda=lambda_search[ll])$BIC
-  }
+list_BIC=matrix(0,nrow=length(alpha_search)*length(lambda1_search)*length(lambda2_search),ncol=4) #matrix of BIC's: alpha x lambda
+
+list_BIC[,1]=rep(alpha_search,each=length(lambda1_search)*length(lambda2_search))
+list_BIC[,2]=rep(rep(lambda1_search,each=length(lambda2_search)),times=length(alpha_search))
+list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search))
+
+for(aa in 1:nrow(list_BIC)){
+  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
+  print(list_BIC[aa,])
 }
 
-max_index<-which(list_BIC==max(list_BIC),arr.ind=TRUE)
+max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
 
-max_alpha<-alpha_search[max_index[1]]
-max_lambda<-lambda_search[max_index[2]]
+max_alpha<-list_BIC[max_index,1]
+max_lambda1<-list_BIC[max_index,2]
+max_lambda2<-list_BIC[max_index,3]
 
 num_nondiscr<-rep(0,times=sim)
 
+
 #simulations
 for(i in 1:sim){
-  X<-EM(n=n,k=k,g=g,pi=pi,b=b,alpha=max_alpha,lambda=max_lambda)
+  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
@@ -267,5 +290,5 @@ print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
 print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
-print(paste("final (alpha,lambda) =",max_alpha,max_lambda))
+print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
 sink()
