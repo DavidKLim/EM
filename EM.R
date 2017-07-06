@@ -43,6 +43,8 @@ for(i in 1:n){
   true_clusters[i]<-which(z[,i]==1)
 }
 
+print(true_clusters)     # print the cluster memberships being simulated
+
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
 gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
@@ -235,7 +237,10 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     for(c in 1:k){
       wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
     }
-    print(pi)
+    
+    
+    # print(pi) # print estimated cluster proportions
+    
     
   }
   
@@ -265,7 +270,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         if(f>c){if(abs(exp(coefs[j,c])-exp(coefs[j,f]))>5){m[j]=m[j]+1}} # nondiscriminatory threshold: count is off by 5
       }
     }
-    if(m[j]!=3){nondiscriminatory[j]=TRUE}       # NONDISCRIMINATORY TRUE MEANS GENE IS NOT DISCRIMINATORY ACROSS ALL CLUSTERS (could be across 2)
+    if(m[j]==0){nondiscriminatory[j]=TRUE}       # NONDISCRIMINATORY TRUE MEANS GENE IS NOT DISCRIMINATORY ACROSS ALL CLUSTERS (could be across 2)
   }
   
   BIC=-2*Q[a]+log(n)*sum(m)
