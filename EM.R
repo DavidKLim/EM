@@ -3,6 +3,8 @@ library(mclust)
 library(stats)
 library(MASS)
 library(fpc)
+library(permute)
+
 
 logsumexpc=function(v){  
   if(any(is.infinite(v))){ 
@@ -36,6 +38,10 @@ for(j in 1:g){
     y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c]))
   }
 }
+true_clusters<-rep(0,times=n)
+for(i in 1:n){
+  true_clusters[i]<-which(z[,i]==1)
+}
 
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
@@ -44,11 +50,35 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
 # EM
   
+  # Clustering
   d<-dist(t(y))
   model<-hclust(d)
   cls<-cutree(model,k=k)
   #cls<-sample(1:k,n,replace=TRUE) #random initialization
   
+  # choosing the permutation of cluster indices that best fit the true cluster indices (for summarizing simulations)
+  all_perms=allPerms(1:k)
+  all_clusts=list()
+  temp_clust<-rep(0,times=n)
+  
+  for(ii in 1:nrow(all_perms)){
+    for(i in 1:n){
+      temp_clust[i]<-all_perms[ii,cls[i]]
+    }
+    all_clusts[[ii]]<-temp_clust
+  }
+  
+  all_clusts[[nrow(all_perms)+1]]<-cls     # contains all permutations of cluster indices
+  match_index<-rep(0,times=nrow(all_perms)+1)
+  
+  for(ii in 1:(nrow(all_perms)+1)){
+    match_index[ii]<-mean(true_clusters==all_clusts[[ii]])     # compares each permutation to true --> % of match
+  }
+
+  cls<-all_clusts[[which.max(match_index)]]
+  
+  
+  # initialize weights
   wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   for(c in 1:k){
     wts[c,]=(cls==c)^2
@@ -221,10 +251,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   
   
   final_clusters<-rep(0,times=n)
-  true_clusters<-rep(0,times=n)
   for(i in 1:n){
     final_clusters[i]<-which.max(finalwts[,i])
-    true_clusters[i]<-which(z[,i]==1)
   }
   
   stats<-cluster.stats(d=d,true_clusters,final_clusters) #d is euclidean distance found earlier in cluster init.
@@ -234,7 +262,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   for(j in 1:g){
     for(c in 1:k){
       for(f in 1:k){
-        if(f>c){if(abs(coefs[j,c]-coefs[j,f])>0.1){m[j]=m[j]+1}} # nondiscriminatory threshold: 0.1
+        if(f>c){if(abs(exp(coefs[j,c])-exp(coefs[j,f]))>5){m[j]=m[j]+1}} # nondiscriminatory threshold: count is off by 5
       }
     }
     if(m[j]!=3){nondiscriminatory[j]=TRUE}       # NONDISCRIMINATORY TRUE MEANS GENE IS NOT DISCRIMINATORY ACROSS ALL CLUSTERS (could be across 2)

@@ -53,30 +53,16 @@ for(i in 1:sim){
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
-  num_nondiscr[i]<-X$nondiscriminatory
+  num_nondiscr[i]<-mean(X$nondiscriminatory)
 }
 
-mean_pi<-colSums(t(apply(temp_pi,1,sort)))/sim # sort in increasing order, then mean #
-mean_pi<-mean_pi[order(mean_pi)][rank(pi)] # order of true pi
-
-# array of gxk matrices (100 (numsims) of them) of coefficients
-sorted_coefs<-list()
-for(i in 1:sim){
-  sorted_coefs[[i]]<-temp_coefs[[i]][,order(temp_pi[i,])] # sort by increasing order of pi (to align --> take mean) #
-}   # trickier when varying each gene mean
-
-mean_coefs<-Reduce('+',sorted_coefs)/sim # gxk matrix of mean coef's across simulations #
-sorted_means<-matrix(rep(0,times=g*k),nrow=g)
-for(j in 1:g){
-  sorted_means[j,]<-mean_coefs[j,rank(pi)] # order each row according to order of true pi #
-}
-coef1_means<-colSums(sorted_means)/nrow(sorted_means)
+mean_pi<-colSums(temp_pi)/sim
+mean_coefs<-Reduce('+',temp_coefs)/sim
+coef1_means<-colSums(mean_coefs)/nrow(mean_coefs)
 
 mean_ARI<-mean(ARI)
 
 SSE_estims<-sum((pi-mean_pi)^2)+sum((b-sorted_means)^2)
-
-
 
 
 # output #
@@ -113,7 +99,7 @@ sink()
 
 
 
-# CASE 3: 50% nondiscriminatory
+# CASE 2: 50% nondiscriminatory
 n=20
 k=3
 g=200
@@ -162,25 +148,13 @@ for(i in 1:sim){
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
-  num_nondiscr[i]<-X$nondiscriminatory
+  num_nondiscr[i]<-mean(X$nondiscriminatory)
 }
 
-mean_pi<-colSums(t(apply(temp_pi,1,sort)))/sim # sort in increasing order, then mean #
-mean_pi<-mean_pi[order(mean_pi)][rank(pi)] # order of true pi
-
-# array of gxk matrices (100 (numsims) of them) of coefficients
-sorted_coefs<-list()
-for(i in 1:sim){
-  sorted_coefs[[i]]<-temp_coefs[[i]][,order(temp_pi[i,])] # sort by increasing order of pi (to align --> take mean) #
-}   # trickier when varying each gene mean
-
-mean_coefs<-Reduce('+',sorted_coefs)/sim # gxk matrix of mean coef's across simulations #
-sorted_means<-matrix(rep(0,times=g*k),nrow=g)
-for(j in 1:g){
-  sorted_means[j,]<-mean_coefs[j,rank(pi)] # order each row according to order of true pi #
-}
-coef1_means<-colSums(sorted_means[1:100,])/nrow(sorted_means[1:100,])
-coef2_means<-colSums(sorted_means[101:200,])/nrow(sorted_means[101:200,])
+mean_pi<-colSums(temp_pi)/sim
+mean_coefs<-Reduce('+',temp_coefs)/sim
+coef1_means<-colSums(mean_coefs[1:100,])/100
+coef2_means<-colSums(mean_coefs[101:200,])/100
 
 mean_ARI<-mean(ARI)
 
@@ -264,25 +238,13 @@ for(i in 1:sim){
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
-  num_nondiscr[i]<-X$nondiscriminatory
+  num_nondiscr[i]<-mean(X$nondiscriminatory)
 }
 
-mean_pi<-colSums(t(apply(temp_pi,1,sort)))/sim # sort in increasing order, then mean #
-mean_pi<-mean_pi[order(mean_pi)][rank(pi)] # order of true pi
-
-# array of gxk matrices (100 (numsims) of them) of coefficients
-sorted_coefs<-list()
-for(i in 1:sim){
-  sorted_coefs[[i]]<-temp_coefs[[i]][,order(temp_pi[i,])] # sort by increasing order of pi (to align --> take mean) #
-}   # trickier when varying each gene mean
-
-mean_coefs<-Reduce('+',sorted_coefs)/sim # gxk matrix of mean coef's across simulations #
-sorted_means<-matrix(rep(0,times=g*k),nrow=g)
-for(j in 1:g){
-  sorted_means[j,]<-mean_coefs[j,rank(pi)] # order each row according to order of true pi #
-}
-coef1_means<-colSums(sorted_means[1:20,])/nrow(sorted_means[1:20,])
-coef2_means<-colSums(sorted_means[21:200,])/nrow(sorted_means[21:200,])
+mean_pi<-colSums(temp_pi)/sim
+mean_coefs<-Reduce('+',temp_coefs)/sim
+coef1_means<-colSums(mean_coefs[1:100,])/100
+coef2_means<-colSums(mean_coefs[101:200,])/100
 
 mean_ARI<-mean(ARI)
 
