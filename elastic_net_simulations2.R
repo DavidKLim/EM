@@ -5,7 +5,7 @@ library(MASS)
 
 set.seed(24)
 
-n=100
+n=50
 k=3
 g=200
 pi=c(1/3,1/3,1/3)

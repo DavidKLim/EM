@@ -33,6 +33,8 @@ y<-matrix(rep(0,times=g*n),nrow=g)      # initialize count matrix gxn #
 # Prepare new flattened data
 
 z = rmultinom(n,1,init_pi)
+while(any(rowSums(z)==0)){z=rmultinom(n,1,init_pi)}   # makes sure that no one cluster simulated @ 0 membership
+
 for(j in 1:g){
   for(c in 1:k){
     y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c]))
