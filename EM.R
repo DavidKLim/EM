@@ -266,11 +266,11 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   
   m=rep(0,times=g)
   nondiscriminatory=rep(FALSE,times=g)
+  mean_across_clusters<-rowSums(coefs)/ncol(coefs)
+  
   for(j in 1:g){
     for(c in 1:k){
-      for(f in 1:k){
-        if(f>c){if(abs(exp(coefs[j,c])-exp(coefs[j,f]))>5){m[j]=m[j]+1}} # nondiscriminatory threshold: count is off by 5
-      }
+        if(abs(exp(coefs[j,c])-exp(mean_across_clusters))>7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
     }
     if(m[j]==0){nondiscriminatory[j]=TRUE}       # NONDISCRIMINATORY TRUE MEANS GENE IS NOT DISCRIMINATORY ACROSS ALL CLUSTERS (could be across 2)
   }
