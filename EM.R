@@ -264,22 +264,23 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   
   stats<-cluster.stats(d=d,true_clusters,final_clusters) #d is euclidean distance found earlier in cluster init.
   
-  m=rep(0,times=g)
   nondiscriminatory=rep(FALSE,times=g)
+  true_nondiscriminatory=rep(FALSE,times=g)
   mean_across_clusters<-rowSums(coefs)/ncol(coefs)
+  true_mean_across_clusters<-rowSums(b)/ncol(b)
   
   for(j in 1:g){
-    for(c in 1:k){
-        if(abs(exp(coefs[j,c])-exp(mean_across_clusters))>7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
-    }
-    if(m[j]==0){nondiscriminatory[j]=TRUE}       # NONDISCRIMINATORY TRUE MEANS GENE IS NOT DISCRIMINATORY ACROSS ALL CLUSTERS (could be across 2)
+    if(all(abs(exp(b[j,])-exp(true_mean_across_clusters[j]))<7)){true_nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
+    if(all(abs(exp(coefs[j,])-exp(mean_across_clusters[j]))<7)){nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
   }
+  
+  pred.nondiscriminatory<-mean(true_nondiscriminatory==nondiscriminatory)
   
   BIC=-2*Q[a]+log(n)*sum(m)
   
   
   
-  result<-list(pi=pi,coefs=coefs,Q=Q[1:a],ARI=stats$corrected.rand,BIC=BIC,nondiscriminatory=nondiscriminatory)
+  result<-list(pi=pi,coefs=coefs,Q=Q[1:a],ARI=stats$corrected.rand,BIC=BIC,nondiscriminatory=pred.nondiscriminatory)
   #plot(Q[2:a])   # omit the first one due to instability
   return(result)
   
