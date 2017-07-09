@@ -278,7 +278,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     }
   }
   
-  pred.nondiscriminatory<-mean(true_nondiscriminatory==nondiscriminatory)
+  pred.nondiscriminatory<-(true_nondiscriminatory==nondiscriminatory)
   
   BIC=-2*Q[a]+log(n)*sum(m)
   
