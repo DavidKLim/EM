@@ -243,8 +243,8 @@ for(i in 1:sim){
 
 mean_pi<-colSums(temp_pi)/sim
 mean_coefs<-Reduce('+',temp_coefs)/sim
-coef1_means<-colSums(mean_coefs[1:100,])/100
-coef2_means<-colSums(mean_coefs[101:200,])/100
+coef1_means<-colSums(mean_coefs[1:20,])/20
+coef2_means<-colSums(mean_coefs[21:200,])/180
 
 mean_ARI<-mean(ARI)
 
