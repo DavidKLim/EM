@@ -33,7 +33,7 @@ y<-matrix(rep(0,times=g*n),nrow=g)      # initialize count matrix gxn #
 # Prepare new flattened data
 
 z = rmultinom(n,1,init_pi)
-while(any(rowSums(z)==0)){z=rmultinom(n,1,init_pi)}   # makes sure that no one cluster simulated @ 0 membership
+# while(any(rowSums(z)==0)){z=rmultinom(n,1,init_pi)}   # makes sure that no one cluster simulated @ 0 membership (only good for simulations)
 
 for(j in 1:g){
   for(c in 1:k){
@@ -212,6 +212,14 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     for(c in 1:k)
     {
       pi[c]=mean(wts[c,])
+      if(pi[c]<1E-6){
+        warning(paste("cluster proportion", c, "close to 0"))
+        pi[c]=1E-6
+      } # lowerbound for pi
+      if(pi[c]>(1-1E-6)){
+        warning(paste("cluster proportion", c, "close to 1"))
+        pi[c]=(1-1E-6)
+      } # upperbound for pi
     }
     
     
@@ -240,7 +248,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
       wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
     }
     
-    
+    if(a==maxit){finalwts<-wts}
     # print(pi) # print estimated cluster proportions
     
     
@@ -250,12 +258,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   
   
   
-  
-  
-  
-  
-  
-  
+  num_warns=length(warnings())
   
   final_clusters<-rep(0,times=n)
   for(i in 1:n){
@@ -274,17 +277,30 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     if(all(abs(exp(b[j,])-exp(true_mean_across_clusters[j]))<7)){true_nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
     if(all(abs(exp(coefs[j,])-exp(mean_across_clusters[j]))<7)){nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
     for(c in 1:k){
-      if(abs(exp(coefs[j,c])-exp(mean_across_clusters))>7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
+      if(abs(exp(coefs[j,c])-exp(mean_across_clusters[j]))>7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
     }
   }
   
   pred.nondiscriminatory<-(true_nondiscriminatory==nondiscriminatory)
+  init.discriminatory<-which(true_nondiscriminatory==FALSE)
+  init.nondiscriminatory<-which(true_nondiscriminatory==TRUE)
+  sens<-mean(nondiscriminatory[init.discriminatory]==FALSE)    # % of initially discriminatory genes that were kept discriminatory
+  false_pos<-mean(nondiscriminatory[init.nondiscriminatory]==FALSE)  # % of initially nondiscriminatory genes that were kept discriminatory
   
   BIC=-2*Q[a]+log(n)*sum(m)
   
+  cl_accuracy=mean(true_clusters==final_clusters)
   
   
-  result<-list(pi=pi,coefs=coefs,Q=Q[1:a],ARI=stats$corrected.rand,BIC=BIC,nondiscriminatory=pred.nondiscriminatory)
+  result<-list(pi=pi,
+               coefs=coefs,
+               Q=Q[1:a],
+               ARI=stats$corrected.rand,
+               BIC=BIC,
+               nondiscriminatory=pred.nondiscriminatory,
+               cl_accuracy=cl_accuracy,
+               sens=sens,
+               false_pos=false_pos)
   #plot(Q[2:a])   # omit the first one due to instability
   return(result)
   

@@ -3,8 +3,6 @@ setwd("/netscr/deelim")
 source("EM.R")
 library(MASS)
 
-set.seed(24)
-
 n=20
 k=3
 g=200
@@ -23,9 +21,10 @@ temp_coefs<-list()
 ARI<-rep(0,times=sim)
 
 #grid search
-alpha_search=seq(0,1,by=0.25) # 5 elts
-lambda1_search=seq(0.1,1,by=0.1) #lambda1 can't = 0. 10 elts
-lambda2_search=c(0.01,0.05,0.1,0.2,1) # 5 elts
+# alpha_search=seq(0,1,by=0.25) # 5 elts
+alpha_search=1    # rerun with alpha=1
+lambda1_search=c(0.01,0.05, 0.1, 0.2, 0.5, 0.8, 1) #
+lambda2_search=c(0.01,0.05, 0.1, 0.2, 0.5, 0.8, 1) #
 
 list_BIC=matrix(0,nrow=length(alpha_search)*length(lambda1_search)*length(lambda2_search),ncol=4) #matrix of BIC's: alpha x lambda
 
@@ -34,6 +33,7 @@ list_BIC[,2]=rep(rep(lambda1_search,each=length(lambda2_search)),times=length(al
 list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search))
 
 for(aa in 1:nrow(list_BIC)){
+  set.seed(aa)
   list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
   print(list_BIC[aa,])
 }
@@ -46,14 +46,22 @@ max_lambda2<-list_BIC[max_index,3]
 
 num_nondiscr<-rep(0,times=sim)
 
+cl_accuracy<-rep(0,times=sim)
+sens<-rep(0,times=sim)
+false_pos<-rep(0,times=sim)
+
 
 #simulations
 for(i in 1:sim){
+  set.seed(i)
   X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
   num_nondiscr[i]<-mean(X$nondiscriminatory)
+  cl_accuracy[i]<-X$cl_accuracy
+  sens[i]<-X$sens
+  false_pos[i]<-X$false_pos
 }
 
 mean_pi<-colSums(temp_pi)/sim
@@ -76,6 +84,9 @@ print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
 print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
+print(paste("Mean Cluster Accuracy =",mean(cl_accuracy)))
+print(paste("Mean sensitivity =", mean(sens)))
+print(paste("Mean false positive rate =", mean(false_pos)))
 sink()
 
 
@@ -119,9 +130,10 @@ ARI<-rep(0,times=sim)
 
 
 #grid search
-alpha_search=seq(0,1,by=0.25) # 5 elts
-lambda1_search=seq(0.1,1,by=0.1) #lambda1 can't = 0. 10 elts
-lambda2_search=c(0.01,0.05,0.1,0.2,1) # 5 elts
+# alpha_search=seq(0,1,by=0.25) # 5 elts
+alpha_search=1    # rerun with alpha=1
+lambda1_search=c(0.01,0.05, 0.1, 0.2, 0.5, 0.8, 1) #
+lambda2_search=c(0.01,0.05, 0.1, 0.2, 0.5, 0.8, 1) #
 
 list_BIC=matrix(0,nrow=length(alpha_search)*length(lambda1_search)*length(lambda2_search),ncol=4) #matrix of BIC's: alpha x lambda
 
@@ -130,6 +142,7 @@ list_BIC[,2]=rep(rep(lambda1_search,each=length(lambda2_search)),times=length(al
 list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search))
 
 for(aa in 1:nrow(list_BIC)){
+  set.seed(aa)
   list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
   print(list_BIC[aa,])
 }
@@ -142,13 +155,21 @@ max_lambda2<-list_BIC[max_index,3]
 
 num_nondiscr<-rep(0,times=sim)
 
+cl_accuracy<-rep(0,times=sim)
+sens<-rep(0,times=sim)
+false_pos<-rep(0,times=sim)
+
 #simulations
 for(i in 1:sim){
+  set.seed(i)
   X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
   num_nondiscr[i]<-mean(X$nondiscriminatory)
+  cl_accuracy[i]<-X$cl_accuracy
+  sens[i]<-X$sens
+  false_pos[i]<-X$false_pos
 }
 
 mean_pi<-colSums(temp_pi)/sim
@@ -172,6 +193,9 @@ print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
 print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
+print(paste("Mean Cluster Accuracy =",mean(cl_accuracy)))
+print(paste("Mean sensitivity =", mean(sens)))
+print(paste("Mean false positive rate =", mean(false_pos)))
 sink()
 
 
@@ -208,9 +232,10 @@ ARI<-rep(0,times=sim)
 
 
 #grid search
-alpha_search=seq(0,1,by=0.25) # 5 elts
-lambda1_search=seq(0.1,1,by=0.1) #lambda1 can't = 0. 10 elts
-lambda2_search=c(0.01,0.05,0.1,0.2,1) # 5 elts
+# alpha_search=seq(0,1,by=0.25) # 5 elts
+alpha_search=1    # rerun with alpha=1
+lambda1_search=c(0.01,0.05, 0.1, 0.2, 0.5, 0.8, 1) #
+lambda2_search=c(0.01,0.05, 0.1, 0.2, 0.5, 0.8, 1) #
 
 list_BIC=matrix(0,nrow=length(alpha_search)*length(lambda1_search)*length(lambda2_search),ncol=4) #matrix of BIC's: alpha x lambda
 
@@ -219,6 +244,7 @@ list_BIC[,2]=rep(rep(lambda1_search,each=length(lambda2_search)),times=length(al
 list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search))
 
 for(aa in 1:nrow(list_BIC)){
+  set.seed(aa)
   list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
   print(list_BIC[aa,])
 }
@@ -231,14 +257,22 @@ max_lambda2<-list_BIC[max_index,3]
 
 num_nondiscr<-rep(0,times=sim)
 
+cl_accuracy<-rep(0,times=sim)
+sens<-rep(0,times=sim)
+false_pos<-rep(0,times=sim)
+
 #simulations
 
 for(i in 1:sim){
+  set.seed(i)
   X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
   num_nondiscr[i]<-mean(X$nondiscriminatory)
+  cl_accuracy[i]<-X$cl_accuracy
+  sens[i]<-X$sens
+  false_pos[i]<-X$false_pos
 }
 
 mean_pi<-colSums(temp_pi)/sim
@@ -262,4 +296,7 @@ print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
 print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
+print(paste("Mean Cluster Accuracy =",mean(cl_accuracy)))
+print(paste("Mean sensitivity =", mean(sens)))
+print(paste("Mean false positive rate =", mean(false_pos)))
 sink()
