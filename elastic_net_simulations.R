@@ -13,7 +13,8 @@ b=matrix(rep(0,times=k*g),nrow=g,byrow=TRUE) # initialize betas
 #### SIMULATIONS ####
 
 # CASE 1: distinct means, uniform across genes
-b[1:200,]<-mvrnorm(200,mu=c(3,3.5,4),sigma) # betas with very distinct means
+#b[1:200,]<-mvrnorm(200,mu=c(3,3.5,4),sigma) # betas with very distinct means
+b[1:200,]<-matrix(rep(c(3,3.5,4),times=200),nrow=200,byrow=TRUE) # Fixing the means to ensure no nondiscriminatory cases
 
 sim=100
 temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)

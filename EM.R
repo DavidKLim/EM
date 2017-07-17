@@ -284,8 +284,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   pred.nondiscriminatory<-(true_nondiscriminatory==nondiscriminatory)
   init.discriminatory<-which(true_nondiscriminatory==FALSE)
   init.nondiscriminatory<-which(true_nondiscriminatory==TRUE)
-  sens<-mean(nondiscriminatory[init.discriminatory]==FALSE)    # % of initially discriminatory genes that were kept discriminatory
-  false_pos<-mean(nondiscriminatory[init.nondiscriminatory]==FALSE)  # % of initially nondiscriminatory genes that were kept discriminatory
+  sens<-sum(nondiscriminatory[init.discriminatory]==FALSE)/length(init.discriminatory) # # of initially discriminatory genes that were kept unequal means/# of discriminatory genes
+  false_pos<-sum(nondiscriminatory[init.nondiscriminatory]==FALSE)/(g-sum(nondiscriminatory))  # # of initially nondiscriminatory genes that were kept unequal means/# of unequal means
   
   BIC=-2*Q[a]+log(n)*sum(m)
   
