@@ -10,7 +10,7 @@
 [1] "final (alpha,lambda1,lambda2) = 1 0.2 0.05"
 [1] "Mean Cluster Accuracy = 1"
 [1] "Mean sensitivity = 0.954452554744526"
-[1] "Mean false positive rate = 0.0993650793650794"
+[1] "Mean false positive rate = 0.0454686584850326"
 
 [1] "CASE 2: One Small Allocation, Two large allocation"
 [1] "n = 20 , k = 3 , g = 200 , pi = 0.45 0.45 0.1"
@@ -24,7 +24,7 @@
 [1] "final (alpha,lambda1,lambda2) = 1 0.01 0.8"
 [1] "Mean Cluster Accuracy = 0.986"
 [1] "Mean sensitivity = 0.898540145985401"
-[1] "Mean false positive rate = 0.106349206349206"
+[1] "Mean false positive rate = 0.0505898789562804"
 
 [1] "CASE 3: Two Small Allocation, One large allocation"
 [1] "n = 20 , k = 3 , g = 200 , pi = 0.8 0.1 0.1"
@@ -38,4 +38,4 @@
 [1] "final (alpha,lambda1,lambda2) = 1 0.05 0.1"
 [1] "Mean Cluster Accuracy = 0.967"
 [1] "Mean sensitivity = 0.869632352941176"
-[1] "Mean false positive rate = 0.11265625"
+[1] "Mean false positive rate = 0.0577480985998616"

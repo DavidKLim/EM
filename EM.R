@@ -25,21 +25,26 @@ soft_thresholding=function(alpha,lambda){
   }
 }
 
+simulate_data=function(n,k,g,init_pi,b){
+  y<-matrix(rep(0,times=g*n),nrow=g)      # initialize count matrix gxn #
+  # Prepare new flattened data
+  z = rmultinom(n,1,init_pi)
+  # while(any(rowSums(z)==0)){z=rmultinom(n,1,init_pi)}   # makes sure that no one cluster simulated @ 0 membership (only good for simulations)
+  for(j in 1:g){
+    for(c in 1:k){
+      y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c]))
+    }
+  }
+  result<-list(y=y,z=z)
+  return(result)
+}
+
 
 EM<-function(n,k,g,init_pi,b,alpha,lambda1,lambda2){
 
-y<-matrix(rep(0,times=g*n),nrow=g)      # initialize count matrix gxn #
+y<-simulate_data(n,k,g,init_pi,b)$y   #simulation
+z<-simulate_data(n,k,g,init_pi,b)$z
 
-# Prepare new flattened data
-
-z = rmultinom(n,1,init_pi)
-# while(any(rowSums(z)==0)){z=rmultinom(n,1,init_pi)}   # makes sure that no one cluster simulated @ 0 membership (only good for simulations)
-
-for(j in 1:g){
-  for(c in 1:k){
-    y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c]))
-  }
-}
 true_clusters<-rep(0,times=n)
 for(i in 1:n){
   true_clusters[i]<-which(z[,i]==1)
@@ -89,10 +94,10 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   }
   
   vect_wts<-rep(as.vector(wts),times=g)
-  clust_index<-rep(c(1,2,3),times=n*g)
+  clust_index<-rep((1:k),times=n*g)
   dat<-cbind(new_y,clusts,clust_index,gene,vect_wts) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
   
-  colnames(dat)<-c("count","cl1","cl2","cl3","clusts","g","weights") # breaks down k>3
+  colnames(dat)<-c("count","cl1","cl2","cl3","clusts","g","weights") # breaks down k!=3 (****************NEED FIX ****************************)
   
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   
