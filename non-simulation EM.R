@@ -28,7 +28,7 @@ soft_thresholding=function(alpha,lambda){
 
 
 
-EM<-function(y,k,alpha,lambda1,lambda2){
+EM<-function(y,k,lambda1,lambda2){
 
 n<-ncol(y)
 g<-nrow(y)
@@ -123,8 +123,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         # update on theta
         for(c in 1:k){
           for(cc in 1:k){
-            #theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],lambda2/lambda1)   # original Wei Pan Lasso
-            theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],alpha*lambda2)/(1+(lambda2/lambda1)*(1-alpha))   # elastic net
+            theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],lambda2/lambda1)   # original Wei Pan Lasso
           }
         }
         
