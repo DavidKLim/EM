@@ -57,7 +57,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   clust_index<-rep((1:k),times=n*g)
   dat<-cbind(new_y,clusts,clust_index,gene,vect_wts) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
   
-  colnames(dat)<-c("count","cl1","cl2","clusts","g","weights") # breaks down k!=3
+  colnames(dat)[1]<-c("count")
+  colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights")
   
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   
