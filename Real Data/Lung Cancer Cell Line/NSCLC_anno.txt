@@ -1,0 +1,24 @@
+Cell.Line	Adeno.Squamous	MIB.1.date	MIB.2.date	MIB.3.date	Batch.number	MS.status	MS.code.1	MS.code.2	MS.code.3	Tumor.location	M.F	Race	Age	Stage	Comments	KRAS.mut	p53.mut	PIK3CA.mut	KEAP1.mut	EGFR.mut	EML4.ALK.fusion
+A427	adenocarcinoma	2015-06-15	2015-06-24	2015-06-27	4	shot	MA1193	MA1198	MA1203	lung	M	Caucasian	52	NA		G12D					
+A549	adenocarcinoma	2015-04-22	2015-04-27	2015-05-07	1	shot	MA1125	MA1129	MA1133	lung	M	Caucasian	58	NA		G12S			G333C		
+DETROIT562	squamous	2015-05-27	2015-06-05	2015-06-09	2	shot	MA1165	MA1170	MA1175	pharynx	F			NA			R175H				
+FADU	squamous	2015-05-27	2015-06-05	2015-06-09	2	shot	MA1164	MA1169	MA1174	pharynx	M	Caucasian	56	NA			R248L, V225splice 				
+H1299	adenocarcinoma	2015-06-15	2015-06-24	2015-06-27	4	shot	MA1196	MA1201	MA1207	lung	M	Caucasian	43	NA	no expression of p53 (homo small del of p53)						
+H1395	adenocarcinoma	2015-10-21	2015-10-27	2015-11-05	5	shot	MA1332	MA1333	MA1334	lung	F	Caucasian	55	2	15 pack-year smoker				G350S (het)		
+H1703	adenocarcinoma	2015-04-22	2015-04-27	2015-05-07	1	shot	MA1127	MA1131	MA1135	lung	M	Caucasian	54	NA	50 pack-year smoker						
+H2126	adenocarcinoma	2015-06-15	2015-06-24	2015-06-27	3	shot	MA1187	MA1188	MA1189	lung	M	Caucasian	65	NA			E62*		R272C		
+H2170	adenocarcinoma	2015-07-07	2015-07-23	2015-07-30	3	shot	MA1190	MA1191	MA1192	lung	M			NA	nonsmoker		R158G	I391M	R336*		
+H2228	adenocarcinoma	2015-04-22	2015-04-27	2015-05-07	1	shot	MA1128	MA1132	MA1136	lung	F			NA	nonsmoker		Q331*				yes
+H358	adenocarcinoma	2015-06-15	2015-06-24	2015-06-27	4	shot	MA1194	MA1199	MA1204	lung/bronchiole	M			NA		G12C					
+H441	adenocarcinoma	2015-06-15	2015-06-24	2015-06-27	4	shot	MA1195	MA1200	MA1206	lung	M			NA		G12D	R158L				
+H520	squamous	2015-05-27	2015-06-05	2015-06-09	2	shot	MA1167	MA1172	MA1177	lung	M			NA			W146*				
+H522	adenocarcinoma	2015-07-07	2015-07-23	2015-07-30	7	shot	MA1209	MA1211	MA1216	lung	M	Caucasian	58	2	60 pack-year smoker		P191fs				
+H596	squamous	2015-04-22	2015-04-27	2015-05-07	1	shot	MA1126	MA1130	MA1134	lung	M	Caucasian	73	NA			G245C 	E545K 			
+HCC827	adenocarcinoma	2015-10-21	2015-10-27	2015-11-05	5	shot	MA1326	MA1327	MA1328	lung	F	Caucasian	39	NA	1 pack year smoker					E746-A750 del	
+KYSE30	squamous	2015-06-15	2015-06-24	2015-06-27	4	shot	MA1197	MA1202	MA1208	esophagus	M	Asian	64	NA			E326K, V225splice 				
+OE21	squamous	2015-08-18	2015-08-27	2015-09-02	6	shot	MA1338	MA1339	MA1340	esophagus	M	Caucasian	74	NA							
+PC9	adenocarcinoma	2015-08-18	2015-09-08	2015-09-09	6	shot	MA1335	MA1336	MA1337	lung				NA						exon 19 del	
+SCC15	squamous	2015-07-07	2015-07-23	2015-07-30	7	shot	MA1210	MA1215	MA1217	tongue	M		55	NA			E224splice				
+SCC25	squamous	2015-08-18	2015-08-27	2015-09-02	6	shot	MA1341	MA1342	MA1343	tongue	M		70	NA			R209fs* 				
+SKMES1	squamous	2015-05-27	2015-06-05	2015-06-09	2	shot	MA1166	MA1171	MA1176	lung	M	Caucasian	65	NA			E298* 				
+SW900	adenocarcinoma	2016-05-03	2016-05-04	2016-05-09	9	shot	MA1354	MA1357	MA1360	lung	M	Caucasian	53	4		G12V	Q167*				

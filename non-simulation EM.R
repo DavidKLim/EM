@@ -52,7 +52,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   for(c in 1:k){
     wts[c,]=(cls==c)^2
   }
-  
+    
   vect_wts<-rep(as.vector(wts),times=g)
   clust_index<-rep((1:k),times=n*g)
   dat<-cbind(new_y,clusts,clust_index,gene,vect_wts) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
@@ -87,7 +87,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     
     # IRWLS:
     
-    maxit_IRLS=1000
+    maxit_IRLS=100
     for(j in 1:g){
       if(a>1) {eta<-coefs[j,]} else {eta<-rep(log(mean(as.numeric(y[j,]))),times=k)}
       temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)
