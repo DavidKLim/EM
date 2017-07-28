@@ -28,13 +28,14 @@ soft_thresholding=function(alpha,lambda){
 
 
 
-EM<-function(y,k,lambda1,lambda2){
+EM<-function(y,k,lambda1,lambda2,size_factors){
 
 n<-ncol(y)
 g<-nrow(y)
 
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
+new_size_factors<-rep(rep(size_factors,each=k),times=g)    ############## corresponding size factors for each entry in trans. data #
 gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
 clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
@@ -55,10 +56,10 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     
   vect_wts<-rep(as.vector(wts),times=g)
   clust_index<-rep((1:k),times=n*g)
-  dat<-cbind(new_y,clusts,clust_index,gene,vect_wts) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
+  dat<-cbind(new_y,clusts,clust_index,gene,vect_wts,new_size_factors) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
   
   colnames(dat)[1]<-c("count")
-  colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights")
+  colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights","size_factors")
   
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   
@@ -111,7 +112,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           X<-dat_gc[,c+1]
           W<-diag(rep(mu[c],times=n))
           trans_y<-rep(0,times=n)
-          trans_y<-eta[c]+dat_gc[,"weights"]*(dat_gc[,"count"]-mu[c])/mu[c]
+          trans_y<-eta[c]+dat_gc[,"weights"]*(dat_gc[,"count"]-mu[c])/mu[c] + log(dat_gc[,"size_factors"])
         
           #eta_update<-ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y    #no penalty
           #eta_update<-(lambda*(sum(eta)-eta[c])-trans_y %*% W %*% X)/(2*lambda-n*mu[c]) # penalty all wrong
