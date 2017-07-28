@@ -243,7 +243,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
                coefs=coefs,
                Q=Q[1:a],
                BIC=BIC,
-               nondiscriminatory=pred.nondiscriminatory)
+               nondiscriminatory=pred.nondiscriminatory,
+               final_clusters=final_clusters)
   #plot(Q[2:a])   # omit the first one due to instability
   return(result)
   

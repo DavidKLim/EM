@@ -12,8 +12,8 @@ y<-y[(rowSums(y)>=100),]
 y<-round(y,digits=0)
 # k=2        # known
 
-cts<-as.matrix(y)
-rownames(cts)<-toupper(y[,1])
+cts<-as.matrix(dat[,-1])
+rownames(cts)<-toupper(dat[,1])
 colnames(cts)<-toupper(colnames(cts))
 coldata<-anno[,-1]
 
@@ -26,11 +26,8 @@ all(rownames(coldata) == colnames(cts))
 
 dds<-DESeqDataSetFromMatrix(countData = cts,
                             colData = coldata,
-                            design = ~ Adeno.Squamous)
+                            design = ~ 1)
 
 dds
-dds <- dds[ rowSums(counts(dds)) > 1, ]
 DESeq_dds<-DESeq(dds)
-res<-results(DESeq_dds)
-
 size_factors<-sizeFactors(DESeq_dds)
