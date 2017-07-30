@@ -13,11 +13,13 @@ library("DESeq2")
 
 anno<-read.table("NSCLC_anno.txt",sep="\t",header=TRUE)
 dat<-read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
-rownames(cts)<-toupper(dat[,1])
+row_names<-toupper(dat[,1])
 dat<-round(dat[,-1],digits=0)
 
 # DESeq2 to find size factors
 cts<-as.matrix(dat)
+rownames(cts)<-row_names
+
 colnames(cts)<-toupper(colnames(cts))
 coldata<-anno[,-1]
 rownames(coldata)<-toupper(anno[,1])
@@ -31,22 +33,25 @@ DESeq_dds<-DESeq(dds)
 size_factors<-sizeFactors(DESeq_dds)
 
 
+
+
 # initial clean-up of data and pre-filtering to include only genes with >=100 count
-y<-dat[,-1]
+dat<-read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
+y<-round(dat[,-1],digits=0)
 rownames(y)<-dat[,1]
 y<-y[(rowSums(y)>=100),]
 
 
 # filtering genes to have top 500 MAD (median absolute deviation): optional
-#med_abs_dev<-rep(0,times=nrow(y))
-#for(j in 1:nrow(y)){
-#  med_abs_dev[j]<-mad(as.numeric(y[j,]),constant=1)
-#}
-#y<-cbind(rownames(y),y,med_abs_dev)
-#subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,500)]
-#genes_y<-subs_y[,1]
-#subs_y<-subs_y[,-1]
-#subs_y<-as.data.frame(subs_y[,-ncol(subs_y)])
+med_abs_dev<-rep(0,times=nrow(y))
+for(j in 1:nrow(y)){
+  med_abs_dev[j]<-mad(as.numeric(y[j,]),constant=1)
+}
+y<-cbind(rownames(y),y,med_abs_dev)
+subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,5000)]
+genes_y<-subs_y[,1]
+subs_y<-subs_y[,-1]
+subs_y<-as.data.frame(subs_y[,-24])
 
 
 
@@ -64,11 +69,11 @@ list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(K_search))
 list_BIC[,2]=rep(lambda2_search,times=length(lambda1_search)*length(K_search))
 list_BIC[,3]=rep(rep(K_search,each=length(lambda1_search)),times=length(lambda2_search))
 
-clusterExport(cl,c("y","size_factors","list_BIC","EM","logsumexpc","soft_thresholding"))
+clusterExport(cl,c("subs_y","y","size_factors","list_BIC","EM","logsumexpc","soft_thresholding"))
 
 extract_BIC<-function(row){
   print(paste("lambda1 =",list_BIC[row,1],"and lambda2 =",list_BIC[row,2],"and K =",list_BIC[row,3]))
-  X<-EM(y=y,k=list_BIC[row,3],lambda1=list_BIC[row,1],lambda2=list_BIC[row,2],size_factors=size_factors)
+  X<-EM(y=subs_y,k=list_BIC[row,3],lambda1=list_BIC[row,1],lambda2=list_BIC[row,2],size_factors=size_factors)
   print(X$pi)
   print(X$BIC)
   print(X$nondiscriminatory)
@@ -91,7 +96,7 @@ max_k<-list_BIC[max_index,3]
 
 
 # actual run:
-X<-EM(y=y,k=max_k,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors)
+X<-EM(y=subs_y,k=max_k,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors)
 
 
 stopCluster(cl)

@@ -231,9 +231,9 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   mean_across_clusters<-rowSums(coefs)/ncol(coefs)
   
   for(j in 1:g){
-    if(all(abs(exp(coefs[j,])-exp(mean_across_clusters[j]))<7)){nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
+    if(all(abs(coefs[j,]-mean_across_clusters[j])<0.7)){nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
     for(c in 1:k){
-      if(abs(exp(coefs[j,c])-exp(mean_across_clusters[j]))>7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
+      if(abs(coefs[j,c]-mean_across_clusters[j])>0.7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
     }
   }
   
