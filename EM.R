@@ -40,7 +40,7 @@ simulate_data=function(n,k,g,init_pi,b){
 }
 
 
-EM<-function(n,k,g,init_pi,b,alpha,lambda1,lambda2){
+EM<-function(n,k,g,init_pi,b,lambda1,lambda2){
 
 y<-simulate_data(n,k,g,init_pi,b)$y   #simulation
 z<-simulate_data(n,k,g,init_pi,b)$z
@@ -150,7 +150,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           X<-dat_gc[,c+1]
           W<-diag(rep(mu[c],times=n))
           trans_y<-rep(0,times=n)
-          trans_y<-eta[c]+dat_gc[,"weights"]*(dat_gc[,"count"]-mu[c])/mu[c]
+          size_factors<-seq(from=1,to=2-1/n,by=1/n)
+          trans_y<-eta[c]+dat_gc[,"weights"]*(dat_gc[,"count"]-mu[c])/mu[c] + log(size_factors)
         
           #eta_update<-ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y    #no penalty
           #eta_update<-(lambda*(sum(eta)-eta[c])-trans_y %*% W %*% X)/(2*lambda-n*mu[c]) # penalty all wrong
@@ -168,8 +169,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         # update on theta
         for(c in 1:k){
           for(cc in 1:k){
-            #theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],lambda2/lambda1)   # original Wei Pan Lasso
-            theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],alpha*lambda2)/(1+(lambda2/lambda1)*(1-alpha))   # elastic net
+            theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],lambda2/lambda1)   # original Wei Pan Lasso
           }
         }
         

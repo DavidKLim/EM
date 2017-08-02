@@ -44,8 +44,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   # Clustering
   d<-dist(t(y))
   model<-hclust(d)
-  cls<-cutree(model,k=k)
-  #cls<-sample(1:k,n,replace=TRUE) #random initialization
+  #cls<-cutree(model,k=k)
+  cls<-sample(1:k,n,replace=TRUE) #random initialization
   
   
   # initialize weights
@@ -184,7 +184,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     }
     
     
-    # log(f_k(y_i)): summing over all j
+    # log(f_k(y_i))
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
@@ -250,4 +250,3 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   return(result)
   
 }
-

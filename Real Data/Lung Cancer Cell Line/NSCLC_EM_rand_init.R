@@ -1,11 +1,11 @@
 #setwd("C:/Users/David/Desktop/Research/GitHub/EM/Real Data/Lung Cancer Cell Line")
 setwd("/netscr/deelim")
 #source("C:/Users/David/Desktop/Research/GitHub/EM/non-simulation EM.R")
-source("non-simulation EM.R")
+source("non-simulation_EM_rand_init.R")
 library("parallel")
 
 no_cores<-detectCores()-1
-cl<-makeCluster(no_cores,outfile="NSCLC_EM_cluster_output.txt")
+cl<-makeCluster(no_cores,outfile="NSCLC_EM_rand_init_cluster_output.txt")
 
 library("stats")
 library("data.table")
@@ -48,7 +48,7 @@ for(j in 1:nrow(y)){
   med_abs_dev[j]<-mad(as.numeric(y[j,]),constant=1)
 }
 y<-cbind(rownames(y),y,med_abs_dev)
-subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,100)]
+subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,5000)]
 genes_y<-subs_y[,1]
 subs_y<-subs_y[,-1]
 subs_y<-as.data.frame(subs_y[,-24])
@@ -99,7 +99,7 @@ X<-EM(y=subs_y,k=max_k,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size
 stopCluster(cl)
 
 # summarize output #
-sink("NSCLC_EM.txt",append=FALSE)
+sink("NSCLC_EM_rand_init.txt",append=FALSE)
 print("Results")
 print(paste("pi =",X$pi))
 print(paste("mean % of nondiscriminatory genes =",X$nondiscriminatory))
@@ -107,7 +107,7 @@ print(paste("final (lambda1,lambda2) =",max_lambda1,max_lambda2))
 print(paste("final clusters:",X$final_clusters))
 sink()
 
-sink("NSCLC_EM_coefs.txt",append=FALSE)
+sink("NSCLC_EM_coefs_rand_init.txt",append=FALSE)
 print("coefs")
 print(X$coefs)
 sink()
