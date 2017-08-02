@@ -150,7 +150,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           X<-dat_gc[,c+1]
           W<-diag(rep(mu[c],times=n))
           trans_y<-rep(0,times=n)
-          size_factors<-seq(from=1,to=2-1/n,by=1/n)
+          
+          size_factors<-sample(size_factors,n,replace=FALSE)
           trans_y<-eta[c]+dat_gc[,"weights"]*(dat_gc[,"count"]-mu[c])/mu[c] + log(size_factors)
         
           #eta_update<-ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y    #no penalty

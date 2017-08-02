@@ -4,6 +4,8 @@ library(stats)
 library(MASS)
 library(fpc)
 library(permute)
+library(flexclust)
+library(amap)
 
 
 logsumexpc=function(v){  
@@ -41,10 +43,20 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
 # EM
   
-  # Clustering
-  d<-dist(t(y))
-  model<-hclust(d)
+  # Initial Clustering
+  #d<-dist(t(y))                               ##Euclidean distance##
+  d<-Dist(t(log(y+0.001)),method="spearman")   ##Spearman correlation distance w/ log transform##
+  model<-hclust(d)       # hierarchical clustering
   cls<-cutree(model,k=k)
+  
+  #model<-cclust(t(y),k=2) # convex clustering
+  #model<-kcca(t(y),k=2)   # K-means
+  #model<-kcca(t(y),k=2,family=kccaFamily("kmedians"))   # K-medians
+  #model<-kcca(t(y),k=2,family=kccaFamily("angle"))
+  #model<-kcca(t(y),k=2,family=kccaFamily("jaccard"))
+  #model<-kcca(t(y),k=2,family=kccaFamily("ejaccard"))
+  #cls<-predict(model)
+  
   #cls<-sample(1:k,n,replace=TRUE) #random initialization
   
   
@@ -238,7 +250,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   }
   
   pred.nondiscriminatory<-mean(nondiscriminatory)
-  BIC=-2*Q[a]+log(n)*sum(m)
+  BIC=-2*sum(l)+log(n)*sum(m)
   
   result<-list(pi=pi,
                coefs=coefs,

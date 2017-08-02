@@ -60,14 +60,14 @@ subs_y<-as.data.frame(subs_y[,-24])
 # grid search for tuning params lambda1 and lambda2 and K
 
 lambda1_search=c(0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 1)
-lambda2_search=c(0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 1)
+lambda2_search=c(0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2)
 K_search=c(2:6)
 
 list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(K_search),ncol=4) #matrix of BIC's: lambda1 and lambda2 and K, 49*5 combinations
 
 list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(K_search))
 list_BIC[,2]=rep(lambda2_search,times=length(lambda1_search)*length(K_search))
-list_BIC[,3]=rep(rep(K_search,each=length(lambda1_search)),times=length(lambda2_search))
+list_BIC[,3]=rep(rep(K_search,each=length(lambda2_search)),times=length(lambda1_search))
 
 clusterExport(cl,c("subs_y","y","size_factors","list_BIC","EM","logsumexpc","soft_thresholding"))
 

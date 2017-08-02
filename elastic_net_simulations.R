@@ -35,13 +35,12 @@ list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search
 
 for(aa in 1:nrow(list_BIC)){
   set.seed(aa)
-  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
+  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
   print(list_BIC[aa,])
 }
 
 max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
 
-max_alpha<-list_BIC[max_index,1]
 max_lambda1<-list_BIC[max_index,2]
 max_lambda2<-list_BIC[max_index,3]
 
@@ -55,7 +54,7 @@ false_pos<-rep(0,times=sim)
 #simulations
 for(i in 1:sim){
   set.seed(i)
-  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
+  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
@@ -84,7 +83,7 @@ print(paste("mean_coefs =",coef1_means[1],coef1_means[2],coef1_means[3])) # in v
 print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
-print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
+print(paste("final (lambda1,lambda2) =",max_lambda1,max_lambda2))
 print(paste("Mean Cluster Accuracy =",mean(cl_accuracy)))
 print(paste("Mean sensitivity =", mean(sens)))
 print(paste("Mean false positive rate =", mean(false_pos)))
@@ -144,13 +143,12 @@ list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search
 
 for(aa in 1:nrow(list_BIC)){
   set.seed(aa)
-  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
+  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
   print(list_BIC[aa,])
 }
 
 max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
 
-max_alpha<-list_BIC[max_index,1]
 max_lambda1<-list_BIC[max_index,2]
 max_lambda2<-list_BIC[max_index,3]
 
@@ -163,7 +161,7 @@ false_pos<-rep(0,times=sim)
 #simulations
 for(i in 1:sim){
   set.seed(i)
-  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
+  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
@@ -193,7 +191,7 @@ print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
 print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
-print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
+print(paste("final (lambda1,lambda2) =",max_lambda1,max_lambda2))
 print(paste("Mean Cluster Accuracy =",mean(cl_accuracy)))
 print(paste("Mean sensitivity =", mean(sens)))
 print(paste("Mean false positive rate =", mean(false_pos)))
@@ -246,13 +244,12 @@ list_BIC[,3]=rep(lambda2_search,times=length(alpha_search)*length(lambda1_search
 
 for(aa in 1:nrow(list_BIC)){
   set.seed(aa)
-  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=list_BIC[aa,1],lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
+  list_BIC[aa,4]<-EM(n=n,k=k,g=g,init_pi=pi,b=b,lambda1=list_BIC[aa,2],lambda2=list_BIC[aa,3])$BIC
   print(list_BIC[aa,])
 }
 
 max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
 
-max_alpha<-list_BIC[max_index,1]
 max_lambda1<-list_BIC[max_index,2]
 max_lambda2<-list_BIC[max_index,3]
 
@@ -266,7 +263,7 @@ false_pos<-rep(0,times=sim)
 
 for(i in 1:sim){
   set.seed(i)
-  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,alpha=max_alpha,lambda1=max_lambda1,lambda2=max_lambda2)
+  X<-EM(n=n,k=k,g=g,init_pi=pi,b=b,lambda1=max_lambda1,lambda2=max_lambda2)
   temp_pi[i,]<-X$pi
   temp_coefs[[i]]<-X$coefs
   ARI[i]<-X$ARI
@@ -296,7 +293,7 @@ print(paste("mean_coefs2 =",coef2_means[1],coef2_means[2],coef2_means[3]))
 print(paste("mean_ARI =",mean_ARI)) # mean of corrected rand index
 print(paste("SSE_estimates =",SSE_estims)) # sum of square errors of all estimated parameters (pi and coefs)
 print(paste("mean % of nondiscriminatory genes =",mean(num_nondiscr)))
-print(paste("final (alpha,lambda1,lambda2) =",max_alpha,max_lambda1,max_lambda2))
+print(paste("final (lambda1,lambda2) =",max_lambda1,max_lambda2))
 print(paste("Mean Cluster Accuracy =",mean(cl_accuracy)))
 print(paste("Mean sensitivity =", mean(sens)))
 print(paste("Mean false positive rate =", mean(false_pos)))
