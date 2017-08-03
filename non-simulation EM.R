@@ -6,6 +6,7 @@ library(fpc)
 library(permute)
 library(flexclust)
 library(amap)
+library(gplots)
 
 
 logsumexpc=function(v){  
@@ -45,8 +46,11 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   
   # Initial Clustering
   #d<-dist(t(y))                               ##Euclidean distance##
-  d<-Dist(t(log(y+0.001)),method="spearman")   ##Spearman correlation distance w/ log transform##
-  model<-hclust(d)       # hierarchical clustering
+  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+  model<-hclust(d,method="complete")       # hierarchical clustering
+  #col<-rep("",times=ncol(y))
+  #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
+  #heatmap.2(as.matrix(norm_y), Rowv=as.dendrogram(model), Colv=as.dendrogram(model),ColSideColors=col)
   cls<-cutree(model,k=k)
   
   #model<-cclust(t(y),k=2) # convex clustering

@@ -32,6 +32,7 @@ dds<-DESeqDataSetFromMatrix(countData = cts,
 DESeq_dds<-DESeq(dds)
 size_factors<-sizeFactors(DESeq_dds)
 
+norm_y<-counts(DESeq_dds,normalized=TRUE)
 
 
 
@@ -48,7 +49,7 @@ for(j in 1:nrow(y)){
   med_abs_dev[j]<-mad(as.numeric(y[j,]),constant=1)
 }
 y<-cbind(rownames(y),y,med_abs_dev)
-subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,100)]
+subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,5000)]
 genes_y<-subs_y[,1]
 subs_y<-subs_y[,-1]
 subs_y<-as.data.frame(subs_y[,-24])
@@ -69,7 +70,7 @@ list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(K_search))
 list_BIC[,2]=rep(lambda2_search,times=length(lambda1_search)*length(K_search))
 list_BIC[,3]=rep(rep(K_search,each=length(lambda2_search)),times=length(lambda1_search))
 
-clusterExport(cl,c("subs_y","y","size_factors","list_BIC","EM","logsumexpc","soft_thresholding"))
+clusterExport(cl,c("subs_y","y","size_factors","norm_y","list_BIC","EM","logsumexpc","soft_thresholding"))
 
 extract_BIC<-function(row){
   X<-EM(y=subs_y,k=list_BIC[row,3],lambda1=list_BIC[row,1],lambda2=list_BIC[row,2],size_factors=size_factors)
