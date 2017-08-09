@@ -31,7 +31,7 @@ soft_thresholding=function(alpha,lambda){
 
 
 
-EM<-function(y,k,lambda1,lambda2,size_factors){
+EM<-function(y,k,lambda1,lambda2,tau,size_factors){
 
 n<-ncol(y)
 g<-nrow(y)
@@ -105,6 +105,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     # IRWLS:
     
     maxit_IRLS=100
+    theta_list<-list()
+    
     for(j in 1:g){
       if(a>1) {eta<-coefs[j,]} else {eta<-rep(log(mean(as.numeric(y[j,]))),times=k)}
       temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)
@@ -141,7 +143,8 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         # update on theta
         for(c in 1:k){
           for(cc in 1:k){
-            theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],lambda2/lambda1)   # original Wei Pan Lasso
+            if(theta[c,cc]>=tau){theta[c,cc]<-eta[c]-eta[cc]}                      # gTLP from Pan paper
+            else{theta[c,cc]<-soft_thresholding(eta[c]-eta[cc],lambda2/lambda1)}   # 
           }
         }
         
@@ -149,10 +152,14 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         if(i>1){
           if(sum((temp[i,]-temp[i-1,])^2)<1E-7){
             coefs[j,]<-eta
+            theta_list[[j]]<-theta
             break
           }
         }
-        if(i==maxit_IRLS){coefs[j,]<-eta}
+        if(i==maxit_IRLS){
+          coefs[j,]<-eta
+          theta_list[[j]]<-theta
+          }
       }
     }
         ##########
@@ -186,8 +193,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     
     
     # update on pi_hat
-    for(c in 1:k)
-    {
+    for(c in 1:k){
       pi[c]=mean(wts[c,])
       if(pi[c]<1E-6){
         warning(paste("cluster proportion", c, "close to 0"))
@@ -211,7 +217,16 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     # store and check stopping criterion
     pt1<-(log(pi)%*%rowSums(wts))
     pt2<-sum(wts*l)
-    Q[a]<-pt1+pt2
+    pt3<-0
+    for(j in 1:g){
+      for(c in 1:k){
+        if(c>1){for(cc in 1:(c-1)){
+          pt3 = pt3 + (lambda1/2)*(coefs[j,cc]-coefs[j,c]-theta_list[[j]][cc,c])^2 +
+            lambda2*abs(theta_list[[j]][cc,c])
+        }}
+      }
+    }
+    Q[a]<-pt1+pt2-pt3
     if(a>10){if(abs(Q[a]-Q[a-10])<1E-5) {
       finalwts<-wts
       break
@@ -260,7 +275,7 @@ clusts<-matrix(rep(diag(k),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
                coefs=coefs,
                Q=Q[1:a],
                BIC=BIC,
-               nondiscriminatory=pred.nondiscriminatory,
+               nondiscriminatory=nondiscriminatory,
                final_clusters=final_clusters)
   #plot(Q[2:a])   # omit the first one due to instability
   return(result)

@@ -60,21 +60,25 @@ subs_y<-as.data.frame(subs_y[,-24])
 
 # grid search for tuning params lambda1 and lambda2 and K
 
-lambda1_search=c(0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 1)
-lambda2_search=c(0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 1, 1.5, 2)
+#lambda1_search=seq(from=1, to=10001,by=1000)
+#lambda2_search=seq(from=1, to=10001, by=1000)
+lambda1_search=c(0.01,0.05,0.1,0.2,1)
+lambda2_search=c(0.01,0.05,0.1,0.2,1)
+tau_search=seq(from=0.1,to=1,by=0.1)
 K_search=c(2:6)
 
-list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(K_search),ncol=4) #matrix of BIC's: lambda1 and lambda2 and K, 49*5 combinations
+list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(K_search)*length(tau_search),ncol=5) #matrix of BIC's: lambda1 and lambda2 and K, 49*5 combinations
 
-list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(K_search))
-list_BIC[,2]=rep(lambda2_search,times=length(lambda1_search)*length(K_search))
-list_BIC[,3]=rep(rep(K_search,each=length(lambda2_search)),times=length(lambda1_search))
+list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(K_search)*length(tau_search))
+list_BIC[,2]=rep(rep(lambda2_search,each=length(K_search)*length(tau_search)),times=length(lambda1_search))
+list_BIC[,3]=rep(rep(K_search,each=length(tau_search)),times=length(lambda1_search)*length(lambda2_search))
+list_BIC[,4]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search)*length(K_search))
 
 clusterExport(cl,c("subs_y","y","size_factors","norm_y","list_BIC","EM","logsumexpc","soft_thresholding"))
 
 extract_BIC<-function(row){
-  X<-EM(y=subs_y,k=list_BIC[row,3],lambda1=list_BIC[row,1],lambda2=list_BIC[row,2],size_factors=size_factors)
-  print(paste("lambda1 =",list_BIC[row,1],"and lambda2 =",list_BIC[row,2],"and K =",list_BIC[row,3],"pi=",X$pi,"BIC=",X$BIC,"nondisc=",X$nondiscriminatory))
+  X<-EM(y=subs_y,k=list_BIC[row,3],lambda1=list_BIC[row,1],lambda2=list_BIC[row,2],tau=list_BIC[row,4],size_factors=size_factors)
+  print(paste("lambda1 =",list_BIC[row,1],"and lambda2 =",list_BIC[row,2],"and K =",list_BIC[row,3],"and tau =",list_BIC[row,4],"pi=",X$pi,"BIC=",X$BIC,"nondisc=",X$nondiscriminatory))
   return(X$BIC)
 }
 
@@ -82,19 +86,21 @@ clusterExport(cl,"extract_BIC")
 
 
 # actual grid search run
-list_BIC[,4]<-parSapply(cl,1:nrow(list_BIC),extract_BIC)
+list_BIC[,5]<-parSapply(cl,1:nrow(list_BIC),extract_BIC)
 
 
 # storing optimal BIC index & optimal parameters
-max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
+max_index<-which(list_BIC[,5]==min(list_BIC[,5]))
 
 max_lambda1<-list_BIC[max_index,1]
 max_lambda2<-list_BIC[max_index,2]
 max_k<-list_BIC[max_index,3]
+max_tau<-list_BIC[max_index,4]
 
+print(paste("lambda1, lambda2, k, tau =", max_lambda1, max_lambda2, max_k, max_tau))
 
 # actual run:
-X<-EM(y=subs_y,k=max_k,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors)
+X<-EM(y=subs_y,k=max_k,lambda1=max_lambda1,lambda2=max_lambda2,tau=max_tau,size_factors=size_factors)
 
 
 stopCluster(cl)
