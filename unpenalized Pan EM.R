@@ -37,8 +37,8 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 # EM
   
   # Initial Clustering
-  #d<-dist(t(y))                               ##Euclidean distance##
-  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+  d<-dist(t(y))                               ##Euclidean distance##
+  #d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
   model<-hclust(d,method="complete")       # hierarchical clustering
   #col<-rep("",times=ncol(y))
   #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
@@ -196,6 +196,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     for(c in 1:k){
       if(abs(coefs[j,c]-mean_across_clusters[j])>0.7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
     }
+    if(m[j]==0){m[j]=1}
   }
   
   pred.nondiscriminatory<-mean(nondiscriminatory)
@@ -203,7 +204,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
   log_L<-sum(apply(log(pi)+l,2,logsumexpc))    # need to check
   
-  BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best
+  BIC=-2*log_L+log(n*g)*(k*g+(g+k-1))         # -2log(L) + log(#obs)*(#parameters estimated: sigma_j + mixture proportions + nonzero coefs (sum(m))??? or all coefs(k*g)). minimum = best
   
   result<-list(pi=pi,
                coefs=coefs,

@@ -1,4 +1,4 @@
-#setwd("C:/Users/David/Desktop/Research/GitHub/EM/Real Data/Lung Cancer Cell Line")
+setwd("C:/Users/David/Desktop/Research/GitHub/EM/Real Data/Lung Cancer Cell Line")
 setwd("/netscr/deelim")
 library("parallel")
 
@@ -22,8 +22,8 @@ colnames(cts)<-toupper(colnames(cts))
 coldata<-anno[,-1]
 rownames(coldata)<-toupper(anno[,1])
 coldata<-coldata[,c("Adeno.Squamous","Tumor.location")]
-all(rownames(coldata) %in% colnames(cts))
-all(rownames(coldata) == colnames(cts))
+#all(rownames(coldata) %in% colnames(cts))         # check that headers are correct
+#all(rownames(coldata) == colnames(cts))
 dds<-DESeqDataSetFromMatrix(countData = cts,
                             colData = coldata,
                             design = ~ 1)

@@ -4,9 +4,9 @@ source("non-simulation EM.R")   # Pan method
 library(MASS)
 
 n=20
-k=1
-g=1
-pi=1
+k=4
+g=500
+pi=c(0.3,0.3,0.2,0.2)
 sigma=diag(k)
 b=matrix(rep(0,times=k*g),nrow=g,byrow=TRUE) # initialize betas
 
@@ -14,10 +14,11 @@ b=matrix(rep(0,times=k*g),nrow=g,byrow=TRUE) # initialize betas
 #### SIMULATIONS ####
 
 # CASE 1: distinct means, uniform across genes
-b[1:200,]<-mvrnorm(200,mu=c(10,11,11.5),sigma) # betas with very distinct means
-b[1:200,]<-matrix(rep(c(10,11,11.5),times=200),nrow=200,byrow=TRUE) # Fixing the means to ensure no nondiscriminatory cases
-b[1:50,]<-mvrnorm(50,mu=c(10,10,10),sigma)
-b[1:50,]<-matrix(rep(c(10,10,10),times=50),nrow=50)
+b[1:500,]<-mvrnorm(500,mu=c(10,10.5,11,11.5),sigma) # betas with very distinct means
+b[1:250,]<-mvrnorm(250,mu=c(9.5,9.5,9.5,9.5),sigma)
+
+b[1:500,]<-matrix(rep(c(10,10.5,11,11.5),times=500),nrow=500,byrow=TRUE) # Fixing the means to ensure no nondiscriminatory cases
+b[1:250,]<-matrix(rep(c(9,9,9,9),times=250),nrow=250)
 
 sim_size_factors<-rep(1,times=n) ### Size Factors
 sim_size_factors<-seq(from=0.75, to=2, length.out=n)
