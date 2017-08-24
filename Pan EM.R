@@ -45,8 +45,8 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 # EM
   
   # Initial Clustering
-  #d<-dist(t(y))                               ##Euclidean distance##
-  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+  d<-dist(t(y))                               ##Euclidean distance##
+  #d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
   model<-hclust(d,method="complete")       # hierarchical clustering
   #col<-rep("",times=ncol(y))
   #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
@@ -223,10 +223,11 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     
     if(a==maxit){finalwts<-wts}
     # print(pi) # print estimated cluster proportions
-    if(any(rowSums(wts)==0)){
-      print(paste("Empty cluster when K =",k,". Choose smaller K"))
-      break
-    }
+    
+    # if(any(rowSums(wts)==0)){
+    #   print(paste("Empty cluster when K =",k,". Choose smaller K"))
+    #   break
+    # }
     
   }
   
@@ -259,7 +260,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
   log_L<-sum(apply(log(pi)+l,2,logsumexpc))    # need to check
   
-  BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best
+  BIC=-2*log_L+log(n*g)*(g*k+(g+k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
   
   result<-list(pi=pi,
                coefs=coefs,

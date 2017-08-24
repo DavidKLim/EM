@@ -154,7 +154,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     pt1<-(log(pi)%*%rowSums(wts))
     pt2<-sum(wts*l)
     Q[a]<-pt1+pt2
-    if(a>10){if(abs(Q[a]-Q[a-10])<1E-5) {
+    if(a>10){if(abs(Q[a]-Q[a-10])<1E-10) {
       finalwts<-wts
       break
     }}

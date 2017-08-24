@@ -1,5 +1,5 @@
-setwd("C:/Users/David/Desktop/Research/GitHub/EM/Real Data/Lung Cancer Cell Line")
-setwd("/netscr/deelim")
+setwd("Real Data/Lung Cancer Cell Line")
+#setwd("/netscr/deelim")
 library("parallel")
 
 no_cores<-detectCores()-1
