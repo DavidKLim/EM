@@ -38,7 +38,6 @@ g<-nrow(y)
 
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
-new_size_factors<-rep(rep(size_factors,each=k),times=g)    ############## corresponding size factors for each entry in trans. data #
 gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
 clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
@@ -73,10 +72,10 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     
   vect_wts<-rep(as.vector(wts),times=g)
   clust_index<-rep((1:k),times=n*g)
-  dat<-cbind(new_y,clusts,clust_index,gene,vect_wts,new_size_factors) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
+  dat<-cbind(new_y,clusts,clust_index,gene,vect_wts) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
   
   colnames(dat)[1]<-c("count")
-  colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights","size_factors")
+  colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights")
   
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   
@@ -146,7 +145,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           dat_gc<-dat_g[dat_g[,"clusts"]==c,]
           trans_y<-rep(0,times=n)
           
-          trans_y<-eta[,c] + dat_gc[,"weights"]*(dat_gc[,"count"]-mu[,c])/mu[,c] - log(dat_gc[,"size_factors"])    # subtract size factor from transf. y
+          trans_y<-eta[,c] + dat_gc[,"weights"]*(dat_gc[,"count"]-mu[,c])/mu[,c] - log(size_factors)    # subtract size factor from transf. y
         
           
           #beta[c]<-log(glm(dat_gc[,"count"] ~ 1 + offset(log(size_factors)), weights=dat_gc[,"weights"])$coef)
@@ -154,7 +153,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(mu[,c]*trans_y)))/((lambda1*(k-1))+(1/n)*sum(mu[,c]))
           if(beta[c]<(-100)){beta[c]=-100}
           
-          eta[,c]<-beta[c] + log(dat_gc[,"size_factors"])      # add back size factors to eta
+          eta[,c]<-beta[c] + log(size_factors)      # add back size factors to eta
           mu[,c]<-exp(eta[,c])
         }
         
