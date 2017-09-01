@@ -86,11 +86,14 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   coefs<-matrix(rep(0,times=g*k),nrow=g)
   pi<-rep(0,times=k)
   Q<-rep(0,times=maxit)
-  theta_list<-list()       # temporary to hold all K x K theta matrices
+  theta_list<-list()                # temporary to hold all K x K theta matrices
   
-  family=poisson(link="log")       # can specify family here
+  family=poisson(link="log")        # can specify family here
   offset=log(size_factors,base=2)
-  #offset=rep(0,times=n)       # no offsets
+  #offset=rep(0,times=n)            # no offsets
+  
+  IRLS_tol = 1E-7                   # Tolerance levels for embedded IRLS and Q fx in EM
+  EM_tol = 1E-5
   
   ########### M / E STEPS #########
   for(a in 1:maxit){
@@ -133,7 +136,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         theta<-theta_list[[j]]                                            # previous iteration
       }
       
-      temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)    # to test for convergence of IRLS
+      temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
       dat_g<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
       for(i in 1:maxit_IRLS){
@@ -173,7 +176,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         
         # break conditions for IRLS
         if(i>1){
-          if(sum((temp[i,]-temp[i-1,])^2)<1E-7){
+          if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){
             coefs[j,]<-beta                                 # reached convergence
             theta_list[[j]]<-theta
             break
@@ -221,7 +224,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     
     
     
-    if(a>10){if(abs(Q[a]-Q[a-10])<1E-5) {
+    if(a>10){if(abs(Q[a]-Q[a-10])<EM_tol) {
       finalwts<-wts
       break
     }}
