@@ -31,7 +31,9 @@ soft_thresholding=function(alpha,lambda){
 
 
 
-EM<-function(y,k,lambda1,lambda2,tau,size_factors){
+EM<-function(y, k,
+             lambda1=0, lambda2=0, tau=0,
+             size_factors=rep(1,times=ncol(y)) ){
 
 n<-ncol(y)
 g<-nrow(y)
@@ -86,7 +88,9 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   Q<-rep(0,times=maxit)
   theta_list<-list()       # temporary to hold all K x K theta matrices
   
-  
+  family=poisson(link="log")       # can specify family here
+  #offset=log(size_factors)
+  offset=rep(0,times=n)       # no offsets
   
   ########### M / E STEPS #########
   for(a in 1:maxit){
@@ -109,74 +113,78 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     beta<-rep(0,times=k)
     
     for(j in 1:g){
-      if(a>1) {beta<-coefs[j,]} else {
-        for(c in 1:k){
-          beta[c]<-log(mean(as.numeric(y[j,cls==c])))
-        }
-      }   # initialization of beta = gene mean
-      temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)    # to test for convergence of IRLS
-      dat_g<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
-      
       if(a==1){
+        
+        for(c in 1:k){
+          beta[c]<-log(mean(as.numeric(y[j,cls==c])))                       # Initialize beta
+        }
+        
         theta<-matrix(rep(0,times=k^2),nrow=k)
         for(c in 1:k){
           for(cc in 1:k){
-            if(theta[c,cc]>=tau){theta[c,cc]<-beta[c]-beta[cc]}             # gTLP from Pan paper
+            if(theta[c,cc]>=tau){theta[c,cc]<-beta[c]-beta[cc]}             # Initialize theta
             else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)   # 
+            }
           }
         }
-      }}else{
-        theta<-theta_list[[j]]
-      }                                       #initializing theta as either first estimate, or previous iteration value of thetas
+        
+      }else{
+        beta<-coefs[j,]                                                   # Retrieve beta & theta from
+        theta<-theta_list[[j]]                                            # previous iteration
+      }
+      
+      temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)    # to test for convergence of IRLS
+      dat_g<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
       for(i in 1:maxit_IRLS){
         
         temp[i,]<-beta
         if(a==1 & i==1){
           eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
-          mu<-exp(eta)
         }else if(a>1 & i==1){
-          eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE)+log(size_factors)     # initialization of eta for IRLS (prev. beta + offset)
-          mu<-exp(eta)
-          }
+          eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
+        }
         
         for(c in 1:k){
+          mu<-exp(eta)
+          g_fx<-family$linkinv(eta)
+          g_fx_prime<-family$mu.eta(eta)
+          var_fx<-family$variance(mu)
           
           dat_gc<-dat_g[dat_g[,"clusts"]==c,]
-          trans_y<-rep(0,times=n)
           
-          trans_y<-eta[,c] + dat_gc[,"weights"]*(dat_gc[,"count"]-mu[,c])/mu[,c] - log(size_factors)    # subtract size factor from transf. y
+          trans_y<-eta[,c] + dat_gc[,"weights"]*(dat_gc[,"count"]-g_fx[,c])/g_fx_prime[,c] - offset    # subtract size factor from transf. y
         
           
-          #beta[c]<-log(glm(dat_gc[,"count"] ~ 1 + offset(log(size_factors)), weights=dat_gc[,"weights"])$coef)
+          #beta[c]<-log(glm(dat_gc[,"count"] ~ 1 + offset(log(size_factors,base=2)), weights=dat_gc[,"weights"])$coef)
             
-          beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(mu[,c]*trans_y)))/((lambda1*(k-1))+(1/n)*sum(mu[,c]))
+          beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(var_fx[,c]*trans_y)))/((lambda1*(k-1))+(1/n)*sum(var_fx[,c]))
           if(beta[c]<(-100)){beta[c]=-100}
           
-          eta[,c]<-beta[c] + log(size_factors)      # add back size factors to eta
-          mu[,c]<-exp(eta[,c])
+          eta[,c]<-beta[c] + offset      # add back size factors to eta
         }
         
         # update on theta
         for(c in 1:k){
           for(cc in 1:k){
             if(theta[c,cc]>=tau){theta[c,cc]<-beta[c]-beta[cc]}                      # gTLP from Pan paper
-            else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}   # 
+            else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}           # 
           }
         }
         
-        # break condition for IRLS
+        # break conditions for IRLS
         if(i>1){
           if(sum((temp[i,]-temp[i-1,])^2)<1E-7){
-            coefs[j,]<-beta
+            coefs[j,]<-beta                                 # reached convergence
             theta_list[[j]]<-theta
             break
           }
         }
         if(i==maxit_IRLS){
           coefs[j,]<-beta
-          theta_list[[j]]<-theta
+          theta_list[[j]]<-theta                           # reached maxit
         }
+        
       }
     }
 
@@ -201,7 +209,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c])*size_factors[i],log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c]),log=TRUE))    # posterior log like, include size_factor of subj
       }
     }
     
@@ -209,6 +217,11 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
     pt1<-(log(pi)%*%rowSums(wts))
     pt2<-sum(wts*l)
     Q[a]<-pt1+pt2
+    
+  
+    
+    
+    
     if(a>10){if(abs(Q[a]-Q[a-10])<1E-5) {
       finalwts<-wts
       break
