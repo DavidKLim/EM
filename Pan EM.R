@@ -45,8 +45,9 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 # EM
   
   # Initial Clustering
-  d<-dist(t(y))                               ##Euclidean distance##
-  #d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+  #d<-dist(t(y))                               ##Euclidean distance##
+  #d<-dist(t(norm_y))                        ## scaled to account for size factors ##
+  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
   model<-hclust(d,method="complete")       # hierarchical clustering
   #col<-rep("",times=ncol(y))
   #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
@@ -135,7 +136,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         if(a==1 & i==1){
           eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
           mu<-exp(eta)
-        }else if(i==1){
+        }else if(a>1 & i==1){
           eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE)+log(size_factors)     # initialization of eta for IRLS (prev. beta + offset)
           mu<-exp(eta)
           }
@@ -150,7 +151,8 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           
           #beta[c]<-log(glm(dat_gc[,"count"] ~ 1 + offset(log(size_factors)), weights=dat_gc[,"weights"])$coef)
             
-          beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(exp(beta[c])*trans_y)))/((lambda1*(k-1))+exp(beta[c]))
+          beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(mu[,c]*trans_y)))/((lambda1*(k-1))+(1/n)*sum(mu[,c]))
+          if(beta[c]<(-100)){beta[c]=-100}
           
           eta[,c]<-beta[c] + log(dat_gc[,"size_factors"])      # add back size factors to eta
           mu[,c]<-exp(eta[,c])
@@ -175,7 +177,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         if(i==maxit_IRLS){
           coefs[j,]<-beta
           theta_list[[j]]<-theta
-          }
+        }
       }
     }
 
@@ -235,7 +237,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   
   
   
-  num_warns=length(warnings())
+num_warns=length(warnings())
   
   final_clusters<-rep(0,times=n)
   for(i in 1:n){
@@ -258,9 +260,9 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   pred.nondiscriminatory<-mean(nondiscriminatory)
   
 
-  log_L<-sum(apply(log(pi)+l,2,logsumexpc))    # need to check
+  log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
   
-  BIC=-2*log_L+log(n*g)*(g*k+(g+k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
+  BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
   
   result<-list(pi=pi,
                coefs=coefs,

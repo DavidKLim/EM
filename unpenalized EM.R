@@ -37,8 +37,9 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 # EM
   
   # Initial Clustering
-  d<-dist(t(y))                               ##Euclidean distance##
-  #d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+  #d<-dist(t(y))                               ## Euclidean distance ##
+  #d<-dist(t(scaled_y))                        ## scaled to account for size factors ##
+  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
   model<-hclust(d,method="complete")       # hierarchical clustering
   #col<-rep("",times=ncol(y))
   #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
@@ -107,9 +108,9 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         for(c in 1:k){
           
           dat_gc<-dat_g[dat_g[,"clusts"]==c,]
-          
           beta[c]<-log(glm(dat_gc[,"count"] ~ 1 + offset(log(dat_gc[,"size_factors"])), weights=dat_gc[,"weights"])$coef)
-        }
+          if(beta[c]<0){beta[c]=0}
+       }
         
         
         # break condition for IRLS
@@ -204,7 +205,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
   log_L<-sum(apply(log(pi)+l,2,logsumexpc))    # need to check
   
-  BIC=-2*log_L+log(n*g)*(k*g+(g+k-1))         # -2log(L) + log(#obs)*(#parameters estimated: sigma_j + mixture proportions + nonzero coefs (sum(m))??? or all coefs(k*g)). minimum = best
+  BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated: sigma_j + mixture proportions + nonzero coefs (sum(m))??? or all coefs(k*g)). minimum = best
   
   result<-list(pi=pi,
                coefs=coefs,

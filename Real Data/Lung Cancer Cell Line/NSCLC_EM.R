@@ -1,4 +1,4 @@
-setwd("Real Data/Lung Cancer Cell Line")
+setwd("C:/Users/David/Desktop/Research/EM/Real Data/Lung Cancer Cell Line")
 #setwd("/netscr/deelim")
 library("parallel")
 
@@ -26,31 +26,42 @@ coldata<-coldata[,c("Adeno.Squamous","Tumor.location")]
 #all(rownames(coldata) == colnames(cts))
 dds<-DESeqDataSetFromMatrix(countData = cts,
                             colData = coldata,
-                            design = ~ 1)
+                            design = ~ Adeno.Squamous)
 DESeq_dds<-DESeq(dds)
 size_factors<-sizeFactors(DESeq_dds)
 
 norm_y<-counts(DESeq_dds,normalized=TRUE)
 
+res<-results(DESeq_dds,alpha=0.05)
+signif_res<-res[is.na(res$padj)==FALSE,]
+signif_res<-signif_res[order(signif_res$padj),]
+signif_res<-signif_res[1:100,]
+
 
 
 # initial clean-up of data and pre-filtering to include only genes with >=100 count
 dat<-read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
-y<-round(dat[,-1],digits=0)
-rownames(y)<-dat[,1]
+rownames(dat)<-toupper(dat[,1])
+dat<-dat[,-1]
+signif_dat<-dat[toupper(rownames(signif_res)),]      # Subsetting just the significant genes from DESeq2
+y<-round(signif_dat,digits=0)
 y<-y[(rowSums(y)>=100),]
+y<-y+1
 
 
 # filtering genes to have top 500 MAD (median absolute deviation): optional
-med_abs_dev<-rep(0,times=nrow(y))
-for(j in 1:nrow(y)){
-  med_abs_dev[j]<-mad(as.numeric(y[j,]),constant=1)
-}
-y<-cbind(rownames(y),y,med_abs_dev)
-subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,1000)]
-genes_y<-subs_y[,1]
-subs_y<-subs_y[,-1]
-subs_y<-as.data.frame(subs_y[,-24])
+
+# med_abs_dev<-rep(0,times=nrow(y))
+# for(j in 1:nrow(y)){
+#   med_abs_dev[j]<-mad(as.numeric(y[j,]),constant=1)
+# }
+# y<-cbind(rownames(y),y,med_abs_dev)
+# subs_y<-as.data.table(y)[order(-med_abs_dev),head(.SD,100)]
+# genes_y<-subs_y[,1]
+# subs_y<-subs_y[,-1]
+# subs_y<-as.data.frame(subs_y[,-24])
+# 
+# subs_y<-subs_y+1       # Add 1 to data to prevent instability
 
 
 
@@ -58,12 +69,26 @@ subs_y<-as.data.frame(subs_y[,-24])
 
 # grid search for tuning params lambda1 and lambda2 and K
 # Wei Pan
-#source("C:/Users/David/Desktop/Research/GitHub/EM/Pan EM.R")
+#source("C:/Users/David/Desktop/Research/EM/Pan EM.R")
 source("Pan EM.R")
+
+K_search=c(2:8)
+list_BIC=matrix(0,nrow=length(K_search),ncol=2)
+list_BIC[,1]=K_search
+
+for(aa in 1:nrow(list_BIC)){
+  list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors)$BIC   # no penalty Pan
+  #list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],size_factors=size_factors)$BIC       # unpenalized (not Pan)
+  #print(list_BIC[aa,])
+}
+
+max_k=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
+choose_k[ii]<-max_k
+
 lambda1_search=c(0.01,0.05,0.1,0.2,1,1.5,2)
-lambda2_search=c(0.01,0.05,0.1,0.2,1,1.5,2,5,10,100,1000)
+lambda2_search=c(0.01,0.05,0.1,0.2,1,1.5,2)
 tau_search=seq(from=0.1,to=1,by=0.1)
-K_search=c(2:6)
+K_search=max_k
 
 list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(K_search)*length(tau_search),ncol=5) #matrix of BIC's: lambda1 and lambda2 and K, 49*5 combinations
 
