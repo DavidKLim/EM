@@ -89,8 +89,8 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   theta_list<-list()       # temporary to hold all K x K theta matrices
   
   family=poisson(link="log")       # can specify family here
-  #offset=log(size_factors)
-  offset=rep(0,times=n)       # no offsets
+  offset=log(size_factors,base=2)
+  #offset=rep(0,times=n)       # no offsets
   
   ########### M / E STEPS #########
   for(a in 1:maxit){
@@ -146,10 +146,9 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         }
         
         for(c in 1:k){
-          mu<-exp(eta)
-          g_fx<-family$linkinv(eta)
-          g_fx_prime<-family$mu.eta(eta)
-          var_fx<-family$variance(mu)
+          g_fx<-family$linkinv(eta)              # g^(-1) (eta) = mu
+          g_fx_prime<-family$mu.eta(eta)         # g' = d(mu)/d(eta)
+          var_fx<-family$variance(g_fx)
           
           dat_gc<-dat_g[dat_g[,"clusts"]==c,]
           
@@ -158,7 +157,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           
           #beta[c]<-log(glm(dat_gc[,"count"] ~ 1 + offset(log(size_factors,base=2)), weights=dat_gc[,"weights"])$coef)
             
-          beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(var_fx[,c]*trans_y)))/((lambda1*(k-1))+(1/n)*sum(var_fx[,c]))
+          beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(var_fx[,c]*trans_y))) / ((lambda1*(k-1))+(1/n)*sum(var_fx[,c]))
           if(beta[c]<(-100)){beta[c]=-100}
           
           eta[,c]<-beta[c] + offset      # add back size factors to eta
@@ -167,7 +166,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
         # update on theta
         for(c in 1:k){
           for(cc in 1:k){
-            if(theta[c,cc]>=tau){theta[c,cc]<-beta[c]-beta[cc]}                      # gTLP from Pan paper
+            if(abs(theta[c,cc])>=tau){theta[c,cc]<-beta[c]-beta[cc]}                      # gTLP from Pan paper
             else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}           # 
           }
         }
