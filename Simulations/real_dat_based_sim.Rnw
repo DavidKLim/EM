@@ -76,7 +76,7 @@ sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
 
 fold_change<-1               # 50% nondiscriminatory, 50% discriminatory
 nondisc_fold_change<-0.1
-tt<-3*g/4
+tt<-g/2
 sim_coefs[1:tt,]<-matrix(rep(c(-fold_change,fold_change),times=tt),nrow=tt,byrow=TRUE)+sim_coefs[1:tt,]
 sim_coefs[(tt+1):g,]<-matrix(rep(c(-nondisc_fold_change,nondisc_fold_change),times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]
 
@@ -153,9 +153,9 @@ The optimal number of clusters K is set as the most frequently found K from the 
 <<results=tex, echo=FALSE,results=hide>>=
 # Grid search on last simulated y
 
-lambda1_search=seq(from=0.1,to=2,by=0.1)
+lambda1_search=1
 lambda2_search=seq(from=0.1,to=2,by=0.1)
-tau_search=9999
+tau_search=seq(from=0.1,to=2,by=0.1)
 
 list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
 

@@ -1,6 +1,6 @@
 #setwd("/netscr/deelim")
 setwd("C:/Users/David/Desktop/Research/EM")
-source("non-simulation EM.R")   # Pan method
+source("Pan EM.R")   # Pan method
 library(MASS)
 
 
@@ -25,7 +25,7 @@ for(ii in 1:sim){
     # while(any(rowSums(z)==0)){z=rmultinom(n,1,init_pi)}   # makes sure that no one cluster simulated @ 0 membership (only good for simulations)
     for(j in 1:g){
       for(c in 1:k){
-        y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c])*true_size_factors)
+        y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c]))
       }
     }
     result<-list(y=y,z=z)

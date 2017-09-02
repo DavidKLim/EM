@@ -35,7 +35,7 @@ norm_y<-counts(DESeq_dds,normalized=TRUE)
 res<-results(DESeq_dds,alpha=0.05)
 signif_res<-res[is.na(res$padj)==FALSE,]
 signif_res<-signif_res[order(signif_res$padj),]
-signif_res<-signif_res[1:100,]
+signif_res<-signif_res[1:10000,]
 
 
 
@@ -69,8 +69,8 @@ y<-y+1
 
 # grid search for tuning params lambda1 and lambda2 and K
 # Wei Pan
-#source("C:/Users/David/Desktop/Research/EM/Pan EM.R")
-source("Pan EM.R")
+source("C:/Users/David/Desktop/Research/EM/Pan EM.R")
+#source("Pan EM.R")
 
 K_search=c(2:8)
 list_BIC=matrix(0,nrow=length(K_search),ncol=2)
@@ -79,7 +79,7 @@ list_BIC[,1]=K_search
 for(aa in 1:nrow(list_BIC)){
   list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors)$BIC   # no penalty Pan
   #list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],size_factors=size_factors)$BIC       # unpenalized (not Pan)
-  #print(list_BIC[aa,])
+  print(list_BIC[aa,])
 }
 
 max_k=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]

@@ -137,7 +137,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
       }
       
       temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
-      dat_g<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
+      dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
       for(i in 1:maxit_IRLS){
         
@@ -153,14 +153,19 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           g_fx_prime<-family$mu.eta(eta)         # g' = d(mu)/d(eta)
           var_fx<-family$variance(g_fx)
           
-          dat_gc<-dat_g[dat_g[,"clusts"]==c,]
+          dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
           
-          trans_y<-eta[,c] + dat_gc[,"weights"]*(dat_gc[,"count"]-g_fx[,c])/g_fx_prime[,c] - offset    # subtract size factor from transf. y
+          trans_y<-eta[,c] + (dat_jc[,"count"]-exp(beta[c]))/exp(beta[c]) - offset    # subtract size factor from transf. y
         
           
-          #beta[c]<-log(glm(dat_gc[,"count"] ~ 1 + offset(log(size_factors,base=2)), weights=dat_gc[,"weights"])$coef)
-            
-          beta[c]<-((lambda1*((sum(beta)-beta[c])+(sum(theta[c,])-theta[c,c])))+((1/n)*sum(var_fx[,c]*trans_y))) / ((lambda1*(k-1))+(1/n)*sum(var_fx[,c]))
+          #beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(log(size_factors,base=2)), weights=dat_jc[,"weights"])$coef)   # glm update
+          w <- sqrt(dat_jc[,"weights"]*g_fx_prime[,c]^2/var_fx[,c])     # weights used in IRLS
+          beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )    # Pan update
+          
+          #X<-dat_jc[,(c+1)]
+          #W<-diag(g_fx[,c])
+          #xreg<- ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y     # manual regression trans_y on X (cluster)
+
           if(beta[c]<(-100)){beta[c]=-100}
           
           eta[,c]<-beta[c] + offset      # add back size factors to eta
