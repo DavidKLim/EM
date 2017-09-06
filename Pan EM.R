@@ -45,79 +45,87 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
 
 # EM
   
-  # Initial Clustering
-  #d<-dist(t(y))                               ##Euclidean distance##
-  #d<-dist(t(norm_y))                        ## scaled to account for size factors ##
-  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-  model<-hclust(d,method="complete")       # hierarchical clustering
-  #col<-rep("",times=ncol(y))
-  #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
-  #heatmap.2(as.matrix(norm_y), Rowv=as.dendrogram(model), Colv=as.dendrogram(model),ColSideColors=col)
-  cls<-cutree(model,k=k)
+# Initial Clustering
+#d<-dist(t(y))                               ##Euclidean distance##
+#d<-dist(t(norm_y))                        ## scaled to account for size factors ##
+d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+model<-hclust(d,method="complete")       # hierarchical clustering
+#col<-rep("",times=ncol(y))
+#for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
+#heatmap.2(as.matrix(norm_y), Rowv=as.dendrogram(model), Colv=as.dendrogram(model),ColSideColors=col)
+cls<-cutree(model,k=k)
+#cls<-sample(1:k,n,replace=TRUE) #random initialization
   
-  #model<-cclust(t(y),k=2) # convex clustering
-  #model<-kcca(t(y),k=2)   # K-means
-  #model<-kcca(t(y),k=2,family=kccaFamily("kmedians"))   # K-medians
-  #model<-kcca(t(y),k=2,family=kccaFamily("angle"))
-  #model<-kcca(t(y),k=2,family=kccaFamily("jaccard"))
-  #model<-kcca(t(y),k=2,family=kccaFamily("ejaccard"))
-  #cls<-predict(model)
+
+########################## SIMULATION ONLY #############################
+if(is.na(true_clusters)==FALSE){
+  all_perms=allPerms(1:k)
+  all_clusts=list()
+  temp_clust<-rep(0,times=n)
   
-  #cls<-sample(1:k,n,replace=TRUE) #random initialization
-  
-  
-  # initialize weights
-  wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
-  for(c in 1:k){
-    wts[c,]=(cls==c)^2
+  for(ii in 1:nrow(all_perms)){
+    for(i in 1:n){
+      temp_clust[i]<-all_perms[ii,cls[i]]
+    }
+    all_clusts[[ii]]<-temp_clust
   }
+  
+  all_clusts[[nrow(all_perms)+1]]<-cls     # contains all permutations of cluster indices
+  match_index<-rep(0,times=nrow(all_perms)+1)
+  
+  for(ii in 1:(nrow(all_perms)+1)){
+    match_index[ii]<-mean(true_clusters==all_clusts[[ii]])     # compares each permutation to true --> % of match
+  }
+  
+  cls<-all_clusts[[which.max(match_index)]]
+}
+########################## SIMULATION ONLY #############################
+
+  
+# initialize weights
+wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
+for(c in 1:k){
+  wts[c,]=(cls==c)^2
+}
     
-  vect_wts<-rep(as.vector(wts),times=g)
-  clust_index<-rep((1:k),times=n*g)
-  dat<-cbind(new_y,clusts,clust_index,gene,vect_wts) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
+vect_wts<-rep(as.vector(wts),times=g)
+clust_index<-rep((1:k),times=n*g)
+dat<-cbind(new_y,clusts,clust_index,gene,vect_wts) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
+
+colnames(dat)[1]<-c("count")
+colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights")
+
+finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   
-  colnames(dat)[1]<-c("count")
-  colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights")
+coefs<-matrix(rep(0,times=g*k),nrow=g)
+pi<-rep(0,times=k)
+theta_list<-list()                # temporary to hold all K x K theta matrices
   
-  finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
+family=poisson(link="log")        # can specify family here
+offset=log(size_factors,base=2)
+#offset=rep(0,times=n)            # no offsets
   
-  maxit = 100
+IRLS_tol = 1E-7                   # Tolerance levels for embedded IRLS and Q fx in EM
+maxit_IRLS=100
+
+EM_tol = 1E-5
+maxit_EM = 100
+Q<-rep(0,times=maxit_EM)
   
-  coefs<-matrix(rep(0,times=g*k),nrow=g)
-  pi<-rep(0,times=k)
-  Q<-rep(0,times=maxit)
-  theta_list<-list()                # temporary to hold all K x K theta matrices
-  
-  family=poisson(link="log")        # can specify family here
-  offset=log(size_factors,base=2)
-  #offset=rep(0,times=n)            # no offsets
-  
-  IRLS_tol = 1E-7                   # Tolerance levels for embedded IRLS and Q fx in EM
-  EM_tol = 1E-5
+lowerK<-0
   
   ########### M / E STEPS #########
-  for(a in 1:maxit){
+  for(a in 1:maxit_EM){
     
-    # M step
-    
-    # estimate parameters by IRLS, gene by gene
-    #for(j in 1:g){
-    #  for(c in 1:k){
-    #  fit = glm(y[j,] ~ 1, weights = wts[c,], family = poisson())   # automatically uses IRLS to find our maximization
-    #  coefs[j,c]<-fit$coef
-    #  }
-    #}
+  # M step
     
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
     
-    # IRWLS:
-    
-    maxit_IRLS=100
+      # IRWLS:
     beta<-rep(0,times=k)
-    
     for(j in 1:g){
+      
       if(a==1){
-        
         for(c in 1:k){
           beta[c]<-log(mean(as.numeric(y[j,cls==c])))                       # Initialize beta
         }
@@ -130,8 +138,7 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
             }
           }
         }
-        
-      }else{
+      } else {
         beta<-coefs[j,]                                                   # Retrieve beta & theta from
         theta<-theta_list[[j]]                                            # previous iteration
       }
@@ -157,10 +164,10 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
           
           trans_y<-eta[,c] + (dat_jc[,"count"]-exp(beta[c]))/exp(beta[c]) - offset    # subtract size factor from transf. y
         
-          
-          #beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(log(size_factors,base=2)), weights=dat_jc[,"weights"])$coef)   # glm update
           w <- sqrt(dat_jc[,"weights"]*g_fx_prime[,c]^2/var_fx[,c])     # weights used in IRLS
           beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )    # Pan update
+          
+          #beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(log(size_factors,base=2)), weights=dat_jc[,"weights"])$coef)   # glm update
           
           #X<-dat_jc[,(c+1)]
           #W<-diag(g_fx[,c])
@@ -195,9 +202,6 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
       }
     }
 
-    
-    
-    
     # update on pi_hat
     for(c in 1:k){
       pi[c]=mean(wts[c,])
@@ -220,21 +224,19 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
       }
     }
     
-    # store and check stopping criterion
+    # store and check Q function
     pt1<-(log(pi)%*%rowSums(wts))
     pt2<-sum(wts*l)
     Q[a]<-pt1+pt2
-    
   
-    
-    
-    
+    # break condition for EM
     if(a>10){if(abs(Q[a]-Q[a-10])<EM_tol) {
       finalwts<-wts
       break
     }}
     
-    # E step
+    
+  # E step
     
     # update on weights
     logdenom = apply(log(pi) + l, 2,logsumexpc)
@@ -242,13 +244,15 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
       wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
     }
     
-    if(a==maxit){finalwts<-wts}
+    if(a==maxit_EM){finalwts<-wts}
     # print(pi) # print estimated cluster proportions
     
-    # if(any(rowSums(wts)==0)){
-    #   print(paste("Empty cluster when K =",k,". Choose smaller K"))
-    #   break
-    # }
+    
+    if(any(rowSums(wts)==0)){
+      print(paste("Empty cluster when K =",k,". Choose smaller K"))
+      lowerK=1
+      break
+    }
     
   }
   
@@ -258,38 +262,39 @@ clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   
 num_warns=length(warnings())
   
-  final_clusters<-rep(0,times=n)
-  for(i in 1:n){
-    final_clusters[i]<-which.max(finalwts[,i])
-  }
+final_clusters<-rep(0,times=n)
+for(i in 1:n){
+  final_clusters[i]<-which.max(finalwts[,i])
+}
   
-  m<-rep(0,times=g)
-  nondiscriminatory=rep(FALSE,times=g)
-  #mean_across_clusters<-rowSums(coefs)/ncol(coefs)
+m<-rep(0,times=g)
+nondiscriminatory=rep(FALSE,times=g)
+#mean_across_clusters<-rowSums(coefs)/ncol(coefs)
+
+for(j in 1:g){
+  #if(all(abs(coefs[j,]-mean_across_clusters[j])<0.7)){nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
+  #for(c in 1:k){
+  #  if(abs(coefs[j,c]-mean_across_clusters[j])>0.7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
+  #}
+  m[j] <- sum(theta_list[[j]][1,]!=0) + 1         # of parameters estimated
+  if(m[j]==1){nondiscriminatory[j]=TRUE}
+}
   
-  for(j in 1:g){
-    #if(all(abs(coefs[j,]-mean_across_clusters[j])<0.7)){nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
-    #for(c in 1:k){
-    #  if(abs(coefs[j,c]-mean_across_clusters[j])>0.7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
-    #}
-    m[j] <- sum(theta_list[[j]][1,]!=0) + 1         # of parameters estimated
-    if(m[j]==1){nondiscriminatory[j]=TRUE}
-  }
-  
-  pred.nondiscriminatory<-mean(nondiscriminatory)
+pred.nondiscriminatory<-mean(nondiscriminatory)
   
 
-  log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
+log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
   
-  BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
+BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
+if(lowerK==1){BIC=.Machine$integer.max}      # set BIC as max (worst) if K too high
   
-  result<-list(pi=pi,
-               coefs=coefs,
-               Q=Q[1:a],
-               BIC=BIC,
-               nondiscriminatory=nondiscriminatory,
-               final_clusters=final_clusters)
-  #plot(Q[2:a])   # omit the first one due to instability
-  return(result)
+result<-list(pi=pi,
+             coefs=coefs,
+             Q=Q[1:a],
+             BIC=BIC,
+             nondiscriminatory=nondiscriminatory,
+             final_clusters=final_clusters)
+#plot(Q[2:a])   # omit the first one due to instability
+return(result)
   
 }
