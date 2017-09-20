@@ -1,0 +1,15 @@
+\documentclass{article}
+
+\begin{document}
+\SweaveOpts{concordance=FALSE}
+
+<<echo=FALSE>>=
+library(xtable)
+library(gdata)
+
+load("C:/Users/David/Desktop/Research/EM/Simulations/real_dat_based_sim results/final_output.out")
+print(xtable(tab,digits=2,table.placement="!h"))
+@
+
+\clearpage
+\end{document}
