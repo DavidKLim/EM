@@ -33,7 +33,9 @@ soft_thresholding=function(alpha,lambda){
 
 EM<-function(y, k,
              lambda1=0, lambda2=0, tau=0,
-             size_factors=rep(1,times=ncol(y)) ){
+             size_factors=rep(1,times=ncol(y)) ,
+             norm_y=y,
+             true_clusters=NA){
 
 n<-ncol(y)
 g<-nrow(y)
@@ -62,6 +64,7 @@ if(is.na(true_clusters)==FALSE){
   all_perms=allPerms(1:k)
   all_clusts=list()
   temp_clust<-rep(0,times=n)
+  if(k==2){all_perms=matrix(all_perms,nrow=1)}
   
   for(ii in 1:nrow(all_perms)){
     for(i in 1:n){
@@ -102,7 +105,7 @@ pi<-rep(0,times=k)
 theta_list<-list()                # temporary to hold all K x K theta matrices
   
 family=poisson(link="log")        # can specify family here
-offset=log(size_factors,base=2)
+offset=log(size_factors)
 #offset=rep(0,times=n)            # no offsets
   
 IRLS_tol = 1E-7                   # Tolerance levels for embedded IRLS and Q fx in EM
@@ -156,15 +159,16 @@ lowerK<-0
         }
         
         for(c in 1:k){
-          g_fx<-family$linkinv(eta)              # g^(-1) (eta) = mu
-          g_fx_prime<-family$mu.eta(eta)         # g' = d(mu)/d(eta)
-          var_fx<-family$variance(g_fx)
+          g_fx<-family$linkinv              # g^(-1) (eta) = mu
+          g_fx_prime<-family$mu.eta         # g' = d(mu)/d(eta)
+          var_fx<-family$variance
+          mu = g_fx(eta)
           
           dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
           
-          trans_y<-eta[,c] + (dat_jc[,"count"]-exp(beta[c]))/exp(beta[c]) - offset    # subtract size factor from transf. y
+          trans_y<-eta[,c] + (dat_jc[,"count"]-g_fx(eta[,c]))/g_fx_prime(eta[,c]) - offset    # subtract size factor from transf. y
         
-          w <- sqrt(dat_jc[,"weights"]*g_fx_prime[,c]^2/var_fx[,c])     # weights used in IRLS
+          w <- sqrt(dat_jc[,"weights"]*g_fx_prime(eta[,c])^2/var_fx(mu[,c]))     # weights used in IRLS
           beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )    # Pan update
           
           #beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(log(size_factors,base=2)), weights=dat_jc[,"weights"])$coef)   # glm update
@@ -173,7 +177,14 @@ lowerK<-0
           #W<-diag(g_fx[,c])
           #xreg<- ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y     # manual regression trans_y on X (cluster)
 
-          if(beta[c]<(-100)){beta[c]=-100}
+          if(beta[c]<(-100)){
+            warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
+            beta[c] = -100
+          }
+          if(beta[c]>100){
+            warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
+            beta[c] = 100
+          }
           
           eta[,c]<-beta[c] + offset      # add back size factors to eta
         }
