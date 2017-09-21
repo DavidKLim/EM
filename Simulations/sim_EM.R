@@ -30,7 +30,7 @@ simulate_data=function(n,k,g,init_pi,b){
 
 
 # Function to perform EM on simulated data
-sim.EM<-function(true.K,fold.change,num.nondisc){
+sim.EM<-function(true.K,fold.change,num.disc){
   true_clusters<-NA        # TRUE clusters not known for real data
   
   # Unpenalized run to find initial cluster estimates based on K=k
@@ -55,10 +55,11 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
   
   fold_change<-fold.change
   nondisc_fold_change<-0         # fixed nondisc fold change
-  tt<-num.nondisc
+  tt<-num.disc
   sim_coefs[1:tt,]<-matrix(rep( fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=tt),nrow=tt,byrow=TRUE)+sim_coefs[1:tt,]
   #sim_coefs[(tt+1):g,]<-matrix(rep( nondisc_fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]         # nondisc fold change = 0 so this doesn't get changed
-  
+
+  sim_pi<-rep(1/true.K,times=true.K)
   
   # SIMULATIONS
   sim=100
@@ -69,7 +70,7 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
   for(ii in 1:sim){
     
     # Simulate data based on initial estimates/estimate size factors
-    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=init_pi,b=sim_coefs)
+    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs)
     y<-sim.dat$y+1
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
@@ -103,42 +104,51 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
       print(list_BIC[aa,])
     }
     
-    max_k=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
-    choose_k[ii]<-max_k
+    choose_k[ii]=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
   }
   
   print(table(choose_k))
   max_k=as.numeric(which.max(table(choose_k))+1)
   
-  lambda1_search=1
-  lambda2_search=seq(from=0.1,to=2,by=0.1)
-  tau_search=seq(from=0.1,to=2,by=0.1)
+  sim=100
+  choose_lambda1<-rep(0,times=sim)
+  choose_lambda2<-rep(0,times=sim)
+  choose_tau<-rep(0,times=sim)
   
-  list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
-  
-  list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(tau_search))
-  list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
-  list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
-  
-  # Take last simulated y and search for optimal penalty parameters
-  for(aa in 1:nrow(list_BIC)){
-    list_BIC[aa,4]<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC
-    #print(list_BIC[aa,])
-  }
-  
-  # Store optimal penalty parameters
-  max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
-  max_tau<-list_BIC[max_index,3]
-  max_lambda1<-list_BIC[max_index,1]
-  max_lambda2<-list_BIC[max_index,2]
-  
-  if(length(max_index)>1){
-    warning("more than one max index")
-    max_index<-max_index[1]
+  for(ii in 1:sim){
+    lambda1_search=1
+    lambda2_search=seq(from=0.1,to=2,by=0.1)
+    tau_search=seq(from=0.1,to=2,by=0.1)
+    
+    list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
+    
+    list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(tau_search))
+    list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
+    list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
+    
+    # Take last simulated y and search for optimal penalty parameters
+    for(aa in 1:nrow(list_BIC)){
+      list_BIC[aa,4]<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC
+      print(list_BIC[aa,])
+    }
+    
+    # Store optimal penalty parameters
+    max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
     max_tau<-list_BIC[max_index,3]
     max_lambda1<-list_BIC[max_index,1]
     max_lambda2<-list_BIC[max_index,2]
+    
+    print(list_BIC[max_index,])
+    
+    if(length(max_index)>1){
+      warning("more than one max index")
+      max_index<-max_index[1]
+      choose_tau[ii]<-list_BIC[max_index,3]
+      choose_lambda1[ii]<-list_BIC[max_index,1]
+      choose_lambda2[ii]<-list_BIC[max_index,2]
+    }
   }
+  
   
   
   
@@ -151,7 +161,7 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
   temp_sensitivity<-rep(0,times=sim)
   temp_falsepos<-rep(0,times=sim)
   for(ii in 1:sim){
-    sim.dat<-simulate_data(n=n,k=max_k,g=g,init_pi=init_pi,b=sim_coefs)
+    sim.dat<-simulate_data(n=n,k=max_k,g=g,init_pi=sim_pi,b=sim_coefs)
     y<-sim.dat$y+1
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
