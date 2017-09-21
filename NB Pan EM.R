@@ -128,7 +128,8 @@ lowerK<-0
     
       # IRWLS:
     beta<-rep(0,times=k)
-    phi= rep(Inf,times=g)                # initial parameter for negative binomial (gene-specific)
+    phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negative binomial
+                             # --> Poisson (alpha = (1/theta) = 0)
     for(j in 1:g){
       
       if(a==1){
@@ -165,18 +166,23 @@ lowerK<-0
         
         for(c in 1:k){
           
-          g_fx<-family$linkinv              # g^(-1) (eta) = mu
-          g_fx_prime<-family$mu.eta         # g' = d(mu)/d(eta)
-          var_fx<-family$variance
-          mu = g_fx(eta)
+          linkinv<-family$linkinv              # g^(-1) (eta) = mu
+          mu.eta<-family$mu.eta         # g' = d(mu)/d(eta)
+          variance<-family$variance
+          
+          mu = linkinv(eta)
+          mu.eta.val = mu.eta(eta)
           
           dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
           
-          trans_y<-eta[,c] + (dat_jc[,"count"]-g_fx(eta[,c]))/g_fx_prime(eta[,c]) - dat_jc[,"offset"]    # subtract size factor from transf. y
+          good <- (dat_jc[,"weights"]>0) & (mu.eta.val[,c] != 0)
           
-          w <- sqrt(dat_jc[,"weights"]*g_fx_prime(eta[,c])^2/var_fx(mu[,c]))     # weights used in IRLS
-          beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )    # Pan update
+          trans_y <- (eta[,c] - offset)[good] + (dat_jc[,"count"][good] - mu[,c][good]) / mu.eta.val[,c][good]    # subtract size factor from transf. y
           
+          w <- sqrt(dat_jc[,"weights"][good]*mu.eta.val[,c][good]^2/variance(mu[,c])[good])     # weights used in IRLS
+          if(lambda1 != 0){            # Pan update
+            beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
+          } else { beta[c]<-sum(w*trans_y)/sum(w) }
           
           if(beta[c]<(-100)){
             warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
@@ -216,26 +222,31 @@ lowerK<-0
           old_disp = disp
           family = negative.binomial(theta=1/phi[j])
           for(c in 1:k){
-            g_fx<-family$linkinv              # g^(-1) (eta) = mu
-            g_fx_prime<-family$mu.eta         # g' = d(mu)/d(eta)
-            var_fx<-family$variance
-            NB_mu = g_fx(NB_eta)
+            linkinv<-family$linkinv              # g^(-1) (eta) = mu
+            mu.eta<-family$mu.eta         # g' = d(mu)/d(eta)
+            variance<-family$variance
+            
+            NB_mu = linkinv(NB_eta)
+            NB_mu.eta.val = mu.eta(NB_eta)
             
             dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
             
-            trans_y<-NB_eta[,c] + (dat_jc[,"count"]-g_fx(NB_eta[,c]))/g_fx_prime(NB_eta[,c]) - dat_jc[,"offset"]    # subtract size factor from transf. y
+            good <- (dat_jc[,"weights"]>0) & (mu.eta.val[,c] != 0)
             
-            w <- sqrt(dat_jc[,"weights"]*g_fx_prime(NB_eta[,c])^2/var_fx(NB_mu[,c]))     # weights used in IRLS
-            NB_beta[c]<-( (lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )    # Pan update
+            trans_y <- (NB_eta[,c] - offset)[good] + (dat_jc[,"count"][good] - NB_mu[,c][good]) / NB_mu.eta.val[,c][good]    # subtract size factor from transf. y
             
+            w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[,c][good]^2/variance(NB_mu[,c])[good])     # weights used in IRLS
+            if(lambda1 != 0){
+              NB_beta[c]<-( (lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )    # Pan update
+            } else{ NB_beta[c]<-sum(w*trans_y)/sum(w) }
             
-            if(beta[c]<(-100)){
+            if(NB_beta[c]<(-100)){
               warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-              beta[c] = -100
+              NB_beta[c] = -100
             }
-            if(beta[c]>100){
+            if(NB_beta[c]>100){
               warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-              beta[c] = 100
+              NB_beta[c] = 100
             }
             
             NB_eta[,c]<-NB_beta[c] + dat_jc[,"offset"]      # add back size factors to eta
@@ -290,7 +301,7 @@ lowerK<-0
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c] + offset),log=TRUE))    # posterior log like, include size_factor of subj
       }
     }
     
