@@ -6,7 +6,7 @@ init_norm_y<-read.table("init_norm_y.txt")
 n=ncol(init_y)
 g=nrow(init_y)
 
-source("NB Pan EM.R")
+source("Pan EM.R")
 library("stats")
 library("data.table")
 library("DESeq2")
@@ -107,7 +107,7 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
     choose_k[ii]<-max_k
   }
   
-  print(table(max_k))
+  print(table(choose_k))
   max_k=as.numeric(which.max(table(choose_k))+1)
   
   lambda1_search=1
@@ -206,4 +206,3 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
                 falsepos=mean_falsepos)
   return(results)
 }
-X

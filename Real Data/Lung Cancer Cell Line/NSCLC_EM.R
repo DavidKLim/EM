@@ -35,7 +35,7 @@ norm_y<-counts(DESeq_dds,normalized=TRUE)
 res<-results(DESeq_dds,alpha=0.05)
 signif_res<-res[is.na(res$padj)==FALSE,]
 signif_res<-signif_res[order(signif_res$padj),]
-signif_res<-signif_res[1:100,]
+signif_res<-signif_res[1:1000,]
 
 
 
@@ -69,7 +69,7 @@ y<-y+1
 
 # grid search for tuning params lambda1 and lambda2 and K
 # Wei Pan
-source("C:/Users/David/Desktop/Research/EM/NB Pan EM.R")
+source("C:/Users/David/Desktop/Research/EM/Pan EM.R")
 #source("Pan EM.R")
 
 K_search=c(2:7)

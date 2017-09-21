@@ -33,7 +33,7 @@ dds<-DESeqDataSetFromMatrix(countData = cts,
 DESeq_dds<-DESeq(dds)
 size_factors<-sizeFactors(DESeq_dds)
 
-norm_y<-counts(DESeq_dds,normalized=TRUE)
+init_norm_y<-counts(DESeq_dds,normalized=TRUE)
 
 res<-results(DESeq_dds,alpha=0.05)
 signif_res<-res[is.na(res$padj)==FALSE,]
@@ -56,219 +56,254 @@ y<-y+1
 
 init_y<-y
 init_size_factors<-size_factors
-true_clusters<-NA        # TRUE clusters not known for real data
-
 
 source("Pan EM.R")
 
 
-# Unpenalized run to find initial cluster estimates based on K=2
+K_search<-c(2:7)                          # Search over true K
+fold_search<-c(0.3,0.5,1.0)           # Search over fold changes across clusters (for disc genes)
+tt_search<-c(10,25,50,75,90)              # Search over true # of disc genes
 
-k=2
-n=ncol(y)
-g=nrow(y)
+list_conds<-matrix(0,nrow=length(K_search)*length(tt_search)*length(fold_search),ncol=3)
+list_conds[,1]=rep(K_search,each=length(tt_search)*length(fold_search))
+list_conds[,2]=rep(rep(fold_search,each=length(tt_search)),times=length(K_search))
+list_conds[,3]=rep(tt_search,times=length(K_search)*length(fold_search))
 
-X_init<-EM(y=y,k=2,lambda1=0,lambda2=0,tau=0,size_factors=size_factors)
-init_coefs<-X_init$coefs              # save init estimates for coefs & pi
-init_pi<-X_init$pi
+tab_K<-rep(0,times=nrow(list_conds))
+tab_lambda2<-rep(0,times=nrow(list_conds))
+tab_tau<-rep(0,times=nrow(list_conds))
+tab_ARI<-rep(0,times=nrow(list_conds))
+tab_nondisc<-rep(0,times=nrow(list_conds))
+tab_sens<-rep(0,times=nrow(list_conds))
+tab_falsepos<-rep(0,times=nrow(list_conds))
 
+for(conds in 10:nrow(list_conds)){
 
-# Mean over clusters, controlled fold change
-
-sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
-
-fold_change<-0.5               # 50% nondiscriminatory, 50% discriminatory
-nondisc_fold_change<-0.1
-tt<-1                        # g must be even number (tt is # of discriminatory genes)
-sim_coefs[1:tt,]<-matrix(rep(c(-fold_change,fold_change),times=tt),nrow=tt,byrow=TRUE)+sim_coefs[1:tt,]
-sim_coefs[(tt+1):g,]<-matrix(rep(c(-nondisc_fold_change,nondisc_fold_change),times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]
-
-
-# SIMULATIONS
-sim=100
-choose_k<-rep(0,times=sim)
-
-# Function to simulate data
-
-simulate_data=function(n,k,g,init_pi,b){
-  y<-matrix(rep(0,times=g*n),nrow=g)
-  z = rmultinom(n,1,init_pi)
+  true_clusters<-NA        # TRUE clusters not known for real data
+  
+  # Unpenalized run to find initial cluster estimates based on K=k
+  k=list_conds[conds,1]
+  n=ncol(init_y)
+  g=nrow(init_y)
+  
+  X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y)
+  init_coefs<-X_init$coefs              # save init estimates for coefs & pi
+  init_pi<-X_init$pi
+  
+  # to prevent error:
   for(j in 1:g){
     for(c in 1:k){
-      y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c]))
+      if(init_coefs[j,c]>12){init_coefs[j,c]=12}
     }
   }
-  result<-list(y=y,z=z)
-  return(result)
-}
-
-for(ii in 1:sim){
   
-  # Simulate data based on initial estimates/estimate size factors
-  sim.dat<-simulate_data(n=n,k=k,g=g,init_pi=init_pi,b=sim_coefs)
-  y<-sim.dat$y+1
-  z<-sim.dat$z
-  true_clusters<-rep(0,times=n)
-  for(i in 1:n){
-    true_clusters[i]<-which(z[,i]==1)
+  # Mean over clusters, controlled fold change
+  
+  sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
+  
+  fold_change<-list_conds[conds,2]
+  nondisc_fold_change<-0         # fixed nondisc fold change
+  tt<-list_conds[conds,3]
+  sim_coefs[1:tt,]<-matrix(rep( fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=tt),nrow=tt,byrow=TRUE)+sim_coefs[1:tt,]
+  #sim_coefs[(tt+1):g,]<-matrix(rep( nondisc_fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]         # nondisc fold change = 0 so this doesn't get changed
+  
+  
+  # SIMULATIONS
+  sim=100
+  choose_k<-rep(0,times=sim)
+  
+  # Function to simulate data
+  
+  simulate_data=function(n,k,g,init_pi,b){
+    y<-matrix(rep(0,times=g*n),nrow=g)
+    z = rmultinom(n,1,init_pi)
+    if(ncol(b)!=k){
+      warning("Wrong order selected. Simulating based on correct order")
+      k=ncol(b)
+    }
+    for(j in 1:g){
+      for(c in 1:k){
+        y[j,z[c,]==1] = rpois(sum(z[c,]==1), lambda = exp(b[j,c]))
+      }
+    }
+    result<-list(y=y,z=z)
+    return(result)
   }
-  row_names<-paste("gene",seq(g))
-  col_names<-paste("subj",seq(n))
-  cts<-as.matrix(y)
-  rownames(cts)<-row_names
-  colnames(cts)<-col_names
-  coldata<-matrix(paste("cl",true_clusters,sep=""),nrow=n)
-  rownames(coldata)<-colnames(cts)
-  colnames(coldata)<-"cluster"
-  dds<-DESeqDataSetFromMatrix(countData = cts,
-                              colData = coldata,
-                              design = ~ 1)
-  DESeq_dds<-DESeq(dds)
-  size_factors<-estimateSizeFactors(dds)$sizeFactor
-  norm_y<-counts(DESeq_dds,normalized=TRUE)
   
-  # Simulation order selection based on unpenalized EM #
   
-  K_search=c(2:7)
-  list_BIC=matrix(0,nrow=length(K_search),ncol=2)
-  list_BIC[,1]=K_search
+  # Simulations to find K (Order Selection)
   
-  print(paste("Iteration",ii,":"))
+  for(ii in 1:sim){
+    
+    # Simulate data based on initial estimates/estimate size factors
+    sim.dat<-simulate_data(n=n,k=k,g=g,init_pi=init_pi,b=sim_coefs)
+    y<-sim.dat$y+1
+    z<-sim.dat$z
+    true_clusters<-rep(0,times=n)
+    for(i in 1:n){
+      true_clusters[i]<-which(z[,i]==1)
+    }
+    row_names<-paste("gene",seq(g))
+    col_names<-paste("subj",seq(n))
+    cts<-as.matrix(y)
+    rownames(cts)<-row_names
+    colnames(cts)<-col_names
+    coldata<-matrix(paste("cl",true_clusters,sep=""),nrow=n)
+    rownames(coldata)<-colnames(cts)
+    colnames(coldata)<-"cluster"
+    dds<-DESeqDataSetFromMatrix(countData = cts,
+                                colData = coldata,
+                                design = ~ 1)
+    DESeq_dds<-DESeq(dds)
+    size_factors<-estimateSizeFactors(dds)$sizeFactor
+    norm_y<-counts(DESeq_dds,normalized=TRUE)
+    
+    # Simulation order selection based on unpenalized EM #
+    
+    K_search=c(2:7)
+    list_BIC=matrix(0,nrow=length(K_search),ncol=2)
+    list_BIC[,1]=K_search
+    
+    print(paste("Iteration",ii,":"))
+    for(aa in 1:nrow(list_BIC)){
+      list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y)$BIC  # no penalty
+      print(list_BIC[aa,])
+    }
+    
+    max_k=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
+    choose_k[ii]<-max_k
+  }
+  
+  max_k=as.numeric(which.max(table(choose_k))+1)
+  
+  lambda1_search=1
+  lambda2_search=seq(from=0.1,to=2,by=0.1)
+  tau_search=seq(from=0.1,to=2,by=0.1)
+  
+  list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
+  
+  list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(tau_search))
+  list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
+  list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
+  
+  # Take last simulated y and search for optimal penalty parameters
   for(aa in 1:nrow(list_BIC)){
-    list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors)$BIC   # no penalty Pan
+    list_BIC[aa,4]<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y)$BIC
     print(list_BIC[aa,])
   }
   
-  max_k=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
-  choose_k[ii]<-max_k
-}
-
-@
-
-<<echo=FALSE>>=
-print(paste("# of discriminatory genes =",tt))
-print(paste("fold change for discriminatory genes:",fold_change))
-print(paste('fold change for nondiscriminatory genes:',nondisc_fold_change))
-table(choose_k)    # see how simulations chose each cluster
-max_k=as.numeric(which.max(table(choose_k))+1)
-@
-
-The optimal number of clusters K is set as the most frequently found K from the 100 simulations tabulated above. It is found by using the BIC criterion after running the unpenalized EM algorithm on K spanning from 2 to 8.
-
-Using the last set of simulated counts, I ran a grid search across varying tuning parameters. As done in Pan et al, I fixed $\lambda_1=1$, and searched over $\lambda_2=(0.1,0.2,...,.2)$ and $\tau=(0.1,0.2,...,2)$:
-
-
-<<results=tex, echo=FALSE,results=hide>>=
-# Grid search on last simulated y
-
-lambda1_search=1
-lambda2_search=seq(from=0.1,to=2,by=0.1)
-tau_search=seq(from=0.1,to=2,by=0.1)
-
-list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
-
-list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(tau_search))
-list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
-list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
-
-for(aa in 1:nrow(list_BIC)){
-  list_BIC[aa,4]<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors)$BIC
-  print(list_BIC[aa,])
-}
-
-max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
-max_tau<-list_BIC[max_index,3]
-max_lambda1<-list_BIC[max_index,1]
-max_lambda2<-list_BIC[max_index,2]
-@
-
-
-<<echo=FALSE>>=
-print("lambda1, lambda2, tau, BIC:")
-list_BIC[max_index,]
-@
-
-<<echo=FALSE,results=hide,warnings=TRUE>>=
-if(length(max_index)>1){
-  warning("more than one max index")
-  max_index<-max_index[1]
+  # Store optimal penalty parameters
+  max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
   max_tau<-list_BIC[max_index,3]
   max_lambda1<-list_BIC[max_index,1]
   max_lambda2<-list_BIC[max_index,2]
-}
-@
-
-The results of the final run based on optimal tuning parameters are below:
-
-<<results=tex, echo=FALSE,results=hide>>=
-sim=100
-temp_pi<-matrix(rep(0,times=max_k*sim),nrow=sim)
-temp_coefs<-list()
-temp_nondisc<-rep(0,times=sim)
-temp_ARI<-rep(0,times=sim)
-temp_sensitivity<-rep(0,times=sim)
-temp_falsepos<-rep(0,times=sim)
-for(ii in 1:sim){
-  sim.dat<-simulate_data(n=n,k=max_k,g=g,init_pi=init_pi,b=sim_coefs)
-  y<-sim.dat$y+1
-  z<-sim.dat$z
-  true_clusters<-rep(0,times=n)
-  for(i in 1:n){
-    true_clusters[i]<-which(z[,i]==1)
-  }
-  row_names<-paste("gene",seq(g))
-  col_names<-paste("subj",seq(n))
-  cts<-as.matrix(y)
-  rownames(cts)<-row_names
-  colnames(cts)<-col_names
-  coldata<-matrix(paste("cl",true_clusters,sep=""),nrow=n)
-  rownames(coldata)<-colnames(cts)
-  colnames(coldata)<-"cluster"
-  dds<-DESeqDataSetFromMatrix(countData = cts,
-                              colData = coldata,
-                              design = ~ 1)
-  DESeq_dds<-DESeq(dds)
-  size_factors<-estimateSizeFactors(dds)$sizeFactor
-  norm_y<-counts(DESeq_dds,normalized=TRUE)
   
-  X<-EM(y=y,k=max_k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors)
-  temp_pi[ii,]<-X$pi
-  temp_coefs[[ii]]<-X$coefs
-  temp_nondisc[ii]<-mean(X$nondiscriminatory)
-  temp_ARI[ii]<-randIndex(true_clusters,X$final_clusters)
-  if(tt>0){
-    temp_sensitivity[ii]<-mean(X$nondiscriminatory[1:tt]==FALSE)
-  } else {temp_sensitivity[ii]<-NA}
-  if(tt<g){
-    temp_falsepos[ii]<-mean(X$nondiscriminatory[(tt+1):g]==FALSE)
-  } else {temp_falsepos[ii]<-NA}
+  if(length(max_index)>1){
+    warning("more than one max index")
+    max_index<-max_index[1]
+    max_tau<-list_BIC[max_index,3]
+    max_lambda1<-list_BIC[max_index,1]
+    max_lambda2<-list_BIC[max_index,2]
+  }
+  
+  
+  
+  # Simulations for determining performance based on optimal K and penalty params
+  sim=100
+  temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
+  temp_coefs<-list()
+  temp_nondisc<-rep(0,times=sim)
+  temp_ARI<-rep(0,times=sim)
+  temp_sensitivity<-rep(0,times=sim)
+  temp_falsepos<-rep(0,times=sim)
+  for(ii in 1:sim){
+    sim.dat<-simulate_data(n=n,k=max_k,g=g,init_pi=init_pi,b=sim_coefs)
+    y<-sim.dat$y+1
+    z<-sim.dat$z
+    true_clusters<-rep(0,times=n)
+    for(i in 1:n){
+      true_clusters[i]<-which(z[,i]==1)
+    }
+    row_names<-paste("gene",seq(g))
+    col_names<-paste("subj",seq(n))
+    cts<-as.matrix(y)
+    rownames(cts)<-row_names
+    colnames(cts)<-col_names
+    coldata<-matrix(paste("cl",true_clusters,sep=""),nrow=n)
+    rownames(coldata)<-colnames(cts)
+    colnames(coldata)<-"cluster"
+    dds<-DESeqDataSetFromMatrix(countData = cts,
+                                colData = coldata,
+                                design = ~ 1)
+    DESeq_dds<-DESeq(dds)
+    size_factors<-estimateSizeFactors(dds)$sizeFactor
+    norm_y<-counts(DESeq_dds,normalized=TRUE)
+    
+    # sometimes errors if wrong K is input
+    X<-EM(y=y,k=k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y)
+    temp_pi[ii,]<-X$pi
+    temp_coefs[[ii]]<-X$coefs
+    temp_nondisc[ii]<-mean(X$nondiscriminatory)
+    temp_ARI[ii]<-randIndex(true_clusters,X$final_clusters)
+    if(tt>0){
+      temp_sensitivity[ii]<-mean(X$nondiscriminatory[1:tt]==FALSE)
+    } else {temp_sensitivity[ii]<-NA}
+    if(tt<g){
+      temp_falsepos[ii]<-mean(X$nondiscriminatory[(tt+1):g]==FALSE)
+    } else {temp_falsepos[ii]<-NA}
+  }
+  
+  mean_pi<-colSums(temp_pi)/sim
+  mean_coefs<-Reduce('+',temp_coefs)/sim
+  mean_nondisc<-mean(temp_nondisc)
+  mean_ARI<-mean(temp_ARI)
+  mean_sensitivity<-mean(temp_sensitivity)
+  mean_falsepos<-mean(temp_falsepos)
+  
+  
+  
+  # Store for tabulation:
+  tab_K[conds]<-max_k
+  tab_lambda2[conds]<-max_lambda2
+  tab_tau[conds]<-max_tau
+  tab_ARI[conds]<-mean_ARI
+  tab_nondisc[conds]<-mean_nondisc
+  tab_sens[conds]<-mean_sensitivity
+  tab_falsepos[conds]<-mean_falsepos
+
 }
 
-mean_pi<-colSums(temp_pi)/sim
-mean_coefs<-Reduce('+',temp_coefs)/sim
-mean_nondisc<-mean(temp_nondisc)
-mean_ARI<-mean(temp_ARI)
-
-mean_sensitivity<-mean(temp_sensitivity)
-mean_falsepos<-mean(temp_falsepos)
 @
+
+
+The optimal number of clusters K is set as the most frequently found K from the 100 simulations tabulated above. It is found by using the BIC criterion after running the unpenalized EM algorithm on K spanning from 2 to 7.
+
+Using the last set of simulated counts, I ran a grid search across varying tuning parameters. As done in Pan et al, I fixed $\lambda_1=1$, and searched over $\lambda_2=(0.1,0.2,...,.2)$ and $\tau=(0.1,0.2,...,2)$.
+
+Then, using the optimal K and penalty parameters, I ran 100 simulations. The results of these simulations are below:
 
 Below are the summary of results:
 <<echo=FALSE>>=
-print(paste("Mean pi:",mean_pi))
-print("First 3 genes:")
-head(mean_coefs,n=3)
-print("Last 3 genes:")
-tail(mean_coefs,n=3)
-print(paste("Mean % of nondiscriminatory genes:",mean_nondisc))
-print(paste("Mean ARI:",mean_ARI))
-if(is.na(mean_sensitivity)==FALSE){
-  print(paste("Mean sensitivity:",mean_sensitivity))
-} else {print("No initially discriminatory genes")}
-if(is.na(mean_falsepos)==FALSE){
-  print(paste("Mean false positive rate:",mean_falsepos))
-} else {print("No initially nondiscriminatory genes")}
+library(xtable)
+library(gdata)
+
+final_tab<-data.frame(True.K=list_conds[,1],
+                      log.fold.change=list_conds[,2],
+                      True.Num.Nondisc=list_conds[,3],
+                      K=tab_K,
+                      lambda2=tab_lambda2,
+                      tau=tab_tau,
+                      ARI=tab_ARI,
+                      Num.Nondisc=tab_nondisc,
+                      Sensitivity=tab_sens,
+                      False.Positive=tab_falsepos
+                      )
+print(xtable(final_tab,digits=2,table.placement="!h"))
+
 @
   \clearpage
   
 \end{document}
+
+
+
