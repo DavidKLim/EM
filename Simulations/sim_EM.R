@@ -6,7 +6,7 @@ init_norm_y<-read.table("init_norm_y.txt")
 n=ncol(init_y)
 g=nrow(init_y)
 
-source("Pan EM.R")
+source("NB Pan EM.R")
 library("stats")
 library("data.table")
 library("DESeq2")
@@ -107,6 +107,7 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
     choose_k[ii]<-max_k
   }
   
+  print(table(max_k))
   max_k=as.numeric(which.max(table(choose_k))+1)
   
   lambda1_search=1
@@ -122,7 +123,7 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
   # Take last simulated y and search for optimal penalty parameters
   for(aa in 1:nrow(list_BIC)){
     list_BIC[aa,4]<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC
-    print(list_BIC[aa,])
+    #print(list_BIC[aa,])
   }
   
   # Store optimal penalty parameters
@@ -205,3 +206,4 @@ sim.EM<-function(true.K,fold.change,num.nondisc){
                 falsepos=mean_falsepos)
   return(results)
 }
+X
