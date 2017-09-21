@@ -35,7 +35,7 @@ norm_y<-counts(DESeq_dds,normalized=TRUE)
 res<-results(DESeq_dds,alpha=0.05)
 signif_res<-res[is.na(res$padj)==FALSE,]
 signif_res<-signif_res[order(signif_res$padj),]
-signif_res<-signif_res[1:10000,]
+signif_res<-signif_res[1:100,]
 
 
 
@@ -69,15 +69,15 @@ y<-y+1
 
 # grid search for tuning params lambda1 and lambda2 and K
 # Wei Pan
-source("C:/Users/David/Desktop/Research/EM/Pan EM.R")
+source("C:/Users/David/Desktop/Research/EM/NB Pan EM.R")
 #source("Pan EM.R")
 
-K_search=c(2:8)
+K_search=c(2:7)
 list_BIC=matrix(0,nrow=length(K_search),ncol=2)
 list_BIC[,1]=K_search
 
 for(aa in 1:nrow(list_BIC)){
-  list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors)$BIC   # no penalty Pan
+  list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y)$BIC   # no penalty Pan
   #list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],size_factors=size_factors)$BIC       # unpenalized (not Pan)
   print(list_BIC[aa,])
 }
@@ -98,7 +98,7 @@ list_BIC[,3]=rep(rep(K_search,each=length(tau_search)),times=length(lambda1_sear
 list_BIC[,4]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search)*length(K_search))
 
 extract_BIC<-function(row){
-  X<-EM(y=subs_y,k=list_BIC[row,3],lambda1=list_BIC[row,1],lambda2=list_BIC[row,2],tau=list_BIC[row,4],size_factors=size_factors)
+  X<-EM(y=subs_y,k=list_BIC[row,3],lambda1=list_BIC[row,1],lambda2=list_BIC[row,2],tau=list_BIC[row,4],size_factors=size_factors,norm_y=norm_y)
   print(paste("lambda1 =",list_BIC[row,1],"and lambda2 =",list_BIC[row,2],"and K =",list_BIC[row,3],"and tau =",list_BIC[row,4],"pi=",X$pi,"BIC=",X$BIC,"nondisc=",mean(X$nondiscriminatory)))
   return(X$BIC)
 }
@@ -122,7 +122,7 @@ max_tau<-list_BIC[max_index,4]             # Wei Pan
 print(paste("lambda1, lambda2, k, tau =", max_lambda1, max_lambda2, max_k, max_tau))    # Wei Pan
 
 # actual run:
-X_pan<-EM(y=subs_y,k=max_k,lambda1=max_lambda1,lambda2=max_lambda2,tau=max_tau,size_factors=size_factors) # Wei Pan
+X_pan<-EM(y=subs_y,k=max_k,lambda1=max_lambda1,lambda2=max_lambda2,tau=max_tau,size_factors=size_factors,norm_y=norm_y) # Wei Pan
 
 
 stopCluster(cl)
