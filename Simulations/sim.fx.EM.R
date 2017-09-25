@@ -1,11 +1,11 @@
-run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_disc=c(10,25,50,75,90)){
+run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_disc=c(10,25,50,75,90),method="poisson"){
   setwd("/netscr/deelim/out")
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){
       cmd = rep(0, 3)
       cmd[1] = "unlink('.RData') \n source('sim_EM.R') \n"
-      cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %d)\n",
-                       true_k[i],fold_change[j],num_disc[k])
-      out = sprintf("/netscr/deelim/run_sim_%s_%d_%f_%d",prefix,true_k[i],fold_change[j],num_disc[k])
+      cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %d, method='%s')\n",
+                       true_k[i],fold_change[j],num_disc[k],method)
+      out = sprintf("/netscr/deelim/run_sim_%s_%d_%f_%d_%s",prefix,true_k[i],fold_change[j],num_disc[k],method)
       out2 = sprintf("%s.out", out)
       cmd[3] = sprintf("save(X, file = '%s')", out2)
       cmdf = paste(cmd, collapse = "")
@@ -15,13 +15,13 @@ run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_
   }}}
 }
 
-collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_disc=c(10,25,50,75,90)){
+collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_disc=c(10,25,50,75,90),method="poisson"){
   nsims=length(true_k)*length(fold_change)*length(num_disc)
   tab<-matrix(0,nrow=nsims,ncol=10)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI","sens","false.pos")
   ii=1
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){
-      out = sprintf("/netscr/deelim/run_sim_%s_%d_%f_%d",prefix,true_k[i],fold_change[j],num_disc[k])
+      out = sprintf("/netscr/deelim/run_sim_%s_%d_%f_%d_%s",prefix,true_k[i],fold_change[j],num_disc[k],method)
       out2 = sprintf("%s.out",out)
       print(out2)
       if(!file.exists(out2)) next
@@ -37,5 +37,7 @@ collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),
       tab[ii,10]<-X$falsepos
       ii=ii+1
   }}}
-  save(tab,file="final_output.out")
+  final_results = sprintf("final_table_%s",method)
+  final_results2 = sprintf("%s.out",final_results)
+  save(tab,file=final_results2)
 }
