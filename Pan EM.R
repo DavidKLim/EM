@@ -123,10 +123,9 @@ lowerK<-0
     
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
     
-      # IRWLS:
-    beta<-rep(0,times=k)
+    # IRWLS:
     for(j in 1:g){
-      
+      beta<-rep(0,times=k)
       if(a==1){
         scaled_y = y               # to give a better first estimate
         for(i in 1:n){
@@ -241,7 +240,7 @@ lowerK<-0
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c]-offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c]+offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       }
     }
     

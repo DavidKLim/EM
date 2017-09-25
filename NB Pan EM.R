@@ -312,7 +312,7 @@ lowerK<-0
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dnbinom(y[,i],size=1/phi,mu=exp(coefs[,c] - offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dnbinom(y[,i],size=1/phi,mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       }
     }
     
