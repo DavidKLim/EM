@@ -154,7 +154,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
     
     # Take last simulated y and search for optimal penalty parameters
     for(aa in 1:nrow(list_BIC)){
-      list_BIC[aa,4]<-EM(y=adj_y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC
+      list_BIC[aa,4]<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC
       print(list_BIC[aa,])
     }
     
