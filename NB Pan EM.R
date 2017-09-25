@@ -4,7 +4,6 @@ library(stats)
 library(MASS)
 library(fpc)
 library(permute)
-library(flexclust)
 library(amap)
 library(gplots)
 
@@ -133,8 +132,12 @@ lowerK<-0
     for(j in 1:g){
       
       if(a==1){
+        scaled_y = y               # to give a better first estimate
+        for(i in 1:n){
+          scaled_y[,i] = y[,i]/size_factors[i]
+        }
         for(c in 1:k){
-          beta[c]<-log(mean(as.numeric(y[j,cls==c])))                       # Initialize beta
+          beta[c]<-log(mean(as.numeric(scaled_y[j,cls==c])))               # Initialize beta
         }
         
         theta<-matrix(rep(0,times=k^2),nrow=k)
@@ -217,7 +220,7 @@ lowerK<-0
         NB_eta<-eta
         NB_beta<-beta
         
-        while(abs(disp - old_disp) > NB_tol){
+        while(abs(disp - old_disp) > NB_tol*old_disp){
           #print(phi[j])
           old_disp = disp
           family = negative.binomial(theta=1/phi[j])
@@ -254,7 +257,7 @@ lowerK<-0
           NB_mu_j=as.vector(t(exp(NB_eta)))
           Chi2 = sum((dat_j[,"count"]-NB_mu_j)^2/(NB_mu_j+(1/phi[j])*NB_mu_j^2))
           disp = Chi2/df            # df doesn't change from before
-          phi[j] = disp*phi[j]
+          phi[j] = (1/disp)*phi[j]
           if(phi[j]>1E100){
             phi[j]=Inf
             break
@@ -297,13 +300,22 @@ lowerK<-0
     }
     
     
-    # log(f_k(y_i)): summing over all j
+    # poisson log(f_k(y_i)): summing over all j
+    # l<-matrix(rep(0,times=k*n),nrow=k)
+    # for(i in 1:n){
+    #   for(c in 1:k){
+    #     l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+    #   }
+    # }
+    
+    # nb log(f_k(y_i))
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c] + offset),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dnbinom(y[,i],size=1/phi,mu=exp(coefs[,c] - offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       }
     }
+    
     
     # store and check Q function
     pt1<-(log(pi)%*%rowSums(wts))

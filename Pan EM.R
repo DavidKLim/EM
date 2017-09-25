@@ -4,7 +4,6 @@ library(stats)
 library(MASS)
 library(fpc)
 library(permute)
-library(flexclust)
 library(amap)
 library(gplots)
 
@@ -105,7 +104,7 @@ pi<-rep(0,times=k)
 theta_list<-list()                # temporary to hold all K x K theta matrices
   
 family=poisson(link="log")        # can specify family here
-offset=log2(size_factors)
+offset=log(size_factors)
 #offset=rep(0,times=n)            # no offsets
   
 IRLS_tol = 1E-7                   # Tolerance levels for embedded IRLS and Q fx in EM
@@ -129,8 +128,12 @@ lowerK<-0
     for(j in 1:g){
       
       if(a==1){
+        scaled_y = y               # to give a better first estimate
+        for(i in 1:n){
+          scaled_y[,i] = y[,i]/size_factors[i]
+        }
         for(c in 1:k){
-          beta[c]<-log(mean(as.numeric(y[j,cls==c])))                       # Initialize beta
+          beta[c]<-log(mean(as.numeric(scaled_y[j,cls==c])))               # Initialize beta
         }
         
         theta<-matrix(rep(0,times=k^2),nrow=k)
@@ -173,11 +176,12 @@ lowerK<-0
           trans_y <- (eta[,c] - offset)[good] + (dat_jc[,"count"][good] - mu[,c][good]) / mu.eta.val[,c][good]    # subtract size factor from transf. y
         
           w <- sqrt(dat_jc[,"weights"][good]*mu.eta.val[,c][good]^2/variance(mu[,c])[good])     # weights used in IRLS
+          
           if(lambda1 != 0){            # Pan update
             beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
           } else { beta[c]<-sum(w*trans_y)/sum(w) }
           
-          #beta[c]<-log(glm.nb(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
+          beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
           
           # X<-dat_jc[,(c+1)]
           # W<-diag(g_fx(eta[,c]))
@@ -237,7 +241,7 @@ lowerK<-0
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c]+offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c]-offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       }
     }
     
