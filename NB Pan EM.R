@@ -132,12 +132,8 @@ lowerK<-0
     for(j in 1:g){
       
       if(a==1){
-        scaled_y = y               # to give a better first estimate
-        for(i in 1:n){
-          scaled_y[,i] = y[,i]/size_factors[i]
-        }
         for(c in 1:k){
-          beta[c]<-log(mean(as.numeric(scaled_y[j,cls==c])))               # Initialize beta
+          beta[c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
         }
         
         theta<-matrix(rep(0,times=k^2),nrow=k)
@@ -183,6 +179,7 @@ lowerK<-0
           trans_y <- (eta[,c] - offset)[good] + (dat_jc[,"count"][good] - mu[,c][good]) / mu.eta.val[,c][good]    # subtract size factor from transf. y
           
           w <- sqrt(dat_jc[,"weights"][good]*mu.eta.val[,c][good]^2/variance(mu[,c])[good])     # weights used in IRLS
+          
           if(lambda1 != 0){            # Pan update
             beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
           } else { beta[c]<-sum(w*trans_y)/sum(w) }
