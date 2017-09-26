@@ -97,11 +97,15 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   size_factors<-init_size_factors    # use this for all simulations
   
   
-  # SIMULATIONS
-  sim=100
-  choose_k<-rep(0,times=sim)
+  
+  
+  
+  #### SIMULATIONS ####
   
   # Simulations to find K (Order Selection)
+  
+  sim=100
+  choose_k<-rep(0,times=sim)
   
   for(ii in 1:sim){
     
@@ -137,11 +141,40 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   print(tab_k)
   max_k=as.numeric(rownames(tab_k)[which.max(tab_k)])
   
-  # sim=100
-  # choose_lambda1<-rep(0,times=sim)
-  # choose_lambda2<-rep(0,times=sim)
-  # choose_tau<-rep(0,times=sim)
   
+  
+  
+  
+  
+  
+  
+  
+  
+  # Simulations to do Grid search for tuning parameters
+  
+  sim=10
+  choose_lambda1<-rep(0,times=sim)
+  choose_lambda2<-rep(0,times=sim)
+  choose_tau<-rep(0,times=sim)
+  
+  for(ii in 1:sim){
+    
+    print(paste("Iteration",ii,"of grid search"))    # track iteration
+    
+    #simulate data
+    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors)
+    y<-sim.dat$y+1
+    z<-sim.dat$z
+    true_clusters<-rep(0,times=n)
+    for(i in 1:n){
+      true_clusters[i]<-which(z[,i]==1)
+    }
+    norm_y = y
+    for(i in 1:n){
+      norm_y[,i] = y[,i]/size_factors[i]
+    }
+    
+    #create matrix for grid search values
     lambda1_search=1
     lambda2_search=seq(from=0.1,to=2,by=0.1)
     tau_search=seq(from=0.1,to=2,by=0.1)
@@ -152,39 +185,49 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
     list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
     list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
     
-    # Take last simulated y and search for optimal penalty parameters
+    
+    #search for optimal penalty parameters
     for(aa in 1:nrow(list_BIC)){
       list_BIC[aa,4]<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC
       print(list_BIC[aa,])
     }
     
-    # Store optimal penalty parameters
+    #store optimal penalty parameters
     max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
-    max_tau<-list_BIC[max_index,3]
-    max_lambda1<-list_BIC[max_index,1]
-    max_lambda2<-list_BIC[max_index,2]
     
     print(list_BIC[max_index,])
     
     if(length(max_index)>1){
       warning("more than one max index")
       max_index<-max_index[1]
-      # choose_tau[ii]<-list_BIC[max_index,3]
-      # choose_lambda1[ii]<-list_BIC[max_index,1]
-      # choose_lambda2[ii]<-list_BIC[max_index,2]
-      max_tau<-list_BIC[max_index,3]
-      max_lambda1<-list_BIC[max_index,1]
-      max_lambda2<-list_BIC[max_index,2]
+      choose_tau[ii]<-list_BIC[max_index,3]
+      choose_lambda1[ii]<-list_BIC[max_index,1]
+      choose_lambda2[ii]<-list_BIC[max_index,2]
+      # max_tau<-list_BIC[max_index,3]
+      # max_lambda1<-list_BIC[max_index,1]
+      # max_lambda2<-list_BIC[max_index,2]
     }
-    
-    
-  # tab_tau<-table(choose_tau)
-  # tab_lambda1<-table(choose_lambda1)
-  # tab_lambda2<-table(choose_lambda2)
-  # 
-  # max_tau=as.numeric(rownames(tab_tau)[which.max(tau_tau)])
-  # max_lambda1=as.numeric(rownames(tab_lambda1)[which.max(tau_lambda1)])
-  # max_lambda2=as.numeric(rownames(tab_lambda2)[which.max(tau_lambda2)])
+  }
+  
+  #store max penalty parameters based on multiple simulations
+  tab_tau<-table(choose_tau)
+  tab_lambda1<-table(choose_lambda1)
+  tab_lambda2<-table(choose_lambda2)
+  print(tab_tau)
+  print(tab_lambda1)
+  print(tab_lambda2)
+  
+  max_tau=as.numeric(rownames(tab_tau)[which.max(tab_tau)])
+  max_lambda1=as.numeric(rownames(tab_lambda1)[which.max(tab_lambda1)])
+  max_lambda2=as.numeric(rownames(tab_lambda2)[which.max(tab_lambda2)])
+  
+  
+  
+  
+  
+  
+  
+  
   
   
   # Simulations for determining performance based on optimal K and penalty params
