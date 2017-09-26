@@ -127,12 +127,8 @@ lowerK<-0
     for(j in 1:g){
       beta<-rep(0,times=k)
       if(a==1){
-        scaled_y = y               # to give a better first estimate
-        for(i in 1:n){
-          scaled_y[,i] = y[,i]/size_factors[i]
-        }
         for(c in 1:k){
-          beta[c]<-log(mean(as.numeric(scaled_y[j,cls==c])))               # Initialize beta
+          beta[c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
         }
         
         theta<-matrix(rep(0,times=k^2),nrow=k)
@@ -180,19 +176,19 @@ lowerK<-0
             beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
           } else { beta[c]<-sum(w*trans_y)/sum(w) }
           
-          beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
+          #beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
           
           # X<-dat_jc[,(c+1)]
           # W<-diag(g_fx(eta[,c]))
           # xreg<- ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y     # manual regression trans_y on X (cluster)
 
-          if(beta[c]<(-100)){
+          if(beta[c]<(-700)){
             warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-            beta[c] = -100
+            beta[c] = -700
           }
-          if(beta[c]>100){
+          if(beta[c]>700){
             warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-            beta[c] = 100
+            beta[c] = 700
           }
           
           eta[,c]<-beta[c] + offset      # add back size factors to eta
@@ -275,7 +271,6 @@ lowerK<-0
     }
     
   }
-  
   
   
   
