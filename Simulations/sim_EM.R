@@ -194,6 +194,9 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
     
     #store optimal penalty parameters
     max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
+    choose_tau[ii]<-list_BIC[max_index,3]
+    choose_lambda1[ii]<-list_BIC[max_index,1]
+    choose_lambda2[ii]<-list_BIC[max_index,2]
     
     print(list_BIC[max_index,])
     
@@ -217,9 +220,9 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   print(tab_lambda1)
   print(tab_lambda2)
   
-  max_tau=as.numeric(rownames(tab_tau)[which.max(tab_tau)])
-  max_lambda1=as.numeric(rownames(tab_lambda1)[which.max(tab_lambda1)])
-  max_lambda2=as.numeric(rownames(tab_lambda2)[which.max(tab_lambda2)])
+  max_tau=as.numeric(rownames(tab_tau)[which.max(tab_tau)])[1]
+  max_lambda1=as.numeric(rownames(tab_lambda1)[which.max(tab_lambda1)])[1]
+  max_lambda2=as.numeric(rownames(tab_lambda2)[which.max(tab_lambda2)])[1]
   
   
   
