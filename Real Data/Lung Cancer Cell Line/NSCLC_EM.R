@@ -46,7 +46,6 @@ dat<-dat[,-1]
 signif_dat<-dat[toupper(rownames(signif_res)),]      # Subsetting just the significant genes from DESeq2
 y<-round(signif_dat,digits=0)
 y<-y[(rowSums(y)>=100),]
-y<-y+1
 
 
 # filtering genes to have top 500 MAD (median absolute deviation): optional
@@ -61,7 +60,6 @@ y<-y+1
 # subs_y<-subs_y[,-1]
 # subs_y<-as.data.frame(subs_y[,-24])
 # 
-# subs_y<-subs_y+1       # Add 1 to data to prevent instability
 
 
 
@@ -69,7 +67,7 @@ y<-y+1
 
 # grid search for tuning params lambda1 and lambda2 and K
 # Wei Pan
-source("C:/Users/David/Desktop/Research/EM/Pan EM.R")
+source("C:/Users/David/Desktop/Research/EM/NB Pan EM.R")
 #source("Pan EM.R")
 
 K_search=c(2:7)

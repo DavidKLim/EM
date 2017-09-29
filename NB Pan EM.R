@@ -36,8 +36,13 @@ EM<-function(y, k,
              norm_y=y,
              true_clusters=NA){
 
-n<-ncol(y)
 g<-nrow(y)
+
+# this makes it possible to have y=0 --> adds 0.1 to all y
+nobs=g
+eval(family$initialize)
+y<-mustart
+n<-ncol(y)
 
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters

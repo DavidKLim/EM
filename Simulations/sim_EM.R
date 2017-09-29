@@ -111,7 +111,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
     
     # Simulate data based on initial estimates/estimate size factors
     sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors)
-    y<-sim.dat$y+1
+    y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
     for(i in 1:n){
@@ -163,7 +163,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
     
     #simulate data
     sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors)
-    y<-sim.dat$y+1
+    y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
     for(i in 1:n){
@@ -243,7 +243,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   temp_falsepos<-rep(0,times=sim)
   for(ii in 1:sim){
     sim.dat<-simulate_data(n=n,k=max_k,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors)
-    y<-sim.dat$y+1
+    y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
     for(i in 1:n){

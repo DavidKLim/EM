@@ -36,9 +36,15 @@ EM<-function(y, k,
              norm_y=y,
              true_clusters=NA){
 
-n<-ncol(y)
 g<-nrow(y)
 
+# this makes it possible to have y=0 --> adds 0.1 to all y
+nobs=g
+eval(family$initialize)
+y<-mustart
+n<-ncol(y)
+
+# restructure data
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
 gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
@@ -151,7 +157,7 @@ lowerK<-0
         
         temp[i,]<-beta
         if(a==1 & i==1){
-          eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
+          eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset               # first initialization of eta
         }else if(a>1 & i==1){
           eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
         }
@@ -176,19 +182,19 @@ lowerK<-0
             beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
           } else { beta[c]<-sum(w*trans_y)/sum(w) }
           
-          #beta[c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
+          betaglm<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
           
           # X<-dat_jc[,(c+1)]
           # W<-diag(g_fx(eta[,c]))
-          # xreg<- ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y     # manual regression trans_y on X (cluster)
+          # betareg<- ginv(t(X) %*% W %*% X) %*% t(X) %*% W %*% trans_y     # manual regression trans_y on X (cluster)
 
-          if(beta[c]<(-700)){
+          if(beta[c]<(-100)){
             warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-            beta[c] = -700
+            beta[c] = -100
           }
-          if(beta[c]>700){
+          if(beta[c]>100){
             warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-            beta[c] = 700
+            beta[c] = 100
           }
           
           eta[,c]<-beta[c] + offset      # add back size factors to eta
