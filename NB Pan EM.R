@@ -163,11 +163,12 @@ lowerK<-0
         family=negative.binomial(theta=phi[j])        # can specify family here (plug in updated phi)
         
         temp[i,]<-beta
-        if(a==1 & i==1){
-          eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
-        }else if(a>1 & i==1){
-          eta<-matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
-        }
+        eta <- 
+          if(a==1 & i==1){
+            matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
+          }else if(a>1 & i==1){
+            matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
+          }
         
         for(c in 1:k){
           
@@ -201,7 +202,7 @@ lowerK<-0
             beta[c] = 100
           }
           
-          eta[,c]<-beta[c] + dat_jc[,"offset"]      # add back size factors to eta
+          eta[,c]<-beta[c] + offset      # add back size factors to eta
         }
         
         # update on theta (beta_i - beta_j)
