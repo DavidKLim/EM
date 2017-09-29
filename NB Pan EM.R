@@ -131,6 +131,7 @@ lowerK<-0
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
     
       # IRWLS:
+    # betaglm<-matrix(0,nrow=g,ncol=k)    # use to compare with glm procedure
     beta<-rep(0,times=k)
     phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negative binomial
                              # --> Poisson (alpha = (1/theta) = 0)
@@ -188,6 +189,8 @@ lowerK<-0
           if(lambda1 != 0){            # Pan update
             beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
           } else { beta[c]<-sum(w*trans_y)/sum(w) }
+          
+          betaglm[j,c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
           
           if(beta[c]<(-100)){
             warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
