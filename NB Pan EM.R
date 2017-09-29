@@ -118,7 +118,9 @@ maxit_EM = 100
 Q<-rep(0,times=maxit_EM)
   
 lowerK<-0
-  
+
+phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negative binomial
+                         # --> Poisson (alpha = (1/theta) = 0)
 
 
   ########### M / E STEPS #########
@@ -131,8 +133,7 @@ lowerK<-0
       # IRWLS:
     # betaglm<-matrix(0,nrow=g,ncol=k)    # use to compare with glm procedure
     beta<-rep(0,times=k)
-    phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negative binomial
-                             # --> Poisson (alpha = (1/theta) = 0)
+    
     for(j in 1:g){
       
       if(a==1){
