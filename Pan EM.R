@@ -163,7 +163,7 @@ lowerK<-0
             matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
           }else if(a>1 & i==1){
             matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
-          }
+          }else{eta}
         
         for(c in 1:k){
           linkinv<-family$linkinv              # g^(-1) (eta) = mu

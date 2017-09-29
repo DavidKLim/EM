@@ -168,7 +168,7 @@ lowerK<-0
             matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
           }else if(a>1 & i==1){
             matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
-          }
+          }else{eta}
         
         for(c in 1:k){
           
@@ -318,7 +318,7 @@ lowerK<-0
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dnbinom(y[,i],size=1/phi,mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi,mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       }
     }
     
