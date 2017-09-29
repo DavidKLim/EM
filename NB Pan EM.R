@@ -36,13 +36,11 @@ EM<-function(y, k,
              norm_y=y,
              true_clusters=NA){
 
+n<-ncol(y)
 g<-nrow(y)
 
 # this makes it possible to have y=0 --> adds 0.1 to all y
-nobs=g
-eval(family$initialize)
-y<-mustart
-n<-ncol(y)
+y = y+0.1
 
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
@@ -319,7 +317,7 @@ lowerK<-0
     for(i in 1:n){
       for(c in 1:k){
         l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi,mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
-      }
+      }    # subtract out 0.1 that was added earlier
     }
     
     

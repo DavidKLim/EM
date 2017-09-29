@@ -36,13 +36,11 @@ EM<-function(y, k,
              norm_y=y,
              true_clusters=NA){
 
+n<-ncol(y)
 g<-nrow(y)
 
 # this makes it possible to have y=0 --> adds 0.1 to all y
-nobs=g
-eval(family$initialize)     # changes n
-y<-mustart        # mustart is just what the prev. eval calls it. just adds 0.1 to y
-n<-ncol(y)
+y = y+0.1
 
 # restructure data
 vect_y<-as.vector(t(y))
