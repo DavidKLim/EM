@@ -190,7 +190,7 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
             beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
           } else { beta[c]<-sum(w*trans_y)/sum(w) }
           
-          betaglm[j,c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
+          #betaglm[j,c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
           
           if(beta[c]<(-100)){
             warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
@@ -290,6 +290,8 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
         
       }
     }
+    
+    
 
     # update on pi_hat
     for(c in 1:k){
