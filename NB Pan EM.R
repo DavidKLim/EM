@@ -110,18 +110,19 @@ theta_list<-list()                # temporary to hold all K x K theta matrices
 IRLS_tol = 1E-7                   # Tolerance levels for embedded IRLS and Q fx in EM
 maxit_IRLS=100
 
-NB_tol = 1E-5
-maxit_NB = 100
+# NB_tol = 1E-5
+# maxit_NB = 100
 
-EM_tol = 1E-5
-maxit_EM = 100
+EM_tol = 1E-6
+maxit_EM = 200
 Q<-rep(0,times=maxit_EM)
   
 lowerK<-0
 
-phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negative binomial
-                         # --> Poisson (alpha = (1/theta) = 0)
+phi= matrix(0,nrow=g,ncol=k)    # initial gene-specific dispersion parameters for negative binomial
+                                  # --> Poisson (phi = 0 = 1/theta)
 
+phi_list <- list()
 
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
@@ -158,8 +159,7 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
       dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
       for(i in 1:maxit_IRLS){
-        
-        family=negative.binomial(theta=phi[j])        # can specify family here (plug in updated phi)
+        family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
         
         temp[i,]<-beta
         eta <- 
@@ -186,9 +186,10 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
           
           w <- sqrt(dat_jc[,"weights"][good]*mu.eta.val[,c][good]^2/variance(mu[,c])[good])     # weights used in IRLS
           
-          if(lambda1 != 0){            # Pan update
-            beta[c]<-( (lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )
-          } else { beta[c]<-sum(w*trans_y)/sum(w) }
+          beta[c] <-
+             if(lambda1 != 0){
+               ((lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
+             } else { beta[c]<-sum(w*trans_y)/sum(w) }
           
           #betaglm[j,c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
           
@@ -202,6 +203,8 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
           }
           
           eta[,c]<-beta[c] + offset      # add back size factors to eta
+          
+          
         }
         
         # update on theta (beta_i - beta_j)
@@ -212,42 +215,44 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
           }
         }
         
-        
-        #### calculate phi here ####
-        mu_j = as.vector(t(exp(eta)))
-        Chi2 = sum((dat_j[,"count"]-mu_j)^2/mu_j)
-        df = (n*k)-1                  # df = n-1 ???
-        disp = Chi2/df
-        old_disp=0
-        
-        phi[j]=1/disp
-        
-        NB_eta<-eta
-        NB_beta<-beta
-        
-        while(abs(disp - old_disp) > NB_tol*old_disp){
-          #print(phi[j])
-          old_disp = disp
-          family = negative.binomial(theta=1/phi[j])
-          for(c in 1:k){
-            linkinv<-family$linkinv              # g^(-1) (eta) = mu
-            mu.eta<-family$mu.eta         # g' = d(mu)/d(eta)
-            variance<-family$variance
+        #print(paste("Iteration",i," of IRLS"))
+        for(c in 1:k){
+          #### CALCULATE PHI HERE ####
+          if(a==1 & i==1){
+            mu[,c] = exp(eta[,c])
+            Chi2 = sum(dat_jc[,"weights"]*(dat_jc[,"count"]-mu[,c])^2/mu[,c])
+            df = n-1
+            disp = Chi2/df
             
+            if(disp==0){
+              warning("Dispersion goes to 0")
+              disp=1E-5
+            }
+            
+            phi[j,c] = 1/disp
+            #print(paste("FIRST phi",phi[j,c]))
+          }
+          
+          
+          #while(abs(disp-old_disp) > NB_tol){
+            #old_disp=disp
+            
+            NB_eta = eta[,c]
+            NB_beta = beta
+            
+            family = negative.binomial(theta=1/phi[j,c])
+            linkinv = family$linkinv
+            mu.eta = family$mu.eta
+            variance = family$variance
             NB_mu = linkinv(NB_eta)
             NB_mu.eta.val = mu.eta(NB_eta)
-            
-            dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
-            
-            good <- (dat_jc[,"weights"]>0) & (mu.eta.val[,c] != 0)
-            
-            trans_y <- (NB_eta[,c] - offset)[good] + (dat_jc[,"count"][good] - NB_mu[,c][good]) / NB_mu.eta.val[,c][good]    # subtract size factor from transf. y
-            
-            w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[,c][good]^2/variance(NB_mu[,c])[good])     # weights used in IRLS
-            if(lambda1 != 0){
-              NB_beta[c]<-( (lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y)) ) / ( (lambda1*(k-1)) + (1/n)*sum(w) )    # Pan update
-            } else{ NB_beta[c]<-sum(w*trans_y)/sum(w) }
-            
+            good <- (dat_jc[,"weights"]>0) & (NB_mu.eta.val != 0)
+            trans_y <- (NB_eta - offset)[good] + (dat_jc[,"count"][good] - NB_mu[good]) / NB_mu.eta.val[good]
+            w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[good]^2/variance(NB_mu)[good])
+            NB_beta[c] <-
+              if(lambda1!=0){
+                ((lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
+              } else { sum(w*trans_y)/sum(w) }
             if(NB_beta[c]<(-100)){
               warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
               NB_beta[c] = -100
@@ -257,21 +262,21 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
               NB_beta[c] = 100
             }
             
-            NB_eta[,c]<-NB_beta[c] + dat_jc[,"offset"]      # add back size factors to eta
-          }
-          NB_mu_j=as.vector(t(exp(NB_eta)))
-          Chi2 = sum((dat_j[,"count"]-NB_mu_j)^2/(NB_mu_j+(1/phi[j])*NB_mu_j^2))
-          disp = Chi2/df            # df doesn't change from before
-          phi[j] = (1/disp)*phi[j]
-          if(phi[j]>1E100){
-            phi[j]=Inf
-            break
-          }
+            NB_eta<-NB_beta[c] + dat_jc[,"offset"]      # add back size factors to eta
+            NB_mu <- exp(NB_eta)
+            Chi2 = sum(dat_jc[,"weights"]*(dat_j[,"count"]-NB_mu)^2/(NB_mu+(phi[j,c])*NB_mu^2))
+            disp = Chi2/df            # df doesn't change from before
+            
+            if(disp==0){
+              warning("Dispersion goes to 0")
+              disp=1E-5
+            }
+            
+            phi[j,c] = (disp)*phi[j,c]
+            
+            #print(disp)
+          #}
         }
-        
-        
-        ############################
-        
         
         
         
@@ -291,6 +296,7 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
       }
     }
     
+    phi_list[[a]] <- phi
     
 
     # update on pi_hat
@@ -319,7 +325,7 @@ phi= rep(Inf,times=g)    # initial gene-specific dispersion parameters for negat
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi,mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       }    # subtract out 0.1 that was added earlier
     }
     
@@ -398,3 +404,7 @@ result<-list(pi=pi,
 return(result)
   
 }
+
+
+
+#fit<-glm.nb((dat_jc[,"count"]-0.1) ~ 1 + offset(offset), weights=dat_jc[,"weights"],init.theta=0)
