@@ -114,7 +114,7 @@ maxit_IRLS=100
 # maxit_NB = 100
 
 EM_tol = 1E-6
-maxit_EM = 200
+maxit_EM = 2000
 Q<-rep(0,times=maxit_EM)
   
 lowerK<-0
@@ -155,13 +155,13 @@ phi_list <- list()
         theta<-theta_list[[j]]                                            # previous iteration
       }
       
-      temp<-matrix(rep(0,times=maxit_IRLS*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
+      temp<-matrix(0,ncol=(k+1),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
       dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
       for(i in 1:maxit_IRLS){
         family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
         
-        temp[i,]<-beta
+        temp[i,]<-c(beta,1/phi[j,c])
         eta <- 
           if(a==1 & i==1){
             matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
@@ -172,7 +172,7 @@ phi_list <- list()
         for(c in 1:k){
           
           linkinv<-family$linkinv              # g^(-1) (eta) = mu
-          mu.eta<-family$mu.eta         # g' = d(mu)/d(eta)
+          mu.eta<-family$mu.eta                # g' = d(mu)/d(eta)
           variance<-family$variance
           
           mu = linkinv(eta)
@@ -205,18 +205,7 @@ phi_list <- list()
           eta[,c]<-beta[c] + offset      # add back size factors to eta
           
           
-        }
-        
-        # update on theta (beta_i - beta_j)
-        for(c in 1:k){
-          for(cc in 1:k){
-            if(abs(theta[c,cc])>=tau){theta[c,cc]<-beta[c]-beta[cc]}                      # gTLP from Pan paper
-            else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}           # 
-          }
-        }
-        
-        #print(paste("Iteration",i," of IRLS"))
-        for(c in 1:k){
+          
           #### CALCULATE PHI HERE ####
           if(a==1 & i==1){
             mu[,c] = exp(eta[,c])
@@ -230,52 +219,54 @@ phi_list <- list()
             }
             
             phi[j,c] = 1/disp
-            #print(paste("FIRST phi",phi[j,c]))
+            print(paste("FIRST phi",phi[j,c]))
           }
           
+          NB_eta = eta[,c]
+          NB_beta = beta
           
-          #while(abs(disp-old_disp) > NB_tol){
-            #old_disp=disp
+          family = negative.binomial(theta=1/phi[j,c])
+          linkinv = family$linkinv
+          mu.eta = family$mu.eta
+          variance = family$variance
+          NB_mu = linkinv(NB_eta)
+          NB_mu.eta.val = mu.eta(NB_eta)
+          good <- (dat_jc[,"weights"]>0) & (NB_mu.eta.val != 0)
+          trans_y <- (NB_eta - offset)[good] + (dat_jc[,"count"][good] - NB_mu[good]) / NB_mu.eta.val[good]
+          w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[good]^2/variance(NB_mu)[good])
+          NB_beta[c] <-
+            if(lambda1!=0){
+              ((lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
+            } else { sum(w*trans_y)/sum(w) }
+          if(NB_beta[c]<(-100)){
+          warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
+          NB_beta[c] = -100
+          }
+          if(NB_beta[c]>100){
+            warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
+            NB_beta[c] = 100
+          }
+          
+          NB_eta<-NB_beta[c] + dat_jc[,"offset"]      # add back size factors to eta
+          NB_mu <- exp(NB_eta)
+          Chi2 = sum(dat_jc[,"weights"]*(dat_j[,"count"]-NB_mu)^2/(variance(NB_mu)))
+          disp = Chi2/df            # df doesn't change from before
+          
+          if(disp==0){
+            warning("Dispersion goes to 0")
+            disp=1E-5
+          }
             
-            NB_eta = eta[,c]
-            NB_beta = beta
-            
-            family = negative.binomial(theta=1/phi[j,c])
-            linkinv = family$linkinv
-            mu.eta = family$mu.eta
-            variance = family$variance
-            NB_mu = linkinv(NB_eta)
-            NB_mu.eta.val = mu.eta(NB_eta)
-            good <- (dat_jc[,"weights"]>0) & (NB_mu.eta.val != 0)
-            trans_y <- (NB_eta - offset)[good] + (dat_jc[,"count"][good] - NB_mu[good]) / NB_mu.eta.val[good]
-            w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[good]^2/variance(NB_mu)[good])
-            NB_beta[c] <-
-              if(lambda1!=0){
-                ((lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
-              } else { sum(w*trans_y)/sum(w) }
-            if(NB_beta[c]<(-100)){
-              warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-              NB_beta[c] = -100
-            }
-            if(NB_beta[c]>100){
-              warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-              NB_beta[c] = 100
-            }
-            
-            NB_eta<-NB_beta[c] + dat_jc[,"offset"]      # add back size factors to eta
-            NB_mu <- exp(NB_eta)
-            Chi2 = sum(dat_jc[,"weights"]*(dat_j[,"count"]-NB_mu)^2/(NB_mu+(phi[j,c])*NB_mu^2))
-            disp = Chi2/df            # df doesn't change from before
-            
-            if(disp==0){
-              warning("Dispersion goes to 0")
-              disp=1E-5
-            }
-            
-            phi[j,c] = (disp)*phi[j,c]
-            
-            #print(disp)
-          #}
+          phi[j,c] = (disp)*phi[j,c]
+          #print(disp)
+        }
+        
+        # update on theta (beta_i - beta_j)
+        for(c in 1:k){
+          for(cc in 1:k){
+            if(abs(theta[c,cc])>=tau){theta[c,cc]<-beta[c]-beta[cc]}                      # gTLP from Pan paper
+            else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}           # 
+          }
         }
         
         
