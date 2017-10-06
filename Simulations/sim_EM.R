@@ -32,7 +32,7 @@ library("mclust")
 
 
 # Function to simulate data
-simulate_data=function(n,k,g,init_pi,b,size_factors=rep(1,times=size_factors)){
+simulate_data=function(n,k,g,init_pi,b,size_factors,method){
   y<-matrix(rep(0,times=g*n),nrow=g)
   z = rmultinom(n,1,init_pi)
   if(ncol(b)!=k){
@@ -43,10 +43,17 @@ simulate_data=function(n,k,g,init_pi,b,size_factors=rep(1,times=size_factors)){
   for(c in 1:k){
     cl[z[c,]==1] = c
   }
-  
-  for(j in 1:g){
-    for(i in 1:n){
-      y[j,i] = rpois( 1, lambda = size_factors[i]*exp(b[j,cl[i]]))
+  if(method=="poisson"){
+    for(j in 1:g){
+      for(i in 1:n){
+        y[j,i] = rpois( 1, lambda = size_factors[i]*exp(b[j,cl[i]]))
+      }
+    }
+  } else if(method=="nb"){
+    for(j in 1:g){
+      for(i in 1:n){
+        y[j,i] = rnbinom( 1, size = 1/5, mu = size_factors[i]*exp(b[j,cl[i]]))
+      }
     }
   }
   result<-list(y=y,z=z)
@@ -110,7 +117,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   for(ii in 1:sim){
     
     # Simulate data based on initial estimates/estimate size factors
-    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors)
+    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method)
     y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
@@ -162,7 +169,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
     print(paste("Iteration",ii,"of grid search"))    # track iteration
     
     #simulate data
-    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors)
+    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method)
     y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
@@ -242,7 +249,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   temp_sensitivity<-rep(0,times=sim)
   temp_falsepos<-rep(0,times=sim)
   for(ii in 1:sim){
-    sim.dat<-simulate_data(n=n,k=max_k,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors)
+    sim.dat<-simulate_data(n=n,k=max_k,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method)
     y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
