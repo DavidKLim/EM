@@ -32,7 +32,7 @@ library("mclust")
 
 
 # Function to simulate data
-simulate_data=function(n,k,g,init_pi,b,size_factors,method){
+simulate_data=function(n,k,g,init_pi,b,size_factors,method,phi=matrix(0,nrow=g,ncol=k)){
   y<-matrix(rep(0,times=g*n),nrow=g)
   z = rmultinom(n,1,init_pi)
   if(ncol(b)!=k){
@@ -52,7 +52,7 @@ simulate_data=function(n,k,g,init_pi,b,size_factors,method){
   } else if(method=="nb"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rnbinom( 1, size = 1/5, mu = size_factors[i]*exp(b[j,cl[i]]))
+        y[j,i] = rnbinom( 1, size = 1/phi[j,cl[i]], mu = size_factors[i]*exp(b[j,cl[i]]))
       }
     }
   }
@@ -117,7 +117,8 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   for(ii in 1:sim){
     
     # Simulate data based on initial estimates/estimate size factors
-    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method)
+    phi=matrix(c(1,2),nrow=1,ncol=2)
+    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method,phi=phi) # same disp param
     y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
