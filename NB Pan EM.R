@@ -10,7 +10,7 @@ library(gplots)
 
 logsumexpc=function(v){  
   if(any(is.infinite(v))){ 
-    stop("infinite value in v\n") 
+    warning("infinite value in v\n") 
   } 
   if(length(v)==1){ return(v[1]) }  
   sv = sort(v, decreasing=TRUE) 
@@ -55,9 +55,9 @@ model<-hclust(d,method="complete")       # hierarchical clustering
 #col<-rep("",times=ncol(y))
 #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
 #heatmap.2(as.matrix(norm_y), Rowv=as.dendrogram(model), Colv=as.dendrogram(model),ColSideColors=col)
-cls<-cutree(model,k=k)
+   #cls<-cutree(model,k=k)
 #cls<-sample(1:k,n,replace=TRUE) #random initialization
-  
+cls<-cutree(model,k=k)
 
 ########################## SIMULATION ONLY #############################
 if(is.na(true_clusters)==FALSE){
@@ -120,12 +120,16 @@ Q<-rep(0,times=maxit_EM)
 lowerK<-0
 
 phi= matrix(0,nrow=g,ncol=k)    # initial gene-specific dispersion parameters for negative binomial
-                                  # --> Poisson (phi = 0 = 1/theta)
+                                # --> Poisson (phi = 0 = 1/theta)
+#glmphi=phi                        # phi's (1/theta) generated from glm
+#init_phi=phi                      # store initialization of phi (1/disp)
 
-phi_list <- list()
+temp_list <- list()             # store temp to see progression of IRLS
+
+phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
 
   ########### M / E STEPS #########
-  for(a in 1:maxit_EM){
+    for(a in 1:maxit_EM){
     
   # M step
     
@@ -155,13 +159,10 @@ phi_list <- list()
         theta<-theta_list[[j]]                                            # previous iteration
       }
       
-      temp<-matrix(0,ncol=(k+1),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
+      temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
       dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
       for(i in 1:maxit_IRLS){
-        family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
-        
-        temp[i,]<-c(beta,1/phi[j,c])
         eta <- 
           if(a==1 & i==1){
             matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
@@ -169,7 +170,16 @@ phi_list <- list()
             matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
           }else{eta}
         
+        
+        temp[i,]<-c(beta,phi[j,])
+        
         for(c in 1:k){
+          
+          dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
+          
+          #phi[j,c]<-glm.nb((dat_jc[,"count"]-0.1) ~ 1 + offset(offset), weights=dat_jc[,"weights"])$theta   #glm.nb() theta
+
+          family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
           
           linkinv<-family$linkinv              # g^(-1) (eta) = mu
           mu.eta<-family$mu.eta                # g' = d(mu)/d(eta)
@@ -178,7 +188,6 @@ phi_list <- list()
           mu = linkinv(eta)
           mu.eta.val = mu.eta(eta)
           
-          dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
           
           good <- (dat_jc[,"weights"]>0) & (mu.eta.val[,c] != 0)
           
@@ -190,8 +199,7 @@ phi_list <- list()
              if(lambda1 != 0){
                ((lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
              } else { beta[c]<-sum(w*trans_y)/sum(w) }
-          
-          #betaglm[j,c]<-log(glm(dat_jc[,"count"] ~ 1 + offset(offset), weights=dat_jc[,"weights"])$coef)   # glm update
+        
           
           if(beta[c]<(-100)){
             warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
@@ -203,63 +211,72 @@ phi_list <- list()
           }
           
           eta[,c]<-beta[c] + offset      # add back size factors to eta
+          mu[,c]<-linkinv(eta[,c])
           
           
+          phi[j,c] <- 
+            if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
+              1/theta.ml(y = dat_jc[,"count"]-0.1,
+                        mu = mu[,c],
+                        weights = dat_jc[,"weights"],
+                        limit=10,trace=FALSE)                # this bypasses error when all counts in cluster are identical or
+                                                             # there is just one subject in cluster (this would be 0 disp anyway)
+            } else {0}
           
-          #### CALCULATE PHI HERE ####
-          if(a==1 & i==1){
-            mu[,c] = exp(eta[,c])
-            Chi2 = sum(dat_jc[,"weights"]*(dat_jc[,"count"]-mu[,c])^2/mu[,c])
-            df = n-1
-            disp = Chi2/df
-            
-            if(disp==0){
-              warning("Dispersion goes to 0")
-              disp=1E-5
-            }
-            
-            phi[j,c] = 1/disp
-            print(paste("FIRST phi",phi[j,c]))
-          }
+          #### CHI SQUARE DAMPENING ####
           
-          NB_eta = eta[,c]
-          NB_beta = beta
+          # Initialize phi #
+          # if(a==1 & i==1){
+          #   mu[,c] = exp(eta[,c])
+          #   Chi2 = sum(dat_jc[,"weights"]*(dat_jc[,"count"]-mu[,c])^2/mu[,c])
+          #   df = sum(dat_jc[,"weights"])-1            # df is number in cluster c, minus 1 (effective df if partial weights)
+          #   disp = Chi2/df
+          # 
+          #   if(disp==0){
+          #     warning("Dispersion goes to 0")
+          #     disp=1e-10
+          #   }
+          # 
+          #   phi[j,c] = 1/disp
+          #   init_phi[j,c] = phi[j,c]
+          #   #print(paste("FIRST phi",phi[j,c]))
+          # }
+          # NB_eta = eta[,c]
+          # NB_beta = beta
+          # family = negative.binomial(theta=1/phi[j,c])
+          # linkinv = family$linkinv
+          # mu.eta = family$mu.eta
+          # variance = family$variance
+          # NB_mu = linkinv(NB_eta)
+          # NB_mu.eta.val = mu.eta(NB_eta)
+          # good <- (dat_jc[,"weights"]>0) & (NB_mu.eta.val != 0)
+          # trans_y <- (NB_eta - offset)[good] + (dat_jc[,"count"][good] - NB_mu[good]) / NB_mu.eta.val[good]
+          # w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[good]^2/variance(NB_mu)[good])
+          # NB_beta[c] <-
+          #   if(lambda1!=0){
+          #     ((lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
+          #   } else { sum(w*trans_y)/sum(w) }
+          # if(NB_beta[c]<(-100)){
+          # warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
+          # NB_beta[c] = -100
+          # }
+          # if(NB_beta[c]>100){
+          #   warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
+          #   NB_beta[c] = 100
+          # }
+          # 
+          # NB_eta<-NB_beta[c] + offset      # add back size factors to eta
+          # NB_mu <- linkinv(NB_eta)
+          # Chi2 = sum(dat_jc[,"weights"]*(dat_jc[,"count"]-NB_mu)^2/(variance(NB_mu)))
+          # disp = Chi2/df            # df doesn't change from before
+          # 
+          # if(disp==0){
+          #   warning("Dispersion goes to 0")
+          #   disp=1E-5
+          # }
+          # phi[j,c] = (disp)*phi[j,c]
           
-          family = negative.binomial(theta=1/phi[j,c])
-          linkinv = family$linkinv
-          mu.eta = family$mu.eta
-          variance = family$variance
-          NB_mu = linkinv(NB_eta)
-          NB_mu.eta.val = mu.eta(NB_eta)
-          good <- (dat_jc[,"weights"]>0) & (NB_mu.eta.val != 0)
-          trans_y <- (NB_eta - offset)[good] + (dat_jc[,"count"][good] - NB_mu[good]) / NB_mu.eta.val[good]
-          w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[good]^2/variance(NB_mu)[good])
-          NB_beta[c] <-
-            if(lambda1!=0){
-              ((lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
-            } else { sum(w*trans_y)/sum(w) }
-          if(NB_beta[c]<(-100)){
-          warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-          NB_beta[c] = -100
-          }
-          if(NB_beta[c]>100){
-            warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-            NB_beta[c] = 100
-          }
-          
-          NB_eta<-NB_beta[c] + dat_jc[,"offset"]      # add back size factors to eta
-          NB_mu <- exp(NB_eta)
-          Chi2 = sum(dat_jc[,"weights"]*(dat_j[,"count"]-NB_mu)^2/(variance(NB_mu)))
-          disp = Chi2/df            # df doesn't change from before
-          
-          if(disp==0){
-            warning("Dispersion goes to 0")
-            disp=1E-5
-          }
-            
-          phi[j,c] = (disp)*phi[j,c]
-          #print(disp)
-        }
+         }
         
         # update on theta (beta_i - beta_j)
         for(c in 1:k){
@@ -276,12 +293,14 @@ phi_list <- list()
           if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){
             coefs[j,]<-beta                                 # reached convergence
             theta_list[[j]]<-theta
+            temp_list[[j]]<-temp[1:i,]
             break
           }
         }
         if(i==maxit_IRLS){
           coefs[j,]<-beta
-          theta_list[[j]]<-theta                           # reached maxit
+          theta_list[[j]]<-theta  
+          temp_list[[j]]<-temp[1:i,]           # reached maxit
         }
         
       }
@@ -302,15 +321,6 @@ phi_list <- list()
         pi[c]=(1-1E-6)
       } # upperbound for pi
     }
-    
-    
-    # poisson log(f_k(y_i)): summing over all j
-    # l<-matrix(rep(0,times=k*n),nrow=k)
-    # for(i in 1:n){
-    #   for(c in 1:k){
-    #     l[c,i]<-sum(dpois(y[,i],lambda=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
-    #   }
-    # }
     
     # nb log(f_k(y_i))
     l<-matrix(rep(0,times=k*n),nrow=k)
@@ -346,6 +356,7 @@ phi_list <- list()
     
     
     if(any(rowSums(wts)==0)){
+      finalwts<-wts
       print(paste("Empty cluster when K =",k,". Choose smaller K"))
       lowerK=1
       break
@@ -366,13 +377,8 @@ for(i in 1:n){
   
 m<-rep(0,times=g)
 nondiscriminatory=rep(FALSE,times=g)
-#mean_across_clusters<-rowSums(coefs)/ncol(coefs)
 
 for(j in 1:g){
-  #if(all(abs(coefs[j,]-mean_across_clusters[j])<0.7)){nondiscriminatory[j]=TRUE}     # threshold for nondiscriminatory gene: 1.5 diff from mean across clusters
-  #for(c in 1:k){
-  #  if(abs(coefs[j,c]-mean_across_clusters[j])>0.7){m[j]=m[j]+1} # nondiscriminatory threshold: away from mean by 7
-  #}
   m[j] <- sum(theta_list[[j]][1,]!=0) + 1         # of parameters estimated
   if(m[j]==1){nondiscriminatory[j]=TRUE}
 }
@@ -390,12 +396,11 @@ result<-list(pi=pi,
              Q=Q[1:a],
              BIC=BIC,
              nondiscriminatory=nondiscriminatory,
-             final_clusters=final_clusters)
-#plot(Q[2:a])   # omit the first one due to instability
+             final_clusters=final_clusters,
+             phi=phi)
 return(result)
   
 }
 
 
 
-#fit<-glm.nb((dat_jc[,"count"]-0.1) ~ 1 + offset(offset), weights=dat_jc[,"weights"],init.theta=0)

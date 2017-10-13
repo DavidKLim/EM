@@ -1,7 +1,9 @@
+setwd("C:/Users/David/Desktop/Research/EM")
 
 init_y<-read.table("init_y.txt")
 init_size_factors<-as.numeric(read.table("init_size_factors.txt")[,1])
 init_norm_y<-read.table("init_norm_y.txt")
+init_phi<-read.table("init_phi.txt")
 
 n=ncol(init_y)
 g=nrow(init_y)
@@ -12,7 +14,7 @@ library("DESeq2")
 library("mclust")
 
 
-## DESeq analysis
+# DESeq analysis
 # row_names<-paste("gene",seq(g))
 # col_names<-paste("subj",seq(n))
 # cts<-as.matrix(y)
@@ -81,6 +83,7 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters)
   init_coefs<-X_init$coefs              # save init estimates for coefs & pi
   init_pi<-X_init$pi
+  init_phi<-X_init$phi
   
   # to prevent error:
    for(j in 1:g){
@@ -117,8 +120,9 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   for(ii in 1:sim){
     
     # Simulate data based on initial estimates/estimate size factors
-    phi=matrix(c(1,2),nrow=1,ncol=2)
-    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method,phi=phi) # same disp param
+    #phi=matrix(c(1,2),nrow=1,ncol=2)
+    #phi=5/exp(sim_coefs)^2
+    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method,phi=init_phi) # same disp param
     y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
