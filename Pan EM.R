@@ -268,10 +268,20 @@ lowerK<-0
     # print(pi) # print estimated cluster proportions
     
     
-    if(any(rowSums(wts)==0)){
-      print(paste("Empty cluster when K =",k,". Choose smaller K"))
-      lowerK=1
-      break
+    # if(any(rowSums(wts)==0)){
+    #   print(paste("Empty cluster when K =",k,". Choose smaller K"))
+    #   lowerK=1
+    #   break
+    # }
+    for(i in 1:n){
+      for(c in 1:k){
+        if(wts[c,i]<1E-25){
+          wts[c,i]=1E-25
+        }
+        if(wts[c,i]>(1-1E-25)){
+          wts[c,i]=1E-25
+        }
+      }
     }
     
   }
