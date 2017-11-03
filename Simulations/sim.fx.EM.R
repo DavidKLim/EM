@@ -1,4 +1,4 @@
-run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_disc=c(10,25,50,75,90),method="poisson"){
+run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.3,0.5,1),num_disc=c(5,15,25),method="poisson"){
   setwd("/netscr/deelim/out")
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){
       cmd = rep(0, 3)
@@ -10,12 +10,12 @@ run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_
       cmd[3] = sprintf("save(X, file = '%s')", out2)
       cmdf = paste(cmd, collapse = "")
       write.table(cmdf, file = out, col.names = F, row.names = F, quote = F)
-      run = sprintf("bsub -M 4 -q week -o /netscr/deelim/dump R CMD BATCH %s", out)
+      run = sprintf("bsub -M 8 -q debug -n 2 -R \"span[hosts=1]\" -o /netscr/deelim/dump R CMD BATCH %s", out)
       system(run)
   }}}
 }
 
-collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.1,0.3,0.5,0.7,1),num_disc=c(10,25,50,75,90),method="poisson"){
+collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.3,0.5,1),num_disc=c(5,15,25),method="poisson"){
   nsims=length(true_k)*length(fold_change)*length(num_disc)
   tab<-matrix(0,nrow=nsims,ncol=10)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI","sens","false.pos")

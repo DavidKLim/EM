@@ -1,12 +1,9 @@
-setwd("C:/Users/David/Desktop/Research/EM")
+#setwd("C:/Users/David/Desktop/Research/EM")
 
 init_y<-read.table("init_y.txt")
 init_size_factors<-as.numeric(read.table("init_size_factors.txt")[,1])
 init_norm_y<-read.table("init_norm_y.txt")
-init_phi<-read.table("init_phi.txt")
 
-n=ncol(init_y)
-g=nrow(init_y)
 
 library("stats")
 library("data.table")
@@ -14,7 +11,7 @@ library("DESeq2")
 library("mclust")
 
 
-# DESeq analysis
+# # # DESeq analysis
 # row_names<-paste("gene",seq(g))
 # col_names<-paste("subj",seq(n))
 # cts<-as.matrix(y)
@@ -62,13 +59,42 @@ simulate_data=function(n,k,g,init_pi,b,size_factors,method,phi=matrix(0,nrow=g,n
   return(result)
 }
 
+# Simulate data with gene-wise dispersion parameters
+simulate_data_g=function(n,k,g,init_pi,b,size_factors,method,phi=rep(0,times=g)){
+  y<-matrix(rep(0,times=g*n),nrow=g)
+  z = rmultinom(n,1,init_pi)
+  if(ncol(b)!=k){
+    warning("Wrong order selected. Simulating based on correct order")
+    k=ncol(b)
+  }
+  cl = rep(0,n)
+  for(c in 1:k){
+    cl[z[c,]==1] = c
+  }
+  if(method=="poisson"){
+    for(j in 1:g){
+      for(i in 1:n){
+        y[j,i] = rpois( 1, lambda = size_factors[i]*exp(b[j,cl[i]]))
+      }
+    }
+  } else if(method=="nb"){
+    for(j in 1:g){
+      for(i in 1:n){
+        y[j,i] = rnbinom( 1, size = 1/phi[j], mu = size_factors[i]*exp(b[j,cl[i]]))
+      }
+    }
+  }
+  result<-list(y=y,z=z)
+  return(result)
+}
+
 
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, method){
   if(method=="poisson"){
     source("Pan EM.R")
   } else if(method=="nb"){
-    source("NB Pan EM.R")
+    source("NB Pan EM par.R")
   } else{
     print("no method input. Defaulting to Poisson")
     source("Pan EM.R")
@@ -120,9 +146,10 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   for(ii in 1:sim){
     
     # Simulate data based on initial estimates/estimate size factors
-    #phi=matrix(c(1,2),nrow=1,ncol=2)
-    #phi=5/exp(sim_coefs)^2
+    #init_phi=matrix(0.5,nrow=g,ncol=k)
+    init_phi=10/exp(sim_coefs)^2
     sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method,phi=init_phi) # same disp param
+    #sim.dat<-simulate_data_g(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method,phi=init_phi) # same disp param
     y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)

@@ -6,7 +6,8 @@ library(fpc)
 library(permute)
 library(amap)
 library(gplots)
-library(parallel)
+library(foreach)
+library(doParallel)
 
 
 
@@ -75,6 +76,8 @@ theta.ml2 <-
 
 M.step<-function(j){
   beta<-rep(0,times=k)
+  
+  print("stops here 1")
   if(a==1){
     for(c in 1:k){
       beta[c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
@@ -92,11 +95,14 @@ M.step<-function(j){
     beta<-coefs[j,]                                                   # Retrieve beta & theta from
     theta<-theta_list[[j]]                                            # previous iteration
   }
+  print("stops here 2")
+  
   
   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
   dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
   
   for(i in 1:maxit_IRLS){
+    print("stops here")
     eta <- 
       if(a==1 & i==1){
         matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
@@ -361,7 +367,9 @@ EM<-function(y, k,
   lowerK<-0
   
   phi= matrix(0,nrow=g,ncol=k)    # initial gene-specific dispersion parameters for negative binomial
-  # --> Poisson (phi = 0 = 1/theta)
+                                  # --> Poisson (phi = 0 = 1/theta)
+  #phi=rep(0,times=g)     # gene specific
+  
   #glmphi=phi                        # phi's (1/theta) generated from glm
   #init_phi=phi                      # store initialization of phi (1/disp)
   
@@ -380,11 +388,13 @@ EM<-function(y, k,
     
     par_X=rep(list(list()),g)
     
-    cl<-makeCluster(no_cores)
-    clusterExport(cl,ls(all.names=TRUE))
+    
+    cl<-makeCluster(no_cores,outfile="mylog.txt")
+    clusterExport(cl,c(ls(),"a","theta.ml2"))
     clusterEvalQ(cl, library("MASS"))
     
-    par_X<-parLapply(cl, 1:g, M.step)
+    
+    par_X<-foreach(gene=1:g, .combine=list, .multicombine=TRUE)  %dopar%  M.step(gene)
     
     stopCluster(cl)
     
@@ -495,8 +505,12 @@ EM<-function(y, k,
                Q=Q[1:a],
                BIC=BIC,
                nondiscriminatory=nondiscriminatory,
+               init_clusters=cls,
                final_clusters=final_clusters,
-               phi=phi)
+               phi=phi,
+               init_dat=y,
+               logL=log_L,
+               wts=wts)
   return(result)
   
 }

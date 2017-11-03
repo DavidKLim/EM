@@ -6,6 +6,7 @@ library(fpc)
 library(permute)
 library(amap)
 library(gplots)
+library(DESeq2)
 
 
 logsumexpc=function(v){  
@@ -28,6 +29,204 @@ soft_thresholding=function(alpha,lambda){
 }
 
 
+# theta.ml2() from glm.nb() function from MASS package
+# EDIT: use MM if ML diverges
+theta.ml2 <-
+  function(y, mu, n = sum(weights), weights, limit = 10,
+           eps = .Machine$double.eps^0.25,
+           trace = FALSE){
+    score <- function(n, th, mu, y, w)
+      sum(w*(digamma(th + y) - digamma(th) + log(th) +
+               1 - log(th + mu) - (y + th)/(mu + th)))
+    info <- function(n, th, mu, y, w)
+      sum(w*( - trigamma(th + y) + trigamma(th) - 1/th +
+                2/(mu + th) - (y + th)/(mu + th)^2))
+    if(inherits(y, "lm")) {
+      mu <- y$fitted.values
+      y <- if(is.null(y$y)) mu + residuals(y) else y$y
+    }
+    if(missing(weights)) weights <- rep(1, length(y))
+    t0 <- n/sum(weights*(y/mu - 1)^2)
+    it <- 0
+    del <- 1
+    if(trace) message(sprintf("theta.ml: iter %d 'theta = %f'",
+                              it, signif(t0)), domain = NA)
+    while((it <- it + 1) < limit && abs(del) > eps) {
+      t0 <- abs(t0)
+      del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, mu, y, weights))
+      if(del < (-t0) || is.na(del)){
+        warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
+        t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)
+        break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
+      }
+      t0 <- t0 + del
+      if(trace) message("theta.ml: iter", it," theta =", signif(t0))
+    }
+    if(t0 < 0) {
+      t0 <- 0
+      warning("estimate truncated at zero")
+      attr(t0, "warn") <- gettext("estimate truncated at zero")
+    }
+    if(it == limit) {
+      warning("iteration limit reached")
+      attr(t0, "warn") <- gettext("iteration limit reached")
+    }
+    attr(t0, "SE") <- sqrt(1/i)
+    t0
+  }
+
+
+
+# estimateDispersionsGeneEst() from DESeq2 package
+# EDIT: use current phi instead of MM estimates
+# source("C:/Users/David/Documents/R/win-library/3.4/DESeq2/unexported.DESeq2.fx.R")
+# estimateDispersionsGeneEst2 <- function(object, minDisp=1e-8, kappa_0=1,
+#                                        dispTol=1e-6, maxit=100, quiet=TRUE,
+#                                        modelMatrix=NULL, niter=1, linearMu=NULL,
+#                                        minmu=0.5) {
+#   if (!is.null(mcols(object)$dispGeneEst)) {
+#     if (!quiet) message("found already estimated gene-wise dispersions, removing these")
+#     removeCols <- c("dispGeneEst")
+#     mcols(object) <- mcols(object)[,!names(mcols(object)) %in% removeCols,drop=FALSE]
+#   }
+#   stopifnot(length(minDisp) == 1)
+#   stopifnot(length(kappa_0) == 1)
+#   stopifnot(length(dispTol) == 1)
+#   stopifnot(length(maxit) == 1)
+#   if (log(minDisp/10) <= -30) {
+#     stop("for computational stability, log(minDisp/10) should be above -30")
+#   }
+#   
+#   # in case the class of the mcols(mcols(object)) are not character
+#   object <- sanitizeRowRanges(object)
+#   
+#   if (is.null(modelMatrix)) {
+#     modelMatrix <- getModelMatrix(object) 
+#     checkFullRank(modelMatrix)
+#     if (nrow(modelMatrix) == ncol(modelMatrix)) {
+#       stop("the number of samples and the number of model coefficients are equal,
+#            i.e., there are no replicates to estimate the dispersion.
+#            use an alternate design formula")
+#     }
+#     } else {
+#       message("using supplied model matrix")
+#     }
+#   
+#   object <- getBaseMeansAndVariances(object)
+#   
+#   # only continue on the rows with non-zero row mean
+#   objectNZ <- object[!mcols(object)$allZero,,drop=FALSE]
+#   
+#   # this rough dispersion estimate (alpha_hat)
+#   # is for estimating mu
+#   # and for the initial starting point for line search
+#   # first check if model matrix is full rank
+#   fullRank <- qr(modelMatrix)$rank == ncol(modelMatrix)
+#   alpha_hat <- 1/phi
+#   
+#   # bound the rough estimated alpha between minDisp and maxDisp for numeric stability
+#   maxDisp <- max(10, ncol(object))
+#   alpha_hat <- alpha_hat_new <- alpha_init <- pmin(pmax(minDisp, alpha_hat), maxDisp)
+#   
+#   stopifnot(length(niter) == 1 & niter > 0)
+#   
+#   # use weights if they are present in assays(object)
+#   # (we need this already to decide about linear mu fitting)
+#   wlist <- getAndCheckWeights(object, modelMatrix)
+#   weights <- wlist$weights
+#   useWeights <- wlist$useWeights
+#   
+#   # use a linear model to estimate the expected counts
+#   # if the number of groups according to the model matrix
+#   # is equal to the number of columns
+#   if (is.null(linearMu)) {
+#     modelMatrixGroups <- modelMatrixGroups(modelMatrix)
+#     linearMu <- nlevels(modelMatrixGroups) == ncol(modelMatrix)
+#     # also check for weights (then can't do linear mu)
+#     if (useWeights) {
+#       linearMu <- FALSE
+#     }
+#   }
+#   
+#   # below, iterate between mean and dispersion estimation (niter) times
+#   fitidx <- rep(TRUE,nrow(objectNZ))
+#   mu <- matrix(0, nrow=nrow(objectNZ), ncol=ncol(objectNZ))
+#   dispIter <- numeric(nrow(objectNZ))
+#   # bound the estimated count by 'minmu'
+#   # this helps make the fitting more robust,
+#   # because 1/mu occurs in the weights for the NB GLM
+#   for (iter in seq_len(niter)) {
+#     if (!linearMu) {
+#       fit <- fitNbinomGLMs(objectNZ[fitidx,,drop=FALSE],
+#                            alpha_hat=alpha_hat[fitidx],
+#                            modelMatrix=modelMatrix)
+#       fitMu <- fit$mu
+#     } else {
+#       fitMu <- linearModelMuNormalized(objectNZ[fitidx,,drop=FALSE],
+#                                        modelMatrix)
+#     }
+#     fitMu[fitMu < minmu] <- minmu
+#     mu[fitidx,] <- fitMu
+#     
+#     # use of kappa_0 in backtracking search
+#     # initial proposal = log(alpha) + kappa_0 * deriv. of log lik. w.r.t. log(alpha)
+#     # use log(minDisp/10) to stop if dispersions going to -infinity
+#     
+#     dispRes <- fitDispWrapper(ySEXP = counts(objectNZ)[fitidx,,drop=FALSE],
+#                               xSEXP = modelMatrix,
+#                               mu_hatSEXP = fitMu,
+#                               log_alphaSEXP = log(alpha_hat)[fitidx],
+#                               log_alpha_prior_meanSEXP = log(alpha_hat)[fitidx],
+#                               log_alpha_prior_sigmasqSEXP = 1, min_log_alphaSEXP = log(minDisp/10),
+#                               kappa_0SEXP = kappa_0, tolSEXP = dispTol,
+#                               maxitSEXP = maxit, usePriorSEXP = FALSE,
+#                               weightsSEXP = weights, useWeightsSEXP = useWeights)
+#     
+#     dispIter[fitidx] <- dispRes$iter
+#     alpha_hat_new[fitidx] <- pmin(exp(dispRes$log_alpha), maxDisp)
+#     # only rerun those rows which moved
+#     fitidx <- abs(log(alpha_hat_new) - log(alpha_hat)) > .05
+#     alpha_hat <- alpha_hat_new
+#     if (sum(fitidx) == 0) break
+#   }
+#   
+#   # dont accept moves if the log posterior did not
+#   # increase by more than one millionth,
+#   # and set the small estimates to the minimum dispersion
+#   dispGeneEst <- alpha_hat
+#   if (niter == 1) {
+#     noIncrease <- dispRes$last_lp < dispRes$initial_lp + abs(dispRes$initial_lp)/1e6
+#     dispGeneEst[which(noIncrease)] <- alpha_init[which(noIncrease)]
+#   }
+#   dispGeneEstConv <- dispIter < maxit
+#   
+#   # if lacking convergence from fitDisp() (C++)...
+#   refitDisp <- !dispGeneEstConv & dispGeneEst > minDisp*10
+#   if (sum(refitDisp) > 0) {
+#     
+#     dispGrid <- fitDispGridWrapper(y = counts(objectNZ)[refitDisp,,drop=FALSE],
+#                                    x = modelMatrix,
+#                                    mu = mu[refitDisp,,drop=FALSE],
+#                                    logAlphaPriorMean = rep(0,sum(refitDisp)),
+#                                    logAlphaPriorSigmaSq = 1, usePrior = FALSE,
+#                                    weightsSEXP = weights, useWeightsSEXP = useWeights)
+#     dispGeneEst[refitDisp] <- dispGrid
+#   }
+#   dispGeneEst <- pmin(pmax(dispGeneEst, minDisp), maxDisp)
+#   
+#   dispDataFrame <- buildDataFrameWithNARows(list(dispGeneEst=dispGeneEst),
+#                                             mcols(object)$allZero)
+#   mcols(dispDataFrame) <- DataFrame(type=rep("intermediate",ncol(dispDataFrame)),
+#                                     description=c("gene-wise estimates of dispersion"))
+#   mcols(object) <- cbind(mcols(object), dispDataFrame)
+#   assays(object)[["mu"]] <- buildMatrixWithNARows(mu, mcols(object)$allZero)
+#   
+#   return(object)
+# }
+
+
+
+
 
 
 EM<-function(y, k,
@@ -39,9 +238,28 @@ EM<-function(y, k,
 n<-ncol(y)
 g<-nrow(y)
 
+
+
+# Create DESeq Dataset
+# cts<-as.matrix(y)
+# rownames(cts)<-rownames(y)
+# colnames(cts)<-colnames(y)
+# coldata<-data.frame(rep(1,times=n))
+# rownames(coldata)<-colnames(cts)
+# colnames(coldata)<-"dummy"
+# dds<-suppressMessages(DESeqDataSetFromMatrix(countData = cts,
+#                                              colData = coldata,
+#                                              design = ~ 1))
+# dds<-suppressMessages(DESeq(dds,quiet=TRUE))
+
+
+
+
 # this makes it possible to have y=0 --> adds 0.1 to all y
 y = y+0.1
 
+
+# Create flattened data matrix
 vect_y<-as.vector(t(y))
 new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
 gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
@@ -114,18 +332,19 @@ maxit_IRLS=100
 # maxit_NB = 100
 
 EM_tol = 1E-6
-maxit_EM = 2000
+maxit_EM = 5000
 Q<-rep(0,times=maxit_EM)
   
 lowerK<-0
 
 phi= matrix(0,nrow=g,ncol=k)    # initial gene-specific dispersion parameters for negative binomial
-                                # --> Poisson (phi = 0 = 1/theta)
+                                 # --> Poisson (phi = 0 = 1/theta)
+#phi=rep(0,times=g)
+
 #glmphi=phi                        # phi's (1/theta) generated from glm
 #init_phi=phi                      # store initialization of phi (1/disp)
 
 temp_list <- list()             # store temp to see progression of IRLS
-
 phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
 
   ########### M / E STEPS #########
@@ -160,6 +379,8 @@ phi_list <- list()              # store each iteration of phi to see change with
       }
       
       temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
+      #temp<-matrix(0,ncol=(k+1),nrow=maxit_IRLS)      # GENE SPECIFIC
+      
       dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
       for(i in 1:maxit_IRLS){
@@ -171,15 +392,15 @@ phi_list <- list()              # store each iteration of phi to see change with
           }else{eta}
         
         
-        temp[i,]<-c(beta,phi[j,])
+        temp[i,]<-c(beta,phi[j,])              # FOR GENE AND CLUSTER SPECIFIC
+        #temp[i,]<-c(beta,phi[j])                # GENE SPECIFIC
         
         for(c in 1:k){
           
           dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
-          
-          #phi[j,c]<-glm.nb((dat_jc[,"count"]-0.1) ~ 1 + offset(offset), weights=dat_jc[,"weights"])$theta   #glm.nb() theta
 
           family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
+          #family=negative.binomial(theta=1/phi[j])           # GENE SPECIFIC
           
           linkinv<-family$linkinv              # g^(-1) (eta) = mu
           mu.eta<-family$mu.eta                # g' = d(mu)/d(eta)
@@ -214,17 +435,36 @@ phi_list <- list()              # store each iteration of phi to see change with
           mu[,c]<-linkinv(eta[,c])
           
           
-          phi[j,c] <- 
+          # Calculate phi = 1/theta #
+          
+          #### Maximum Likelihood Estimation (cluster & gene) ####
+          phi[j,c] <-
             if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
-              1/theta.ml(y = dat_jc[,"count"]-0.1,
+              1/theta.ml2(y = dat_jc[,"count"]-0.1,
                         mu = mu[,c],
                         weights = dat_jc[,"weights"],
                         limit=10,trace=FALSE)                # this bypasses error when all counts in cluster are identical or
                                                              # there is just one subject in cluster (this would be 0 disp anyway)
             } else {0}
+          ########################################
+          
+          
+          
+          #### Method of Moments ####
+          # phimm[j,c] <- 1/theta.mm(y = dat_jc[,"count"]-0.1,
+          #                        mu=mu[,c],
+          #                        dfr = sum(dat_jc[,"weights"])-1,
+          #                        weights = dat_jc[,"weights"])
+          ###########################
+          
+          #### Deviance ####
+          # phimd[j,c] <- 1/theta.md(y = dat_jc[,"count"]-0.1,
+          #                        mu=mu[,c],
+          #                        dfr = sum(dat_jc[,"weights"])-1,
+          #                        weights = dat_jc[,"weights"])
+          ##################
           
           #### CHI SQUARE DAMPENING ####
-          
           # Initialize phi #
           # if(a==1 & i==1){
           #   mu[,c] = exp(eta[,c])
@@ -275,6 +515,7 @@ phi_list <- list()              # store each iteration of phi to see change with
           #   disp=1E-5
           # }
           # phi[j,c] = (disp)*phi[j,c]
+          #####################################
           
          }
         
@@ -304,7 +545,13 @@ phi_list <- list()              # store each iteration of phi to see change with
         }
         
       }
+      
+      
+      #phi[j] =  1/theta.ml2(y = dat_j[,"count"]-0.1, mu = as.vector(t(mu)), weights = dat_j[,"weights"], limit=10,trace=FALSE)   # GENE SPECIFIC
+      
     }
+    
+    #phi<-1/dispersions(estimateDispersionsGeneEst2(dds))
     
     phi_list[[a]] <- phi
     
@@ -327,6 +574,7 @@ phi_list <- list()              # store each iteration of phi to see change with
     for(i in 1:n){
       for(c in 1:k){
         l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        #l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi,mu=exp(coefs[,c] + offset[i]),log=TRUE))         # GENE SPECIFIC
       }    # subtract out 0.1 that was added earlier
     }
     
@@ -355,11 +603,21 @@ phi_list <- list()              # store each iteration of phi to see change with
     # print(pi) # print estimated cluster proportions
     
     
-    if(any(rowSums(wts)==0)){
-      finalwts<-wts
-      print(paste("Empty cluster when K =",k,". Choose smaller K"))
-      lowerK=1
-      break
+    # if(any(rowSums(wts)==0)){
+    #   finalwts<-wts
+    #   print(paste("Empty cluster when K =",k,". Choose smaller K"))
+    #   lowerK=1
+    #   break
+    # }
+    for(i in 1:n){
+      for(c in 1:k){
+        if(wts[c,i]<1E-50){
+          wts[c,i]=1E-50
+        }
+        if(wts[c,i]>(1-1E-50)){
+          wts[c,i]=1E-50
+        }
+      }
     }
     
   }
