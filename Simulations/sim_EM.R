@@ -1,8 +1,8 @@
 #setwd("C:/Users/David/Desktop/Research/EM")
 
 init_y<-read.table("init_y.txt")
-init_size_factors<-as.numeric(read.table("init_size_factors.txt")[,1])
-init_norm_y<-read.table("init_norm_y.txt")
+#init_size_factors<-as.numeric(read.table("init_size_factors.txt")[,1])
+#init_norm_y<-read.table("init_norm_y.txt")
 
 
 library("stats")
@@ -90,7 +90,7 @@ simulate_data_g=function(n,k,g,init_pi,b,size_factors,method,phi=rep(0,times=g))
 
 
 # Function to perform EM on simulated data
-sim.EM<-function(true.K, fold.change, num.disc, method){
+sim.EM<-function(true.K, fold.change, num.disc, g, method){
   if(method=="poisson"){
     source("Pan EM.R")
   } else if(method=="nb"){
@@ -101,10 +101,27 @@ sim.EM<-function(true.K, fold.change, num.disc, method){
   }
   true_clusters<-NA        # TRUE clusters not known for real data
   
+  n=ncol(init_y)
+  
+  
+  init_y<-init_y[1:g,]
+  row_names<-paste("gene",seq(g))
+  col_names<-paste("subj",seq(n))
+  cts<-as.matrix(init_y)
+  rownames(cts)<-row_names
+  colnames(cts)<-col_names
+  coldata<-data.frame(matrix(paste("cl",true_clusters,sep=""),nrow=n))
+  rownames(coldata)<-colnames(cts)
+  colnames(coldata)<-"cluster"
+  dds<-DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata,
+                              design = ~ 1)
+  DESeq_dds<-DESeq(dds)
+  init_size_factors<-sizeFactors(DESeq_dds)
+  init_norm_y<-counts(DESeq_dds,normalized=TRUE)
+  
   # Unpenalized run to find initial cluster estimates based on K=k
   k=true.K
-  n=ncol(init_y)
-  g=nrow(init_y)
   
   X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters)
   init_coefs<-X_init$coefs              # save init estimates for coefs & pi
