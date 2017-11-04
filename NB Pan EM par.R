@@ -8,6 +8,7 @@ library(amap)
 library(gplots)
 library(foreach)
 library(doParallel)
+library(parallel)
 
 
 
@@ -95,14 +96,12 @@ M.step<-function(j){
     beta<-coefs[j,]                                                   # Retrieve beta & theta from
     theta<-theta_list[[j]]                                            # previous iteration
   }
-  print("stops here 2")
   
   
   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
   dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
   
   for(i in 1:maxit_IRLS){
-    print("stops here")
     eta <- 
       if(a==1 & i==1){
         matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
@@ -388,13 +387,13 @@ EM<-function(y, k,
     
     par_X=rep(list(list()),g)
     
-    
     cl<-makeCluster(no_cores,outfile="mylog.txt")
-    clusterExport(cl,c(ls(),"a","theta.ml2"))
+    clusterExport(cl=cl,varlist=c(ls(),"theta.ml2","soft_thresholding"),envir=environment())
     clusterEvalQ(cl, library("MASS"))
     
     
-    par_X<-foreach(gene=1:g, .combine=list, .multicombine=TRUE)  %dopar%  M.step(gene)
+    #par_X<-foreach(gene=1:g, .combine=list, .multicombine=TRUE)  %dopar%  M.step(gene)
+    par_X<-parLapply(cl, 1:g, M.step)
     
     stopCluster(cl)
     
@@ -508,7 +507,7 @@ EM<-function(y, k,
                init_clusters=cls,
                final_clusters=final_clusters,
                phi=phi,
-               init_dat=y,
+               init_dat=(y-0.1),
                logL=log_L,
                wts=wts)
   return(result)

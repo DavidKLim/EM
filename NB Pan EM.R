@@ -332,7 +332,7 @@ maxit_IRLS=100
 # maxit_NB = 100
 
 EM_tol = 1E-6
-maxit_EM = 5000
+maxit_EM = 1000
 Q<-rep(0,times=maxit_EM)
   
 lowerK<-0
@@ -654,8 +654,12 @@ result<-list(pi=pi,
              Q=Q[1:a],
              BIC=BIC,
              nondiscriminatory=nondiscriminatory,
+             init_clusters=cls,
              final_clusters=final_clusters,
-             phi=phi)
+             phi=phi,
+             init_dat=y,
+             logL=log_L,
+             wts=wts)
 return(result)
   
 }
