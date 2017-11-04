@@ -6,8 +6,6 @@ library(fpc)
 library(permute)
 library(amap)
 library(gplots)
-library(foreach)
-library(doParallel)
 library(parallel)
 
 
@@ -392,7 +390,6 @@ EM<-function(y, k,
     clusterEvalQ(cl, library("MASS"))
     
     
-    #par_X<-foreach(gene=1:g, .combine=list, .multicombine=TRUE)  %dopar%  M.step(gene)
     par_X<-parLapply(cl, 1:g, M.step)
     
     stopCluster(cl)
