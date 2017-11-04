@@ -90,7 +90,9 @@ simulate_data_g=function(n,k,g,init_pi,b,size_factors,method,phi=rep(0,times=g))
 
 
 # Function to perform EM on simulated data
-sim.EM<-function(true.K, fold.change, num.disc, g, method){
+sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
+  # max n = 100, max g = 1088 w/ current (CancerSubtypes GeneExp data)#
+  
   if(method=="poisson"){
     source("Pan EM.R")
   } else if(method=="nb"){
@@ -101,10 +103,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, method){
   }
   true_clusters<-NA        # TRUE clusters not known for real data
   
-  n=ncol(init_y)
   
-  
-  init_y<-init_y[1:g,]
+  init_y<-init_y[1:g,1:n]
   row_names<-paste("gene",seq(g))
   col_names<-paste("subj",seq(n))
   cts<-as.matrix(init_y)
@@ -141,7 +141,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, method){
   
   fold_change<-fold.change
   nondisc_fold_change<-0         # fixed nondisc fold change
-  tt<-num.disc
+  
+  tt<-floor(num.disc*g)
   sim_coefs[1:tt,]<-matrix(rep( fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=tt),nrow=tt,byrow=TRUE)+sim_coefs[1:tt,]
   #sim_coefs[(tt+1):g,]<-matrix(rep( nondisc_fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]         # nondisc fold change = 0 so this doesn't get changed
 
