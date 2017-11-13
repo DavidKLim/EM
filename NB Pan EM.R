@@ -34,7 +34,7 @@ soft_thresholding=function(alpha,lambda){
 theta.ml2 <-
   function(y, mu, n = sum(weights), weights, limit = 10,
            eps = .Machine$double.eps^0.25,
-           trace = FALSE){
+           trace = FALSE,phi_use_ml=1){
     score <- function(n, th, mu, y, w)
       sum(w*(digamma(th + y) - digamma(th) + log(th) +
                1 - log(th + mu) - (y + th)/(mu + th)))
@@ -51,17 +51,20 @@ theta.ml2 <-
     del <- 1
     if(trace) message(sprintf("theta.ml: iter %d 'theta = %f'",
                               it, signif(t0)), domain = NA)
-    while((it <- it + 1) < limit && abs(del) > eps) {
+    while((it <- it + 1) < limit && abs(del) > eps && phi_use_ml==1) {
       t0 <- abs(t0)
       del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, mu, y, weights))
       if(del < (-t0) || is.na(del)){
         warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
-        t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)
+        phi_use_ml=0
         break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
       }
       t0 <- t0 + del
       if(trace) message("theta.ml: iter", it," theta =", signif(t0))
     }
+    
+    if(phi_use_ml==0){t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)}
+    
     if(t0 < 0) {
       t0 <- 0
       warning("estimate truncated at zero")
@@ -383,6 +386,8 @@ phi_list <- list()              # store each iteration of phi to see change with
       
       dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
       
+      phi_use_ml = 1        # track whether you use ml. Default is using ML
+      
       for(i in 1:maxit_IRLS){
         eta <- 
           if(a==1 & i==1){
@@ -443,7 +448,7 @@ phi_list <- list()              # store each iteration of phi to see change with
               1/theta.ml2(y = dat_jc[,"count"]-0.1,
                         mu = mu[,c],
                         weights = dat_jc[,"weights"],
-                        limit=10,trace=FALSE)                # this bypasses error when all counts in cluster are identical or
+                        limit=10,trace=FALSE,phi_use_ml=phi_use_ml)   # this bypasses error when all counts in cluster are identical or
                                                              # there is just one subject in cluster (this would be 0 disp anyway)
             } else {0}
           ########################################

@@ -32,7 +32,7 @@ soft_thresholding=function(alpha,lambda){
 theta.ml2 <-
   function(y, mu, n = sum(weights), weights, limit = 10,
            eps = .Machine$double.eps^0.25,
-           trace = FALSE){
+           trace = FALSE,phi_use_ml=1){
     score <- function(n, th, mu, y, w)
       sum(w*(digamma(th + y) - digamma(th) + log(th) +
                1 - log(th + mu) - (y + th)/(mu + th)))
@@ -49,17 +49,20 @@ theta.ml2 <-
     del <- 1
     if(trace) message(sprintf("theta.ml: iter %d 'theta = %f'",
                               it, signif(t0)), domain = NA)
-    while((it <- it + 1) < limit && abs(del) > eps) {
+    while((it <- it + 1) < limit && abs(del) > eps && phi_use_ml==1) {
       t0 <- abs(t0)
       del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, mu, y, weights))
       if(del < (-t0)){
         warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
-        t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)
+        phi_use_ml=0
         break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
       }
       t0 <- t0 + del
       if(trace) message("theta.ml: iter", it," theta =", signif(t0))
     }
+    
+    if(phi_use_ml==0){t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)}
+    
     if(t0 < 0) {
       t0 <- 0
       warning("estimate truncated at zero")
@@ -76,7 +79,7 @@ theta.ml2 <-
 M.step<-function(j){
   beta<-rep(0,times=k)
   
-  print("stops here 1")
+  print(paste("Gene",j))
   if(a==1){
     for(c in 1:k){
       beta[c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
@@ -99,7 +102,10 @@ M.step<-function(j){
   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
   dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
   
+  phi_use_ml = 1        # track whether you use ml. Default is using ML
+  
   for(i in 1:maxit_IRLS){
+    print(paste("IRLS iter",i))
     eta <- 
       if(a==1 & i==1){
         matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
@@ -111,6 +117,7 @@ M.step<-function(j){
     temp[i,]<-c(beta,phi[j,])
     
     for(c in 1:k){
+      print(paste("Cluster",c))
       
       dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
       
@@ -137,6 +144,7 @@ M.step<-function(j){
           ((lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
         } else { beta[c]<-sum(w*trans_y)/sum(w) }
       
+      print(beta[c])
       
       if(beta[c]<(-100)){
         warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
@@ -159,81 +167,19 @@ M.step<-function(j){
           1/theta.ml2(y = dat_jc[,"count"]-0.1,
                       mu = mu[,c],
                       weights = dat_jc[,"weights"],
-                      limit=10,trace=FALSE)                # this bypasses error when all counts in cluster are identical or
+                      limit=10,trace=FALSE,phi_use_ml=phi_use_ml)    # this bypasses error when all counts in cluster are identical or
           # there is just one subject in cluster (this would be 0 disp anyway)
         } else {0}
       ########################################
       
       
-      #### Method of Moments ####
-      # phimm[j,c] <- 1/theta.mm(y = dat_jc[,"count"]-0.1,
-      #                        mu=mu[,c],
-      #                        dfr = sum(dat_jc[,"weights"])-1,
-      #                        weights = dat_jc[,"weights"])
-      ###########################
       
-      #### Deviance ####
-      # phimd[j,c] <- 1/theta.md(y = dat_jc[,"count"]-0.1,
-      #                        mu=mu[,c],
-      #                        dfr = sum(dat_jc[,"weights"])-1,
-      #                        weights = dat_jc[,"weights"])
-      ##################
-      
-      #### CHI SQUARE DAMPENING ####
-      # Initialize phi #
-      # if(a==1 & i==1){
-      #   mu[,c] = exp(eta[,c])
-      #   Chi2 = sum(dat_jc[,"weights"]*(dat_jc[,"count"]-mu[,c])^2/mu[,c])
-      #   df = sum(dat_jc[,"weights"])-1            # df is number in cluster c, minus 1 (effective df if partial weights)
-      #   disp = Chi2/df
-      # 
-      #   if(disp==0){
-      #     warning("Dispersion goes to 0")
-      #     disp=1e-10
-      #   }
-      # 
-      #   phi[j,c] = 1/disp
-      #   init_phi[j,c] = phi[j,c]
-      #   #print(paste("FIRST phi",phi[j,c]))
-      # }
-      # NB_eta = eta[,c]
-      # NB_beta = beta
-      # family = negative.binomial(theta=1/phi[j,c])
-      # linkinv = family$linkinv
-      # mu.eta = family$mu.eta
-      # variance = family$variance
-      # NB_mu = linkinv(NB_eta)
-      # NB_mu.eta.val = mu.eta(NB_eta)
-      # good <- (dat_jc[,"weights"]>0) & (NB_mu.eta.val != 0)
-      # trans_y <- (NB_eta - offset)[good] + (dat_jc[,"count"][good] - NB_mu[good]) / NB_mu.eta.val[good]
-      # w <- sqrt(dat_jc[,"weights"][good]*NB_mu.eta.val[good]^2/variance(NB_mu)[good])
-      # NB_beta[c] <-
-      #   if(lambda1!=0){
-      #     ((lambda1*((sum(NB_beta)-NB_beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
-      #   } else { sum(w*trans_y)/sum(w) }
-      # if(NB_beta[c]<(-100)){
-      # warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-      # NB_beta[c] = -100
-      # }
-      # if(NB_beta[c]>100){
-      #   warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-      #   NB_beta[c] = 100
-      # }
-      # 
-      # NB_eta<-NB_beta[c] + offset      # add back size factors to eta
-      # NB_mu <- linkinv(NB_eta)
-      # Chi2 = sum(dat_jc[,"weights"]*(dat_jc[,"count"]-NB_mu)^2/(variance(NB_mu)))
-      # disp = Chi2/df            # df doesn't change from before
-      # 
-      # if(disp==0){
-      #   warning("Dispersion goes to 0")
-      #   disp=1E-5
-      # }
-      # phi[j,c] = (disp)*phi[j,c]
-      #####################################
       
     }
     
+    print("Finished IRLS")
+    
+    print(phi[j,])
     # update on theta (beta_i - beta_j)
     for(c in 1:k){
       for(cc in 1:k){
@@ -242,8 +188,9 @@ M.step<-function(j){
       }
     }
     
+    print("Finished update on theta")
     
-    
+    print(sum((temp[i,]-temp[i-1,])^2))
     # break conditions for IRLS
     if(i>1){
       if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){
@@ -254,12 +201,14 @@ M.step<-function(j){
         break
       }
     }
+    print("Finished break condition1")
     if(i==maxit_IRLS){
       coefs_j<-beta
       theta_j<-theta  
       temp_j<-temp[1:i,]           # reached maxit
       phi_j<-phi[j,]
     }
+    print("Finished break condition2")
     
   }
   results=list(coefs_j=coefs_j,
@@ -351,14 +300,14 @@ EM<-function(y, k,
   pi<-rep(0,times=k)
   theta_list<-list()                # temporary to hold all K x K theta matrices
   
-  IRLS_tol = 1E-7                   # Tolerance levels for embedded IRLS and Q fx in EM
-  maxit_IRLS=100
+  IRLS_tol = 1E-6                   # Tolerance levels for embedded IRLS and Q fx in EM
+  maxit_IRLS = 50
   
   # NB_tol = 1E-5
   # maxit_NB = 100
   
   EM_tol = 1E-6
-  maxit_EM = 500
+  maxit_EM = 1000
   Q<-rep(0,times=maxit_EM)
   
   lowerK<-0
