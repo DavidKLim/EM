@@ -227,6 +227,7 @@ EM<-function(y, k,
              norm_y=y,
              true_clusters=NA){
   
+  start<-Sys.time()
   no_cores<-detectCores()-1
   
   n<-ncol(y)
@@ -325,7 +326,6 @@ EM<-function(y, k,
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
-    
     # M step
     
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
@@ -380,6 +380,8 @@ EM<-function(y, k,
     pt2<-sum(wts*l)
     Q[a]<-pt1+pt2
     
+    
+    
     # break condition for EM
     if(a>10){if(abs(Q[a]-Q[a-10])<EM_tol) {
       finalwts<-wts
@@ -415,10 +417,7 @@ EM<-function(y, k,
         }
       }
     }
-    
   }
-  
-  
   
   
   
@@ -445,6 +444,10 @@ EM<-function(y, k,
   BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
   if(lowerK==1){BIC=.Machine$integer.max}      # set BIC as max (worst) if K too high
   
+  end<-Sys.time()
+  
+  time_elap<-end-start
+  
   result<-list(pi=pi,
                coefs=coefs,
                Q=Q[1:a],
@@ -453,9 +456,9 @@ EM<-function(y, k,
                init_clusters=cls,
                final_clusters=final_clusters,
                phi=phi,
-               init_dat=(y-0.1),
                logL=log_L,
-               wts=wts)
+               wts=wts,
+               time_elap=time_elap)
   return(result)
   
 }

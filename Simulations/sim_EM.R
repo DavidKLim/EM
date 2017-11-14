@@ -215,8 +215,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     norm_y = all_data[[ii]]$norm_y
     
     for(aa in 1:nrow(list_BIC)){
-      list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC  # no penalty
+      X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)  # no penalty
+      list_BIC[aa,2]<-X$BIC
       print(list_BIC[aa,])
+      print(paste("Time elapsed:",X$time_elap))
     }
     
     choose_k[ii]=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
@@ -264,8 +266,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     #search for optimal penalty parameters
     for(aa in 1:nrow(list_BIC)){
-      list_BIC[aa,4]<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)$BIC
+      X<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
+      list_BIC[aa,4]<-X$BIC
       print(list_BIC[aa,])
+      print(paste("Time elapsed:",X$time_elap))
     }
     
     #store optimal penalty parameters
@@ -339,6 +343,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     } else {temp_falsepos[ii]<-NA}
     
     print(paste(temp_nondisc[ii],temp_ARI[ii],temp_sensitivity[ii],temp_falsepos[ii]))
+    print(paste("Time elapsed:",X$time_elap))
   }
   
   mean_pi<-colSums(temp_pi)/sim
