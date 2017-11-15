@@ -229,7 +229,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     choose_k[ii]=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
   }
   
-  ktab_k<-table(choose_k)
+  tab_k<-table(choose_k)
   
   print(tab_k)
   max_k=as.numeric(rownames(tab_k)[which.max(tab_k)])
