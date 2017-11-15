@@ -52,7 +52,7 @@ theta.ml2 <-
     while((it <- it + 1) < limit && abs(del) > eps && phi_use_ml==1) {
       t0 <- abs(t0)
       del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, mu, y, weights))
-      if(del < (-t0)){
+      if(del < (-t0) || is.na(t0)){
         warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
         phi_use_ml=0
         break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
@@ -79,7 +79,6 @@ theta.ml2 <-
 M.step<-function(j){
   beta<-rep(0,times=k)
   
-  print(paste("Gene",j))
   if(a==1){
     for(c in 1:k){
       beta[c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
@@ -105,7 +104,6 @@ M.step<-function(j){
   phi_use_ml = 1        # track whether you use ml. Default is using ML
   
   for(i in 1:maxit_IRLS){
-    print(paste("IRLS iter",i))
     eta <- 
       if(a==1 & i==1){
         matrix(rep(beta,times=n),nrow=n,byrow=TRUE)               # first initialization of eta
@@ -117,7 +115,6 @@ M.step<-function(j){
     temp[i,]<-c(beta,phi[j,])
     
     for(c in 1:k){
-      print(paste("Cluster",c))
       
       dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset j'th gene, c'th cluster
       
@@ -144,7 +141,6 @@ M.step<-function(j){
           ((lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
         } else { beta[c]<-sum(w*trans_y)/sum(w) }
       
-      print(beta[c])
       
       if(beta[c]<(-100)){
         warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
@@ -177,9 +173,8 @@ M.step<-function(j){
       
     }
     
-    print("Finished IRLS")
+    print(phi_use_ml)
     
-    print(phi[j,])
     # update on theta (beta_i - beta_j)
     for(c in 1:k){
       for(cc in 1:k){
@@ -188,9 +183,6 @@ M.step<-function(j){
       }
     }
     
-    print("Finished update on theta")
-    
-    print(sum((temp[i,]-temp[i-1,])^2))
     # break conditions for IRLS
     if(i>1){
       if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){
@@ -201,14 +193,12 @@ M.step<-function(j){
         break
       }
     }
-    print("Finished break condition1")
     if(i==maxit_IRLS){
       coefs_j<-beta
       theta_j<-theta  
       temp_j<-temp[1:i,]           # reached maxit
       phi_j<-phi[j,]
     }
-    print("Finished break condition2")
     
   }
   results=list(coefs_j=coefs_j,
@@ -334,7 +324,7 @@ EM<-function(y, k,
     
     par_X=rep(list(list()),g)
     
-    cl<-makeCluster(no_cores,outfile="mylog.txt")
+    cl<-makeCluster(no_cores)
     clusterExport(cl=cl,varlist=c(ls(),"theta.ml2","soft_thresholding"),envir=environment())
     clusterEvalQ(cl, library("MASS"))
     
