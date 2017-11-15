@@ -52,7 +52,7 @@ theta.ml2 <-
     while((it <- it + 1) < limit && abs(del) > eps && phi_use_ml==1) {
       t0 <- abs(t0)
       del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, mu, y, weights))
-      if(del < (-t0) || is.na(t0)){
+      if(del < (-t0) || is.na(t0) || is.na(del)){
         warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
         phi_use_ml=0
         break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
