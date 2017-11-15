@@ -437,6 +437,7 @@ EM<-function(y, k,
   end<-Sys.time()
   
   time_elap<-end-start
+  message(time_elap)
   
   result<-list(pi=pi,
                coefs=coefs,
@@ -447,11 +448,16 @@ EM<-function(y, k,
                final_clusters=final_clusters,
                phi=phi,
                logL=log_L,
-               wts=wts,
-               time_elap=time_elap)
+               wts=wts)
   return(result)
   
 }
 
 
+sleep_for_a_minute <- function() { Sys.sleep(60) }
 
+start_time <- Sys.time()
+sleep_for_a_minute()
+end_time <- Sys.time()
+
+end_time - start_time

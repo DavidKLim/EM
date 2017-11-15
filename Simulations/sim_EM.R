@@ -223,7 +223,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)  # no penalty
       list_BIC[aa,2]<-X$BIC
       print(list_BIC[aa,])
-      message(paste("Time:",X$time_elap))
     }
     
     choose_k[ii]=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
@@ -275,7 +274,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       X<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
       list_BIC[aa,4]<-X$BIC
       print(list_BIC[aa,])
-      message(paste("Time:",X$time_elap))
     }
     
     #store optimal penalty parameters
@@ -349,7 +347,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     } else {temp_falsepos[ii]<-NA}
     
     print(paste(temp_nondisc[ii],temp_ARI[ii],temp_sensitivity[ii],temp_falsepos[ii]))
-    message(paste("Time:",X$time_elap))
   }
   
   mean_pi<-colSums(temp_pi)/sim
