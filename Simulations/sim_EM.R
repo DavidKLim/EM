@@ -184,7 +184,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     }
     true_disc=c(rep(TRUE,tt),rep(FALSE,(g-tt)))
     
-    idx <- rowSums(y)>100      # mark only genes with >100 count total: take out genes with excess 0's or too low count
+    rowZeroes<-rep(0,times=g)
+    for(j in 1:g){
+      rowZeroes[j] = mean(y[j,]==0)
+    }          # Proportion of zeroes in each gene
+    
+    idx <- (rowSums(y)>100 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
     
     y <- y[idx,]
     norm_y <- norm_y[idx,]
@@ -218,13 +223,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)  # no penalty
       list_BIC[aa,2]<-X$BIC
       print(list_BIC[aa,])
-      print(paste("Time elapsed:",X$time_elap))
+      message(paste("Time:",X$time_elap))
     }
     
     choose_k[ii]=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
   }
   
-  tab_k<-table(choose_k)
+  ktab_k<-table(choose_k)
+  
   print(tab_k)
   max_k=as.numeric(rownames(tab_k)[which.max(tab_k)])
   
@@ -269,7 +275,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       X<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
       list_BIC[aa,4]<-X$BIC
       print(list_BIC[aa,])
-      print(paste("Time elapsed:",X$time_elap))
+      message(paste("Time:",X$time_elap))
     }
     
     #store optimal penalty parameters
@@ -343,7 +349,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     } else {temp_falsepos[ii]<-NA}
     
     print(paste(temp_nondisc[ii],temp_ARI[ii],temp_sensitivity[ii],temp_falsepos[ii]))
-    print(paste("Time elapsed:",X$time_elap))
+    message(paste("Time:",X$time_elap))
   }
   
   mean_pi<-colSums(temp_pi)/sim
