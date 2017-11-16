@@ -217,7 +217,8 @@ EM<-function(y, k,
              norm_y=y,
              true_clusters=NA){
   
-  start<-Sys.time()
+  start_time <- Sys.time()
+  
   no_cores<-detectCores()-1
   
   n<-ncol(y)
@@ -434,10 +435,9 @@ EM<-function(y, k,
   BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
   if(lowerK==1){BIC=.Machine$integer.max}      # set BIC as max (worst) if K too high
   
-  end<-Sys.time()
+  end_time <- Sys.time()
   
-  time_elap<-end-start
-  message(time_elap)
+  time_elap <- as.numeric(end_time)-as.numeric(start_time)
   
   result<-list(pi=pi,
                coefs=coefs,
@@ -448,16 +448,10 @@ EM<-function(y, k,
                final_clusters=final_clusters,
                phi=phi,
                logL=log_L,
-               wts=wts)
+               wts=wts,
+               time_elap=time_elap)
   return(result)
   
 }
 
 
-sleep_for_a_minute <- function() { Sys.sleep(60) }
-
-start_time <- Sys.time()
-sleep_for_a_minute()
-end_time <- Sys.time()
-
-end_time - start_time
