@@ -250,7 +250,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   choose_lambda2<-rep(0,times=sim)
   choose_tau<-rep(0,times=sim)
   
-  for(ii in 1:sim){
+  for(ii in 1:sim/10){
     
     print(paste("Iteration",ii,"of grid search"))    # track iteration
     
