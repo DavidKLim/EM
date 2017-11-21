@@ -245,12 +245,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   
   
   # Simulations to do Grid search for tuning parameters
+  sim_tune=sim/10
+  choose_lambda1<-rep(0,times=sim_tune)
+  choose_lambda2<-rep(0,times=sim_tune)
+  choose_tau<-rep(0,times=sim_tune)
   
-  choose_lambda1<-rep(0,times=sim/10)
-  choose_lambda2<-rep(0,times=sim/10)
-  choose_tau<-rep(0,times=sim/10)
-  
-  for(ii in 1:sim/10){
+  for(ii in 1:sim_tune){
     
     print(paste("Iteration",ii,"of grid search"))    # track iteration
     
