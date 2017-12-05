@@ -32,7 +32,7 @@ soft_thresholding=function(alpha,lambda){
 theta.ml2 <-
   function(y, mu, n = sum(weights), weights, limit = 10,
            eps = .Machine$double.eps^0.25,
-           trace = FALSE,phi_use_ml=1){
+           trace = FALSE,use_ml=1){
     score <- function(n, th, mu, y, w)
       sum(w*(digamma(th + y) - digamma(th) + log(th) +
                1 - log(th + mu) - (y + th)/(mu + th)))
@@ -49,19 +49,19 @@ theta.ml2 <-
     del <- 1
     if(trace) message(sprintf("theta.ml: iter %d 'theta = %f'",
                               it, signif(t0)), domain = NA)
-    while((it <- it + 1) < limit && abs(del) > eps && phi_use_ml==1) {
+    while((it <- it + 1) < limit && abs(del) > eps && use_ml==1) {
       t0 <- abs(t0)
       del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, mu, y, weights))
       if(del < (-t0) || is.na(t0) || is.na(del)){
         warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
-        phi_use_ml=0
+        use_ml <- 0
         break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
       }
       t0 <- t0 + del
       if(trace) message("theta.ml: iter", it," theta =", signif(t0))
     }
     
-    if(phi_use_ml==0){t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)}
+    if(use_ml==0){t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)}
     
     if(t0 < 0) {
       t0 <- 0
@@ -73,7 +73,9 @@ theta.ml2 <-
       attr(t0, "warn") <- gettext("iteration limit reached")
     }
     attr(t0, "SE") <- sqrt(1/i)
-    t0
+    res <- list(t0=t0,
+                use_ml=use_ml)
+    return(res)
   }
 
 M.step<-function(j){
@@ -101,7 +103,7 @@ M.step<-function(j){
   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
   dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
   
-  phi_use_ml = 1        # track whether you use ml. Default is using ML
+  phi_use_ml = rep(1,times=k)        # track whether you use ml. Default is using ML
   
   for(i in 1:maxit_IRLS){
     eta <- 
@@ -158,22 +160,20 @@ M.step<-function(j){
       # Calculate phi = 1/theta #
       
       #### Maximum Likelihood Estimation ####
-      phi[j,c] <-
-        if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
-          1/theta.ml2(y = dat_jc[,"count"]-0.1,
-                      mu = mu[,c],
-                      weights = dat_jc[,"weights"],
-                      limit=10,trace=FALSE,phi_use_ml=phi_use_ml)    # this bypasses error when all counts in cluster are identical or
-          # there is just one subject in cluster (this would be 0 disp anyway)
-        } else {0}
+      if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
+          fit <- theta.ml2(y = dat_jc[,"count"]-0.1,
+                           mu = mu[,c],
+                           weights = dat_jc[,"weights"],
+                           limit=10,trace=FALSE,use_ml=phi_use_ml[c])
+          phi[j,c] <- 1/fit$t0    # this bypasses error when all counts in cluster are identical or
+                                # there is just one subject in cluster (this would be 0 disp anyway)
+          phi_use_ml[c] = fit$use_ml
+        } else {phi[j,c]=0}
       ########################################
-      
-      
       
       
     }
     
-    print(phi_use_ml)
     
     # update on theta (beta_i - beta_j)
     for(c in 1:k){
@@ -182,10 +182,9 @@ M.step<-function(j){
         else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}           # 
       }
     }
-    
     # break conditions for IRLS
     if(i>1){
-      if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){
+      if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){  # convergence of just coefs?? or phi too?
         coefs_j<-beta                                 # reached convergence
         theta_j<-theta
         temp_j<-temp[1:i,]
@@ -199,8 +198,8 @@ M.step<-function(j){
       temp_j<-temp[1:i,]           # reached maxit
       phi_j<-phi[j,]
     }
-    
   }
+  
   results=list(coefs_j=coefs_j,
                theta_j=theta_j,
                temp_j=temp_j,
@@ -326,9 +325,10 @@ EM<-function(y, k,
     par_X=rep(list(list()),g)
     
     cl<-makeCluster(no_cores)
+    i=1                            # cluster complained when this wasn't defined before
+    
     clusterExport(cl=cl,varlist=c(ls(),"theta.ml2","soft_thresholding"),envir=environment())
     clusterEvalQ(cl, library("MASS"))
-    
     
     par_X<-parLapply(cl, 1:g, M.step)
     
@@ -364,7 +364,6 @@ EM<-function(y, k,
         l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       }    # subtract out 0.1 that was added earlier
     }
-    
     
     # store and check Q function
     pt1<-(log(pi)%*%rowSums(wts))
