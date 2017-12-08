@@ -103,7 +103,6 @@ M.step<-function(j){
   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
   dat_j<-dat[dat[,"g"]==j,]                                  # subset just the j'th gene
   
-  phi_use_ml = rep(1,times=k)        # track whether you use ml. Default is using ML
   
   for(i in 1:maxit_IRLS){
     eta <- 
@@ -164,10 +163,10 @@ M.step<-function(j){
           fit <- theta.ml2(y = dat_jc[,"count"]-0.1,
                            mu = mu[,c],
                            weights = dat_jc[,"weights"],
-                           limit=10,trace=FALSE,use_ml=phi_use_ml[c])
+                           limit=10,trace=FALSE,use_ml=phi_use_ml[j,c])
           phi[j,c] <- 1/fit$t0    # this bypasses error when all counts in cluster are identical or
                                 # there is just one subject in cluster (this would be 0 disp anyway)
-          phi_use_ml[c] = fit$use_ml
+          phi_use_ml[j,c] = fit$use_ml
         } else {phi[j,c]=0}
       ########################################
       
@@ -189,6 +188,7 @@ M.step<-function(j){
         theta_j<-theta
         temp_j<-temp[1:i,]
         phi_j<-phi[j,]
+        phi_use_ml_j<-phi_use_ml[j,]
         break
       }
     }
@@ -197,13 +197,14 @@ M.step<-function(j){
       theta_j<-theta  
       temp_j<-temp[1:i,]           # reached maxit
       phi_j<-phi[j,]
+      phi_use_ml_j<-phi_use_ml[j,]
     }
   }
   
   results=list(coefs_j=coefs_j,
                theta_j=theta_j,
                temp_j=temp_j,
-               phi_j=phi_j)
+               phi_j=phi_j,phi_use_ml_j=phi_use_ml_j)
   return(results)
 }
 
@@ -298,7 +299,7 @@ EM<-function(y, k,
   # maxit_NB = 100
   
   EM_tol = 1E-6
-  maxit_EM = 1000
+  maxit_EM = 500
   Q<-rep(0,times=maxit_EM)
   
   lowerK<-0
@@ -313,6 +314,8 @@ EM<-function(y, k,
   temp_list <- list()             # store temp to see progression of IRLS
   
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
+  
+  phi_use_ml = matrix(1,nrow=g,ncol=k)
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
@@ -338,7 +341,8 @@ EM<-function(y, k,
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
-      phi[j,] <- par_X[[j]]$phi_j 
+      phi[j,] <- par_X[[j]]$phi_j
+      phi_use_ml[j,] <- par_X[[j]]$phi_use_ml_j
     }
     
     phi_list[[a]] <- phi
@@ -373,7 +377,7 @@ EM<-function(y, k,
     
     
     # break condition for EM
-    if(a>10){if(abs(Q[a]-Q[a-10])<EM_tol) {
+    if(a>5){if(abs(Q[a]-Q[a-5])<EM_tol) {
       finalwts<-wts
       break
     }}
