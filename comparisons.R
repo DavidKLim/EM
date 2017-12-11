@@ -27,17 +27,7 @@ normalizations <- function(dat){
   return(res)
 }
 
-# top 100 significant genes
-# res<-results(DESeq_dds,alpha=0.05)
-# signif_res<-res[is.na(res$padj)==FALSE,]
-# signif_res<-signif_res[order(signif_res$padj),]
-# signif_res<-signif_res[1:100,]
-# 
-# rownames(dat)<-row_names
-# signif_dat<-dat[toupper(rownames(signif_res)),]      # Subsetting just the significant genes from DESeq2
-# y<-signif_dat
 
-#rownames(dat)=toupper(row_names)
 
 
 compare <- function(y){
@@ -164,36 +154,106 @@ rownames(NSCLC_dat)<-toupper(NSCLC_dat[,1])
 NSCLC_subtypes <- NSCLC_anno$Adeno.Squamous
 NSCLC_dat<-round(NSCLC_dat[,-1],digits=0)
 
+# DESeq2 to find top significant genes in clustering
+colnames(NSCLC_dat)<-toupper(colnames(NSCLC_dat))
+coldata<-NSCLC_anno[,-1]
+rownames(coldata)<-toupper(NSCLC_anno[,1])
+coldata<-coldata[,c("Adeno.Squamous","Tumor.location")]
+#all(rownames(coldata) %in% colnames(cts))         # check that headers are correct
+#all(rownames(coldata) == colnames(cts))
+dds<-DESeqDataSetFromMatrix(countData = NSCLC_dat,
+                            colData = coldata,
+                            design = ~ Adeno.Squamous)
+DESeq_dds<-DESeq(dds)
+
+res<-results(DESeq_dds,alpha=0.05)
+signif_res<-res[is.na(res$padj)==FALSE,]
+signif_res<-signif_res[order(signif_res$padj),]
+signif_res<-signif_res[1:1000,]
+
+NSCLC_dat <- NSCLC_dat[rownames(signif_res),]
+
+
+
 library(SummarizedExperiment)
+library(genefilter)
 
 load(file="TCGA_BRCA_exp.rda")
 BRCA_cts <- round(assay(data),digits=0)             # default gives raw count
 BRCA_anno <- colData(data)@listData
 BRCA_subtypes <- BRCA_anno$subtype_PAM50.mRNA
+#idy <- c(which(BRCA_subtypes=="Basal-like")[1:10],
+#         which(BRCA_subtypes=="HER2-enriched")[1:10],
+#         which(BRCA_subtypes=="Luminal A")[1:10],
+#         which(BRCA_subtypes=="Luminal B")[1:10],
+#         which(BRCA_subtypes=="Normal-like")[1:8])
 idy <- !is.na(BRCA_subtypes)
 
-BRCA_dat <- BRCA_cts[, idy]           # 500 subjects
-BRCA_dat <- distinct(as.data.frame(BRCA_dat))
+#BRCA_dat <- unique(as.data.frame(BRCA_dat))
+BRCA_cts <- BRCA_cts[!duplicated(BRCA_cts[,1:ncol(BRCA_cts)]),idy]
+
+# DESeq2 to find top significant genes in clustering
+# colnames(BRCA_cts)<-toupper(colnames(BRCA_cts))
+# coldata<-as.matrix(BRCA_subtypes[idy])
+# rownames(coldata)<-colnames(BRCA_cts)
+# colnames(coldata)<-"subtype"
+# #all(rownames(coldata) %in% colnames(cts))         # check that headers are correct
+# #all(rownames(coldata) == colnames(cts))
+# dds<-DESeqDataSetFromMatrix(countData = BRCA_cts,
+#                             colData = coldata,
+#                             design = ~ subtype)
+# DESeq_dds<-DESeq(dds)
+# 
+# res<-results(DESeq_dds,alpha=0.05)
+# signif_res<-res[is.na(res$padj)==FALSE,]
+# signif_res<-signif_res[order(signif_res$padj),]
+# signif_res<-signif_res[1:2500,]
+# 
+# BRCA_dat <- BRCA_cts[rownames(signif_res),]
+
+
+
 
 # NSCLC first 2000 genes run #
-y1 <- NSCLC_dat[1:2000,]
+#row_mad <- apply(NSCLC_dat,1,mad)
+#NSCLC_dat <- NSCLC_dat[order(-row_mad),]
+y1 <- NSCLC_dat
 fit <- normalizations(y1)
 size_factors <- fit$size_factors
 norm_y <- fit$norm_y
-
-y1 <- y1[rowSums(y1) >= 100,]
+y1 <- y1[rowSums(y1)>=100,]
 
 X1<-compare(y1)
 
 
+
+
 # BRCA first 2000 genes, 100 samples run #
 
-BRCA_dat <- BRCA_dat[order(-rowVars(BRCA_dat)),]
-y2 <- BRCA_dat[1:500,1:50]
+BRCA_dat <- BRCA_cts
+
+row_mad <- apply(BRCA_dat,1,mad)
+BRCA_dat <- BRCA_dat[order(-row_mad),]
+
+#row_var <- rowVars(BRCA_cts)
+#BRCA_cts <- BRCA_cts[order(-row_var),]
+
+y2 <- BRCA_dat[1:100,]
 fit <- normalizations(y2)
 size_factors <- fit$size_factors
 norm_y <- fit$norm_y
 
-y2 <- y2[rowSums(y2 >= 100),]
+y2 <- y2[rowSums(y2)>=100,]
 
 X2 <- compare(y2)
+
+
+
+
+################################################
+d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+model<-hclust(d,method="complete")       # hierarchical clustering
+heatmap(as.matrix(norm_y),Rowv = as.dendrogram(model),Colv=as.dendrogram(model))
+
+
+
