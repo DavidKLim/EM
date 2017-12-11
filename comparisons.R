@@ -143,7 +143,9 @@ compare <- function(y){
        i_tune_time=i_tune_time,
        i_time=i_time,
        EM_tune_time=EM_tune_time,
-       EM_time=EM_time)
+       EM_time=EM_time,
+       i_X=iClust_fit,
+       EM_X=X)
 }
 
 setwd("/Users/limddavid/Documents/Research")
@@ -254,6 +256,3 @@ X2 <- compare(y2)
 d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
 model<-hclust(d,method="complete")       # hierarchical clustering
 heatmap(as.matrix(norm_y),Rowv = as.dendrogram(model),Colv=as.dendrogram(model))
-
-
-
