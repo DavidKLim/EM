@@ -315,12 +315,11 @@ EM<-function(y, k,
   
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
   
-  phi_use_ml = matrix(1,nrow=g,ncol=k)
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
     # M step
-    
+    phi_use_ml = matrix(1,nrow=g,ncol=k)
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
     
     # IRWLS:
@@ -395,12 +394,6 @@ EM<-function(y, k,
     # print(pi) # print estimated cluster proportions
     
     
-    # if(any(rowSums(wts)==0)){
-    #   finalwts<-wts
-    #   print(paste("Empty cluster when K =",k,". Choose smaller K"))
-    #   lowerK=1
-    #   break
-    # }
     for(i in 1:n){
       for(c in 1:k){
         if(wts[c,i]<1E-50){
