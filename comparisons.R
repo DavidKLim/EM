@@ -189,7 +189,7 @@ BRCA_subtypes <- BRCA_anno$subtype_PAM50.mRNA
 #         which(BRCA_subtypes=="Luminal A")[1:10],
 #         which(BRCA_subtypes=="Luminal B")[1:10],
 #         which(BRCA_subtypes=="Normal-like")[1:8])
-idy <- !is.na(BRCA_subtypes)
+idy <- (!is.na(BRCA_subtypes) & BRCA_subtypes != "Normal-like")
 
 #BRCA_dat <- unique(as.data.frame(BRCA_dat))
 BRCA_cts <- BRCA_cts[!duplicated(BRCA_cts[,1:ncol(BRCA_cts)]),idy]
@@ -252,7 +252,18 @@ X2 <- compare(y2)
 
 
 
+
+y3<-  BRCA_cts[1:15000,1:50]
+fit<-normalizations(y3)
+size_factors<-fit$size_factors
+norm_y<-fit$norm_y
+y3<-y3[rowSums(y3)>=100,]
+X3<-compare(y3)
+
+
+
 ################################################
-d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-model<-hclust(d,method="complete")       # hierarchical clustering
-heatmap(as.matrix(norm_y),Rowv = as.dendrogram(model),Colv=as.dendrogram(model))
+#d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+#model<-hclust(d,method="complete")       # hierarchical clustering
+#heatmap(as.matrix(norm_y),Rowv = as.dendrogram(model),Colv=as.dendrogram(model))
+###############################################

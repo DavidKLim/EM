@@ -235,6 +235,8 @@ EM<-function(y, k,
   # EM
   
   # Initial Clustering
+  time_init_i<-as.numeric(Sys.time())
+  
   d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
   model<-hclust(d,method="complete")       # hierarchical clustering
   #col<-rep("",times=ncol(y))
@@ -244,6 +246,8 @@ EM<-function(y, k,
   #cls<-sample(1:k,n,replace=TRUE) #random initialization
   cls<-cutree(model,k=k)
   
+  time_init_f <- as.numeric(Sys.time())
+  time_init <- time_init_f - time_init_i
   ########################## SIMULATION ONLY #############################
   if(is.na(true_clusters)==FALSE){
     all_perms=allPerms(1:k)
