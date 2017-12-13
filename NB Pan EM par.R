@@ -239,11 +239,6 @@ EM<-function(y, k,
   
   d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
   model<-hclust(d,method="complete")       # hierarchical clustering
-  #col<-rep("",times=ncol(y))
-  #for(i in 1:length(col)){if(anno$Adeno.Squamous[i]=="adenocarcinoma"){col[i]="red"}else{col[i]="blue"}}
-  #heatmap.2(as.matrix(norm_y), Rowv=as.dendrogram(model), Colv=as.dendrogram(model),ColSideColors=col)
-  #cls<-cutree(model,k=k)
-  #cls<-sample(1:k,n,replace=TRUE) #random initialization
   cls<-cutree(model,k=k)
   
   time_init_f <- as.numeric(Sys.time())
