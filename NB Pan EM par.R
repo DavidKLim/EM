@@ -32,13 +32,15 @@ soft_thresholding=function(alpha,lambda){
 theta.ml2 <-
   function(y, mu, n = sum(weights), weights, limit = 10,
            eps = .Machine$double.eps^0.25,
-           trace = FALSE,use_ml=1){
-    score <- function(n, th, mu, y, w)
+           trace = FALSE){
+    score <- function(n, th, mu, y, w){
       sum(w*(digamma(th + y) - digamma(th) + log(th) +
                1 - log(th + mu) - (y + th)/(mu + th)))
-    info <- function(n, th, mu, y, w)
+    }
+    info <- function(n, th, mu, y, w){
       sum(w*( - trigamma(th + y) + trigamma(th) - 1/th +
                 2/(mu + th) - (y + th)/(mu + th)^2))
+    }
     if(inherits(y, "lm")) {
       mu <- y$fitted.values
       y <- if(is.null(y$y)) mu + residuals(y) else y$y
@@ -49,19 +51,19 @@ theta.ml2 <-
     del <- 1
     if(trace) message(sprintf("theta.ml: iter %d 'theta = %f'",
                               it, signif(t0)), domain = NA)
-    while((it <- it + 1) < limit && abs(del) > eps && use_ml==1) {
+    while((it <- it + 1) < limit && abs(del) > eps) {
       t0 <- abs(t0)
       del <- score(n, t0, mu, y, weights)/(i <- info(n, t0, mu, y, weights))
-      if(del < (-t0) || is.na(t0) || is.na(del)){
-        warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
-        use_ml <- 0
-        break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
-      }
+      # if(del < (-t0) || is.na(t0) || is.na(del)){
+      #   warning("Theta goes from (+) to (-). Last iteration", it," theta =", signif(t0),". Using method of moments instead")
+      #   use_ml <- 0
+      #   break                 # if the delta is changing the sign of t0 from + to -, then break (keep last iteration of t0)
+      # }
       t0 <- t0 + del
       if(trace) message("theta.ml: iter", it," theta =", signif(t0))
     }
     
-    if(use_ml==0){t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)}
+    # if(use_ml==0){t0 = theta.mm(y=y,mu=mu,dfr=n-1,weights=weights)}
     
     if(t0 < 0) {
       t0 <- 0
@@ -73,10 +75,59 @@ theta.ml2 <-
       attr(t0, "warn") <- gettext("iteration limit reached")
     }
     attr(t0, "SE") <- sqrt(1/i)
-    res <- list(t0=t0,
-                use_ml=use_ml)
+    res <- list(t0=t0)
     return(res)
   }
+
+
+
+phi.ml <-
+  function(y, mu, n = sum(weights), weights, limit = 10,
+           eps = .Machine$double.eps^0.25,
+           trace = FALSE){
+    lambda = 1E-50            ### change to phi instead of theta? ###
+    score <- function(n, ph, mu, y, w){
+      sum(w*(digamma((1/ph) + y) - digamma(1/ph) + log(1/ph) +
+               1 - log((1/ph) + mu) - (y + (1/ph))/(mu + (1/ph))))*(-1/ph^2) + 2*lambda*ph
+    }
+    info <- function(n, ph, mu, y, w){
+      sum(w*( - trigamma((1/ph) + y) + trigamma((1/ph)) - ph +
+                2/(mu + (1/ph)) - (y + (1/ph))/(mu + (1/ph))^2))*(1/ph^4) + 2*lambda
+    }
+    if(inherits(y, "lm")) {
+      mu <- y$fitted.values
+      y <- if(is.null(y$y)) mu + residuals(y) else y$y
+    }
+    if(missing(weights)) weights <- rep(1, length(y))
+    #t0 <- n/sum(weights*(y/mu - 1)^2)
+    p0 <- sum(weights*(y/mu - 1)^2)/n
+    it <- 0
+    del <- 1
+    if(trace) message(sprintf("phi.ml: iter %d 'phi = %f'",
+                              it, signif(p0)), domain = NA)
+    while((it <- it + 1) < limit && abs(del) > eps) {
+      p0 <- abs(p0)
+      del <- score(n, p0, mu, y, weights)/(i <- info(n, p0, mu, y, weights))
+      p0 <- p0 + del
+      if(trace) message("phi.ml: iter", it," phi =", signif(p0))
+    }
+    
+    if(p0 < 0) {
+      p0 <- 0
+      warning("estimate truncated at zero")
+      attr(p0, "warn") <- gettext("estimate truncated at zero")
+    }
+    
+    if(it == limit) {
+      warning("iteration limit reached")
+      attr(p0, "warn") <- gettext("iteration limit reached")
+    }
+    attr(p0, "SE") <- sqrt(1/i)
+    res <- list(p0=p0)
+    return(res)
+  }
+
+
 
 M.step<-function(j){
   beta<-rep(0,times=k)
@@ -158,16 +209,25 @@ M.step<-function(j){
       
       # Calculate phi = 1/theta #
       
-      #### Maximum Likelihood Estimation ####
+      #### Maximum Likelihood Estimation #####
+      # if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
+      #     fit <- theta.ml2(y = dat_jc[,"count"],
+      #                      mu = mu[,c],
+      #                      weights = dat_jc[,"weights"],
+      #                      limit=100,trace=TRUE)
+      #     phi[j,c] <- 1/fit$t0    # this bypasses error when all counts in cluster are identical or
+      #                           # there is just one subject in cluster (this would be 0 disp anyway)
+      #     #phi_use_ml[j,c] = fit$use_ml
+      # } else {phi[j,c]=0}
+      
+      
+      # USING PENALIZED PHI ESTIMATION:::
       if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
-          fit <- theta.ml2(y = dat_jc[,"count"]-0.1,
-                           mu = mu[,c],
-                           weights = dat_jc[,"weights"],
-                           limit=10,trace=FALSE,use_ml=phi_use_ml[j,c])
-          phi[j,c] <- 1/fit$t0    # this bypasses error when all counts in cluster are identical or
-                                # there is just one subject in cluster (this would be 0 disp anyway)
-          phi_use_ml[j,c] = fit$use_ml
-        } else {phi[j,c]=0}
+        phi[j,c]<- phi.ml(y=dat_jc[,"count"],
+             mu=mu[,c],
+             weights=dat_jc[,"weights"],
+             limit=100,trace=TRUE)$p0
+      } else{phi[j,c]=0}
       ########################################
       
       
@@ -188,7 +248,7 @@ M.step<-function(j){
         theta_j<-theta
         temp_j<-temp[1:i,]
         phi_j<-phi[j,]
-        phi_use_ml_j<-phi_use_ml[j,]
+        #phi_use_ml_j<-phi_use_ml[j,]
         break
       }
     }
@@ -197,14 +257,16 @@ M.step<-function(j){
       theta_j<-theta  
       temp_j<-temp[1:i,]           # reached maxit
       phi_j<-phi[j,]
-      phi_use_ml_j<-phi_use_ml[j,]
+      #phi_use_ml_j<-phi_use_ml[j,]
     }
   }
   
   results=list(coefs_j=coefs_j,
                theta_j=theta_j,
                temp_j=temp_j,
-               phi_j=phi_j,phi_use_ml_j=phi_use_ml_j)
+               phi_j=phi_j
+               #phi_use_ml_j=phi_use_ml_j
+               )
   return(results)
 }
 
@@ -318,7 +380,7 @@ EM<-function(y, k,
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
     # M step
-    phi_use_ml = matrix(1,nrow=g,ncol=k)
+    #phi_use_ml = matrix(1,nrow=g,ncol=k)
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
     
     # IRWLS:
@@ -328,7 +390,7 @@ EM<-function(y, k,
     cl<-makeCluster(no_cores)
     i=1                            # cluster complained when this wasn't defined before
     
-    clusterExport(cl=cl,varlist=c(ls(),"theta.ml2","soft_thresholding"),envir=environment())
+    clusterExport(cl=cl,varlist=c(ls(),"phi.ml","soft_thresholding"),envir=environment())
     clusterEvalQ(cl, library("MASS"))
     
     par_X<-parLapply(cl, 1:g, M.step)
@@ -340,7 +402,7 @@ EM<-function(y, k,
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
       phi[j,] <- par_X[[j]]$phi_j
-      phi_use_ml[j,] <- par_X[[j]]$phi_use_ml_j
+      #phi_use_ml[j,] <- par_X[[j]]$phi_use_ml_j
     }
     
     phi_list[[a]] <- phi
