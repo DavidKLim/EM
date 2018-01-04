@@ -198,7 +198,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,
                          norm_y=norm_y,
-                         true_disc=true_disc)
+                         true_disc=true_disc,
+                         gene_id=idx)
   }
     
   
@@ -343,11 +344,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     temp_nondisc[ii]<-mean(X$nondiscriminatory)
     temp_ARI[ii]<-adjustedRandIndex(true_clusters,X$final_clusters)
     if(tt>0){
-      temp_sensitivity[ii]<-mean(X$nondiscriminatory[true_disc==TRUE]==FALSE)
+      temp_sensitivity[ii]<-sum(X$nondiscriminatory[true_disc==TRUE]==FALSE)/g
     } else {temp_sensitivity[ii]<-NA}
     if(tt<g){
-      temp_falsepos[ii]<-mean(X$nondiscriminatory[true_disc==FALSE]==FALSE)
-    } else {temp_falsepos[ii]<-NA}
+      temp_falsepos[ii]<-sum(X$nondiscriminatory[true_disc==FALSE]==FALSE)/g
+    } else {temp_falsepos[ii]<-NA}         # take into account genes omitted b/c rowSum of count was <100 (such genes are assumed nondiscriminatory)
     
     print(paste(temp_nondisc[ii],temp_ARI[ii],temp_sensitivity[ii],temp_falsepos[ii]))
     print(paste("Time:",X$time_elap,"seconds"))
