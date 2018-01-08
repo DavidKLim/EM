@@ -218,11 +218,6 @@ EM<-function(y, k,
   # adds 0.1 to all y
   y = y+0.1
   
-  vect_y<-as.vector(t(y))
-  new_y<-rep(vect_y,each=k)      # flatten and multiply each count by number of clusters
-  gene<-rep(1:g,each=k*n)        # gene for each corresponding new_y
-  clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
-  
   # EM
   
   # Initial Clustering
@@ -267,15 +262,14 @@ EM<-function(y, k,
   
   
   # Flatten data: one observation per each cluster, gene, and subject
-  vect_y<-as.vector(t(y))
-  new_y<-rep(vect_y,each=k) # flatten and multiply each count by number of clusters
+  vect_y<-rep(as.vector(t(y)),each=k)
   gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
   clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   vect_wts<-rep(as.vector(wts),times=g)
   clust_index<-rep((1:k),times=n*g)
   offset=log(size_factors)
   #offset=rep(0,times=n)            # no offsets
-  dat<-cbind(new_y,clusts,clust_index,gene,vect_wts, rep(rep(offset,each=k),times=g) ) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
+  dat<-cbind(vect_y,clusts,clust_index,gene,vect_wts, rep(rep(offset,each=k),times=g) ) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
   colnames(dat)[1]<-c("count")
   colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights","offset")
   
