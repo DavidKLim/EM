@@ -1,13 +1,13 @@
-library(caret)
-library(mclust)
+#library(caret)
+#library(mclust)
+#library(fpc)
+#library(amap)
+#library(gplots)
+
+library(parallel)
 library(stats)
 library(MASS)
-library(fpc)
 library(permute)
-library(amap)
-library(gplots)
-library(parallel)
-
 
 
 logsumexpc=function(v){  
