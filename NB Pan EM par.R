@@ -81,11 +81,10 @@ phi.ml <-
 M.step<-function(j){
   beta<-rep(0,times=k)
   
-  if(a==1){
+  if(a==1){         # Initializations for 1st EM iteration
     for(c in 1:k){
       beta[c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
     }
-    
     theta<-matrix(rep(0,times=k^2),nrow=k)
     for(c in 1:k){
       for(cc in 1:k){
@@ -98,7 +97,6 @@ M.step<-function(j){
     beta<-coefs[j,]                                                   # Retrieve beta & theta from
     theta<-theta_list[[j]]                                            # previous iteration
   }
-  
   
   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
   dat_j<-dat[dat[,"g"]==j,]                     # subset just the j'th gene
@@ -378,8 +376,6 @@ EM<-function(y, k,
     }
   }
   
-  
-  
   num_warns=length(warnings())
   
   final_clusters<-rep(0,times=n)
@@ -389,22 +385,16 @@ EM<-function(y, k,
   
   m<-rep(0,times=g)
   nondiscriminatory=rep(FALSE,times=g)
-  
   for(j in 1:g){
     m[j] <- sum(theta_list[[j]][1,]!=0) + 1         # of parameters estimated
     if(m[j]==1){nondiscriminatory[j]=TRUE}
   }
-  
   pred.nondiscriminatory<-mean(nondiscriminatory)
   
-  
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
-  
   BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
-  if(lowerK==1){BIC=.Machine$integer.max}      # set BIC as max (worst) if K too high
-  
+
   end_time <- Sys.time()
-  
   time_elap <- as.numeric(end_time)-as.numeric(start_time)
   
   result<-list(pi=pi,
