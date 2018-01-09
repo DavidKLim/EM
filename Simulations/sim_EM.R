@@ -161,7 +161,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   # Simulations to find K (Order Selection)
   
   sim=100
-  choose_k<-rep(0,times=sim)
   
   all_data <- list(list())
   
@@ -203,7 +202,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   }
     
   
-  
+  max_k<-rep(0,times=sim)
   max_lambda1<-rep(0,times=sim)
   max_lambda2<-rep(0,times=sim)
   max_tau<-rep(0,times=sim)
@@ -225,7 +224,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     K_search=c(2:7)
     list_BIC=matrix(0,nrow=length(K_search),ncol=2)
     list_BIC[,1]=K_search
-    print(paste("Dataset",ii,":"))
+    print(paste("Dataset",ii,"Order Selection:"))
     
     for(aa in 1:nrow(list_BIC)){
       X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)  # no penalty
@@ -235,9 +234,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       print(paste("Time:",X$time_elap,"seconds"))
     }
     
+    max_k[ii]=list_BIC[which.min(list_BIC[,2]),1]
+    print(max_k[ii])
+    
     # Grid search
     
-    print(paste("Dataset",ii,"grid search"))    # track iteration
+    print(paste("Dataset",ii,"Grid Search:"))    # track iteration
     
     #create matrix for grid search values
     lambda1_search=1
@@ -283,10 +285,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     temp_nondisc[ii]<-mean(X$nondiscriminatory)
     temp_ARI[ii]<-adjustedRandIndex(true_clusters,X$final_clusters)
     if(tt>0){
-      temp_sensitivity[ii]<-sum(X$nondiscriminatory[true_disc==TRUE]==FALSE)/g
+      temp_sensitivity[ii]<-sum(X$nondiscriminatory[true_disc==TRUE]==FALSE)/sum(true_disc==TRUE)
     } else {temp_sensitivity[ii]<-NA}
     if(tt<g){
-      temp_falsepos[ii]<-sum(X$nondiscriminatory[true_disc==FALSE]==FALSE)/g
+      temp_falsepos[ii]<-sum(X$nondiscriminatory[true_disc==FALSE]==FALSE)/sum(true_disc==FALSE)
     } else {temp_falsepos[ii]<-NA}         # take into account genes omitted b/c rowSum of count was <100 (such genes are assumed nondiscriminatory)
     
     print(paste(temp_nondisc[ii],temp_ARI[ii],temp_sensitivity[ii],temp_falsepos[ii]))
@@ -301,10 +303,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   mean_sensitivity<-mean(temp_sensitivity)
   mean_falsepos<-mean(temp_falsepos)
   
+  tab_k = table(max_k)
+  tab_lambda2 = table(max_lambda2)
+  tab_tau = table(max_tau)
+  
+  # Final_K, lambda2, tau represent most frequently found K, lambda2, and tau
+  final_k = as.numeric(names(which.max(tab_k)))
+  final_lambda2 = as.numeric(names(which.max(tab_lambda2)))
+  final_tau = as.numeric(names(which.max(tab_tau)))
+  
   # Store for tabulation:
-  results<-list(K=max_k,
-                lambda2=max_lambda2,
-                tau=max_tau,
+  results<-list(K=final_k,
+                lambda2=final_lambda2,
+                tau=final_tau,
                 ARI=mean_ARI,
                 nondisc=mean_nondisc,
                 sens=mean_sensitivity,
