@@ -204,21 +204,28 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
   
   
+  max_lambda1<-rep(0,times=sim)
+  max_lambda2<-rep(0,times=sim)
+  max_tau<-rep(0,times=sim)
+  temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
+  #temp_coefs<-list()
+  temp_nondisc<-rep(0,times=sim)
+  temp_ARI<-rep(0,times=sim)
+  temp_sensitivity<-rep(0,times=sim)
+  temp_falsepos<-rep(0,times=sim)
   
-  
-  
-  
-  # Simulation order selection based on unpenalized EM #
-  
-  K_search=c(2:7)
-  list_BIC=matrix(0,nrow=length(K_search),ncol=2)
-  list_BIC[,1]=K_search
   for(ii in 1:sim){
     
-    print(paste("Iteration",ii,":"))
     y = all_data[[ii]]$y
     true_clusters = all_data[[ii]]$true_clusters
     norm_y = all_data[[ii]]$norm_y
+    true_disc = all_data[[ii]]$true_disc
+    
+    # Order selection
+    K_search=c(2:7)
+    list_BIC=matrix(0,nrow=length(K_search),ncol=2)
+    list_BIC[,1]=K_search
+    print(paste("Dataset",ii,":"))
     
     for(aa in 1:nrow(list_BIC)){
       X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)  # no penalty
@@ -228,37 +235,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       print(paste("Time:",X$time_elap,"seconds"))
     }
     
-    choose_k[ii]=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
-  }
-  
-  tab_k<-table(choose_k)
-  
-  print(tab_k)
-  max_k=as.numeric(rownames(tab_k)[which.max(tab_k)])
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  # Simulations to do Grid search for tuning parameters
-  sim_tune=sim/10
-  choose_lambda1<-rep(0,times=sim_tune)
-  choose_lambda2<-rep(0,times=sim_tune)
-  choose_tau<-rep(0,times=sim_tune)
-  
-  for(ii in 1:sim_tune){
+    # Grid search
     
-    print(paste("Iteration",ii,"of grid search"))    # track iteration
-    
-    #simulate data
-    y = all_data[[ii]]$y
-    true_clusters = all_data[[ii]]$true_clusters
-    norm_y = all_data[[ii]]$norm_y
+    print(paste("Dataset",ii,"grid search"))    # track iteration
     
     #create matrix for grid search values
     lambda1_search=1
@@ -271,7 +250,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
     list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
     
-    
     #search for optimal penalty parameters
     for(aa in 1:nrow(list_BIC)){
       X<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
@@ -282,63 +260,24 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     #store optimal penalty parameters
     max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
-    choose_tau[ii]<-list_BIC[max_index,3]
-    choose_lambda1[ii]<-list_BIC[max_index,1]
-    choose_lambda2[ii]<-list_BIC[max_index,2]
+    max_tau[ii]<-list_BIC[max_index,3]
+    max_lambda1[ii]<-list_BIC[max_index,1]
+    max_lambda2[ii]<-list_BIC[max_index,2]
     
     print(list_BIC[max_index,])
     
     if(length(max_index)>1){
       warning("more than one max index")
       max_index<-max_index[1]
-      choose_tau[ii]<-list_BIC[max_index,3]
-      choose_lambda1[ii]<-list_BIC[max_index,1]
-      choose_lambda2[ii]<-list_BIC[max_index,2]
-      # max_tau<-list_BIC[max_index,3]
-      # max_lambda1<-list_BIC[max_index,1]
-      # max_lambda2<-list_BIC[max_index,2]
+      max_tau[ii]<-list_BIC[max_index,3]
+      max_lambda1[ii]<-list_BIC[max_index,1]
+      max_lambda2[ii]<-list_BIC[max_index,2]
     }
-  }
-  
-  
-  #store max penalty parameters based on multiple simulations
-  tab_tau<-table(choose_tau)
-  tab_lambda1<-table(choose_lambda1)
-  tab_lambda2<-table(choose_lambda2)
-  print(tab_tau)
-  print(tab_lambda1)
-  print(tab_lambda2)
-  
-  max_tau=as.numeric(rownames(tab_tau)[which.max(tab_tau)])[1]
-  max_lambda1=as.numeric(rownames(tab_lambda1)[which.max(tab_lambda1)])[1]
-  max_lambda2=as.numeric(rownames(tab_lambda2)[which.max(tab_lambda2)])[1]
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  # Simulations for determining performance based on optimal K and penalty params
-  temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
-  #temp_coefs<-list()
-  temp_nondisc<-rep(0,times=sim)
-  temp_ARI<-rep(0,times=sim)
-  temp_sensitivity<-rep(0,times=sim)
-  temp_falsepos<-rep(0,times=sim)
-  for(ii in 1:sim){
-    
-    y = all_data[[ii]]$y
-    true_clusters = all_data[[ii]]$true_clusters
-    norm_y = all_data[[ii]]$norm_y
-    true_disc = all_data[[ii]]$true_disc
     
     
-    # sometimes errors if wrong K is input
-    X<-EM(y=y,k=k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
+    # Final run with optimal parameters
+    
+    X<-EM(y=y,k=k,tau=max_tau[ii],lambda1=max_lambda1[ii],lambda2=max_lambda2[ii],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
     temp_pi[ii,]<-X$pi
     #temp_coefs[[ii]]<-X$coefs
     temp_nondisc[ii]<-mean(X$nondiscriminatory)
@@ -352,6 +291,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     print(paste(temp_nondisc[ii],temp_ARI[ii],temp_sensitivity[ii],temp_falsepos[ii]))
     print(paste("Time:",X$time_elap,"seconds"))
+  
   }
   
   mean_pi<-colSums(temp_pi)/sim
@@ -360,8 +300,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   mean_ARI<-mean(temp_ARI)
   mean_sensitivity<-mean(temp_sensitivity)
   mean_falsepos<-mean(temp_falsepos)
-  
-  
   
   # Store for tabulation:
   results<-list(K=max_k,
@@ -372,5 +310,18 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
                 sens=mean_sensitivity,
                 falsepos=mean_falsepos,
                 all_data)
+  
   return(results)
 }
+  
+  
+  
+  ###################################
+  ###################################
+  ###################################
+  
+  
+  
+  
+  
+  
