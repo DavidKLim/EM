@@ -272,6 +272,12 @@ EM<-function(y, k,
   colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights","offset")
   
   
+  # Stopping Criteria
+  IRLS_tol = 1E-6
+  maxit_IRLS = 50
+  EM_tol = 1E-6
+  maxit_EM = 500
+  
   # Initialize parameters
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   coefs<-matrix(rep(0,times=g*k),nrow=g)
@@ -282,12 +288,6 @@ EM<-function(y, k,
   theta_list <- list()            # temporary to hold all K x K theta matrices across EM iterations
   temp_list <- list()             # store temp to see progression of IRLS
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
-  
-  # Stopping Criteria
-  IRLS_tol = 1E-6
-  maxit_IRLS = 50
-  EM_tol = 1E-6
-  maxit_EM = 500
   
   
   ########### M / E STEPS #########
@@ -317,7 +317,7 @@ EM<-function(y, k,
     phi_list[[a]] <- phi
     
     
-    # update on pi_hat
+    # update on pi_hat, and UB & LB on pi
     for(c in 1:k){
       pi[c]=mean(wts[c,])
       if(pi[c]<1E-6){
@@ -343,8 +343,6 @@ EM<-function(y, k,
     pt2<-sum(wts*l)
     Q[a]<-pt1+pt2
     
-    
-    
     # break condition for EM
     if(a>5){if(abs(Q[a]-Q[a-5])<EM_tol) {
       finalwts<-wts
@@ -360,10 +358,7 @@ EM<-function(y, k,
       wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
     }
     
-    if(a==maxit_EM){finalwts<-wts}
-    # print(pi) # print estimated cluster proportions
-    
-    
+    # UB and LB on weights
     for(i in 1:n){
       for(c in 1:k){
         if(wts[c,i]<1E-50){
@@ -374,6 +369,8 @@ EM<-function(y, k,
         }
       }
     }
+    
+    if(a==maxit_EM){finalwts<-wts}
   }
   
   num_warns=length(warnings())
