@@ -200,15 +200,16 @@ M.step<-function(j){
 
 
 
-EM<-function(y, k,
-             lambda1=0, lambda2=0, tau=0,
-             size_factors=rep(1,times=ncol(y)) ,
-             norm_y=y,
-             true_clusters=NA){
+
+EM_run <- function(y, k,
+                   lambda1=0, lambda2=0, tau=0,
+                   size_factors=rep(1,times=ncol(y)) ,
+                   norm_y=y,
+                   true_clusters=NA,
+                   cls_init,
+                   maxit_EM=500){
   
   start_time <- Sys.time()
-  
-  no_cores<-detectCores()-1   # for parallel computing
   
   n<-ncol(y)
   g<-nrow(y)
@@ -216,17 +217,35 @@ EM<-function(y, k,
   # adds 0.1 to all y
   y = y+0.1
   
-  # EM
+  no_cores<-detectCores()-1   # for parallel computing
   
-  # Initial Clustering
-  time_init_i<-as.numeric(Sys.time())
   
-  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-  model<-hclust(d,method="complete")       # hierarchical clustering
-  cls<-cutree(model,k=k)
+  # Stopping Criteria
+  IRLS_tol = 1E-6
+  maxit_IRLS = 50
+  EM_tol = 1E-6
   
-  time_init_f <- as.numeric(Sys.time())
-  time_init <- time_init_f - time_init_i
+  # Initialize parameters
+  finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
+  coefs<-matrix(rep(0,times=g*k),nrow=g)
+  pi<-rep(0,times=k)
+  phi= matrix(0,nrow=g,ncol=k)    # initial gene-specific dispersion parameters for negative binomial
+  # --> Poisson (phi = 0 = 1/theta)
+  theta_list <- list()            # temporary to hold all K x K theta matrices across EM iterations
+  temp_list <- list()             # store temp to see progression of IRLS
+  phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
+  
+  # Flatten data: one observation per each cluster, gene, and subject
+  vect_y<-rep(as.vector(t(y)),each=k)
+  gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
+  clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
+  clust_index<-rep((1:k),times=n*g)
+  offset=log(size_factors)
+  #offset=rep(0,times=n)            # no offsets
+  
+  Q<-rep(0,times=maxit_EM)
+  
+  cls=cls_init
   ########################## SIMULATION ONLY #############################
   if(is.na(true_clusters)==FALSE){
     all_perms=allPerms(1:k)
@@ -251,43 +270,16 @@ EM<-function(y, k,
   }
   ########################## SIMULATION ONLY #############################
   
-  
   # initialize weights
   wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   for(c in 1:k){
     wts[c,]=(cls==c)^2
   }
   
-  
-  # Flatten data: one observation per each cluster, gene, and subject
-  vect_y<-rep(as.vector(t(y)),each=k)
-  gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
-  clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
   vect_wts<-rep(as.vector(wts),times=g)
-  clust_index<-rep((1:k),times=n*g)
-  offset=log(size_factors)
-  #offset=rep(0,times=n)            # no offsets
   dat<-cbind(vect_y,clusts,clust_index,gene,vect_wts, rep(rep(offset,each=k),times=g) ) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
   colnames(dat)[1]<-c("count")
   colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights","offset")
-  
-  
-  # Stopping Criteria
-  IRLS_tol = 1E-6
-  maxit_IRLS = 50
-  EM_tol = 1E-6
-  maxit_EM = 500
-  
-  # Initialize parameters
-  finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
-  coefs<-matrix(rep(0,times=g*k),nrow=g)
-  pi<-rep(0,times=k)
-  Q<-rep(0,times=maxit_EM)
-  phi= matrix(0,nrow=g,ncol=k)    # initial gene-specific dispersion parameters for negative binomial
-                                  # --> Poisson (phi = 0 = 1/theta)
-  theta_list <- list()            # temporary to hold all K x K theta matrices across EM iterations
-  temp_list <- list()             # store temp to see progression of IRLS
-  phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
   
   
   ########### M / E STEPS #########
@@ -389,7 +381,7 @@ EM<-function(y, k,
   
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
   BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
-
+  
   end_time <- Sys.time()
   time_elap <- as.numeric(end_time)-as.numeric(start_time)
   
@@ -409,6 +401,41 @@ EM<-function(y, k,
                tau=tau)
   return(result)
   
+}
+
+
+
+EM<-function(y, k,
+             lambda1=0, lambda2=0, tau=0,
+             size_factors=rep(1,times=ncol(y)) ,
+             norm_y=y,
+             true_clusters=NA){
+  
+  # Initial Clusterings
+  
+  ## Hierarchical Clustering
+  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+  model<-hclust(d,method="complete")       # hierarchical clustering
+  cls_hc <- cutree(model,k=k)
+  
+  ## K-means Clustering
+  cls_km <- kmeans(t(norm_y),k)$cluster
+  
+  
+  # Iterate through 2-it EM with each initialization
+  all_init_cls <- cbind(cls_hc,cls_km)
+  init_cls_BIC <- rep(0,times=ncol(all_init_cls))
+  for(i in 1:ncol(all_init_cls)){
+    init_cls_BIC[i] <- EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=all_init_cls[,i], maxit_EM=2)$BIC
+  }
+  
+  final_init_cls <- all_init_cls[,which.min(init_cls_BIC)]
+
+  print(colnames(all_init_cls)[which.min(init_cls_BIC)])
+  
+  # Final run based on optimal initialization
+  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=final_init_cls)
+  return(results)
 }
 
 
