@@ -348,6 +348,7 @@ EM<-function(y, k,
       finalwts<-wts
       break
     }}
+    if(a==maxit_EM){finalwts<-wts}
     
     
     # E step
@@ -369,8 +370,6 @@ EM<-function(y, k,
         }
       }
     }
-    
-    if(a==maxit_EM){finalwts<-wts}
   }
   
   num_warns=length(warnings())
