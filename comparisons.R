@@ -1,6 +1,7 @@
 
 library(iClusterPlus)
 library(DESeq2)
+library(mclust)
 
 
 # DESeq analysis
