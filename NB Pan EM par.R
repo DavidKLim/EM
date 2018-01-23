@@ -79,24 +79,11 @@ phi.ml <-
 
 
 M.step<-function(j){
-  beta<-rep(0,times=k)
   
-  if(a==1){         # Initializations for 1st EM iteration
-    for(c in 1:k){
-      beta[c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
-    }
-    theta<-matrix(rep(0,times=k^2),nrow=k)
-    for(c in 1:k){
-      for(cc in 1:k){
-        if(theta[c,cc]>=tau){theta[c,cc]<-beta[c]-beta[cc]}             # Initialize theta
-        else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)   # 
-        }
-      }
-    }
-  } else {
-    beta<-coefs[j,]                                                   # Retrieve beta & theta from
-    theta<-theta_list[[j]]                                            # previous iteration
-  }
+  
+  beta<-coefs[j,]                                                   # Retrieve beta & theta from
+  theta<-theta_list[[j]]                                            # previous iteration
+
   
   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
   dat_j<-dat[dat[,"g"]==j,]                     # subset just the j'th gene
@@ -287,6 +274,21 @@ EM_run <- function(y, k,
     
     # M step
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
+    
+    if(a==1){         # Initializations for 1st EM iteration
+      for(j in 1:g){
+        for(c in 1:k){
+          coefs[j,c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
+        }
+        theta<-matrix(rep(0,times=k^2),nrow=k)
+        for(c in 1:k){
+          for(cc in 1:k){
+            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)
+          }
+        }
+        theta_list[[j]] <- theta
+      }
+    }
     
     par_X=rep(list(list()),g)
     

@@ -176,7 +176,7 @@ res<-results(DESeq_dds,alpha=0.05)
 signif_res<-res[is.na(res$padj)==FALSE,]
 signif_res<-signif_res[order(signif_res$padj),]
 signif_res<-signif_res[1:100,]
-NSCLC_dat <- NSCLC_dat[rownames(signif_res),]
+subs_NSCLC_dat <- NSCLC_dat[rownames(signif_res),]
 
 ## Using Row MAD
 #row_mad <- apply(NSCLC_dat,1,mad)
@@ -184,11 +184,10 @@ NSCLC_dat <- NSCLC_dat[rownames(signif_res),]
 
 
 # RUN
-y1 <- NSCLC_dat
-fit <- normalizations(y1)
+fit <- normalizations(NSCLC_dat)    # Normalizations done on full dataset
 size_factors <- fit$size_factors
 norm_y <- fit$norm_y
-y1 <- y1[rowSums(y1)>=100,]
+y1 <- subs_NSCLC_dat[rowSums(subs_NSCLC_dat)>=100,]
 
 X1<-compare(y1)
 
@@ -229,12 +228,12 @@ BRCA_dat <- BRCA_dat[order(-row_mad),]
 
 # RUN
 
-y2 <- BRCA_dat[1:1000,]
-fit <- normalizations(y2)
+subs_BRCA_dat <- BRCA_dat[1:1000,]
+fit <- normalizations(BRCA_dat)
 size_factors <- fit$size_factors
 norm_y <- fit$norm_y
 
-y2 <- y2[rowSums(y2)>=100,]
+y2 <- subs_BRCA_dat[rowSums(subs_BRCA_dat)>=100,]
 
 # X2 <- compare(y2)
 
