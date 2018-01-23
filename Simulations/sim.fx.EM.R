@@ -16,7 +16,7 @@ run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.3,0.5,1),num_disc=c(.
 }
 
 collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.3,0.5,1),num_disc=c(.05,.15,.25),g=c(100,300),n=c(50,100),method="poisson"){
-  nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length
+  nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n)
   tab<-matrix(0,nrow=nsims,ncol=12)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI","sens","false.pos")
   ii=1
