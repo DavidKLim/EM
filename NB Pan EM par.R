@@ -280,6 +280,7 @@ EM_run <- function(y, k,
         for(c in 1:k){
           coefs[j,c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
         }
+        beta <- coefs[j,]
         theta<-matrix(rep(0,times=k^2),nrow=k)
         for(c in 1:k){
           for(cc in 1:k){
