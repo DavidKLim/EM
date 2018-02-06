@@ -4,10 +4,15 @@
 #library(amap)
 #library(gplots)
 
-library(parallel)
+#library(parallel)
 library(stats)
 library(MASS)
 library(permute)
+
+library(Rcpp)
+library(RcppArmadillo)
+
+sourceCpp("/Users/deelim/Documents/Research/Rcpp/M_step.cpp")
 
 
 logsumexpc=function(v){  
@@ -28,161 +33,161 @@ soft_thresholding=function(alpha,lambda){
     return(sign(alpha)*(abs(alpha)-lambda))
   }
 }
+# 
+# 
+# phi.ml <-
+#   function(y, mu, n = sum(weights), weights, limit = 10,
+#            eps = .Machine$double.eps^0.25,
+#            trace = FALSE){
+#     lambda = 1E-50            ### change to phi instead of theta? ###
+#     score <- function(n, ph, mu, y, w){
+#       sum(w*(digamma((1/ph) + y) - digamma(1/ph) + log(1/ph) +
+#                1 - log((1/ph) + mu) - (y + (1/ph))/(mu + (1/ph))))*(-1/ph^2) + 2*lambda*ph
+#     }
+#     info <- function(n, ph, mu, y, w){
+#       sum(w*( - trigamma((1/ph) + y) + trigamma((1/ph)) - ph +
+#                 2/(mu + (1/ph)) - (y + (1/ph))/(mu + (1/ph))^2))*(1/ph^4) + 2*lambda
+#     }
+#     if(inherits(y, "lm")) {
+#       mu <- y$fitted.values
+#       y <- if(is.null(y$y)) mu + residuals(y) else y$y
+#     }
+#     if(missing(weights)) weights <- rep(1, length(y))
+#     #t0 <- n/sum(weights*(y/mu - 1)^2)
+#     p0 <- sum(weights*(y/mu - 1)^2)/n
+#     it <- 0
+#     del <- 1
+#     if(trace) message(sprintf("phi.ml: iter %d 'phi = %f'",
+#                               it, signif(p0)), domain = NA)
+#     while((it <- it + 1) < limit && abs(del) > eps) {
+#       p0 <- abs(p0)
+#       del <- score(n, p0, mu, y, weights)/(i <- info(n, p0, mu, y, weights))
+#       p0 <- p0 + del
+#       if(trace) message("phi.ml: iter", it," phi =", signif(p0))
+#     }
+#     
+#     if(p0 < 0) {
+#       p0 <- 0
+#       warning("estimate truncated at zero")
+#       attr(p0, "warn") <- gettext("estimate truncated at zero")
+#     }
+#     
+#     if(it == limit) {
+#       warning("iteration limit reached")
+#       attr(p0, "warn") <- gettext("iteration limit reached")
+#     }
+#     attr(p0, "SE") <- sqrt(1/i)
+#     res <- list(p0=p0)
+#     return(res)
+#   }
 
 
-phi.ml <-
-  function(y, mu, n = sum(weights), weights, limit = 10,
-           eps = .Machine$double.eps^0.25,
-           trace = FALSE){
-    lambda = 1E-50            ### change to phi instead of theta? ###
-    score <- function(n, ph, mu, y, w){
-      sum(w*(digamma((1/ph) + y) - digamma(1/ph) + log(1/ph) +
-               1 - log((1/ph) + mu) - (y + (1/ph))/(mu + (1/ph))))*(-1/ph^2) + 2*lambda*ph
-    }
-    info <- function(n, ph, mu, y, w){
-      sum(w*( - trigamma((1/ph) + y) + trigamma((1/ph)) - ph +
-                2/(mu + (1/ph)) - (y + (1/ph))/(mu + (1/ph))^2))*(1/ph^4) + 2*lambda
-    }
-    if(inherits(y, "lm")) {
-      mu <- y$fitted.values
-      y <- if(is.null(y$y)) mu + residuals(y) else y$y
-    }
-    if(missing(weights)) weights <- rep(1, length(y))
-    #t0 <- n/sum(weights*(y/mu - 1)^2)
-    p0 <- sum(weights*(y/mu - 1)^2)/n
-    it <- 0
-    del <- 1
-    if(trace) message(sprintf("phi.ml: iter %d 'phi = %f'",
-                              it, signif(p0)), domain = NA)
-    while((it <- it + 1) < limit && abs(del) > eps) {
-      p0 <- abs(p0)
-      del <- score(n, p0, mu, y, weights)/(i <- info(n, p0, mu, y, weights))
-      p0 <- p0 + del
-      if(trace) message("phi.ml: iter", it," phi =", signif(p0))
-    }
-    
-    if(p0 < 0) {
-      p0 <- 0
-      warning("estimate truncated at zero")
-      attr(p0, "warn") <- gettext("estimate truncated at zero")
-    }
-    
-    if(it == limit) {
-      warning("iteration limit reached")
-      attr(p0, "warn") <- gettext("iteration limit reached")
-    }
-    attr(p0, "SE") <- sqrt(1/i)
-    res <- list(p0=p0)
-    return(res)
-  }
 
-
-
-M.step<-function(j){
-  
-  
-  beta<-coefs[j,]                                                   # Retrieve beta & theta from
-  theta<-theta_list[[j]]                                            # previous iteration
-
-  
-  temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
-  dat_j<-dat[dat[,"g"]==j,]                     # subset just the j'th gene
-  
-  
-  for(i in 1:maxit_IRLS){
-    eta <- 
-      if(a==1 & i==1){
-        matrix(rep(beta,times=n),nrow=n,byrow=TRUE)              # first initialization of eta
-      }else if(a>1 & i==1){
-        matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
-      }else{eta}
-    
-    temp[i,]<-c(beta,phi[j,])
-    
-    for(c in 1:k){
-      
-      dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset data for j'th gene, c'th cluster
-      
-      family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
-      
-      linkinv<-family$linkinv              # g^(-1) (eta) = mu
-      mu.eta<-family$mu.eta                # g' = d(mu)/d(eta)
-      variance<-family$variance
-      
-      # Estimate beta #
-      mu = linkinv(eta)
-      mu.eta.val = mu.eta(eta)
-      
-      good <- (dat_jc[,"weights"]>0) & (mu.eta.val[,c] != 0)
-      trans_y <- (eta[,c] - offset)[good] + (dat_jc[,"count"][good] - mu[,c][good]) / mu.eta.val[,c][good]    # subtract size factor from transf. y
-      w <- sqrt(dat_jc[,"weights"][good]*mu.eta.val[,c][good]^2/variance(mu[,c])[good])     # weights used in IRLS
-      
-      beta[c] <-
-        if(lambda1 != 0){
-          ((lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
-        } else { beta[c]<-sum(w*trans_y)/sum(w) }
-      
-      #in case beta goes to -inf/+inf: continue with warning
-      if(beta[c]<(-100)){
-        warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-        beta[c] = -100
-      }
-      if(beta[c]>100){
-        warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-        beta[c] = 100
-      }
-      
-      eta[,c]<-beta[c] + offset      # add back size factors to eta
-      mu[,c]<-linkinv(eta[,c])
-      
-      
-      # Estimate phi #
-  
-      # USING PENALIZED PHI ESTIMATION:::
-      if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
-        phi[j,c]<- phi.ml(y=dat_jc[,"count"],
-             mu=mu[,c],
-             weights=dat_jc[,"weights"],
-             limit=100,trace=TRUE)$p0
-      } else{phi[j,c]=0}
-      # if condition sets phi = 0 if all observations in cluster are equal
-      ########################################
-      
-    }
-    
-    
-    # update on theta (beta_i - beta_j)
-    for(c in 1:k){
-      for(cc in 1:k){
-        if(abs(theta[c,cc])>=tau){theta[c,cc]<-beta[c]-beta[cc]}        # TLP from Pan paper
-        else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}
-      }
-    }
-    
-    # break conditions for IRLS
-    if(i>1){
-      if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){   # Sum of Squares of estimated parameters
-        coefs_j<-beta
-        theta_j<-theta
-        temp_j<-temp[1:i,]
-        phi_j<-phi[j,]
-        break
-      }
-    }
-    if(i==maxit_IRLS){
-      coefs_j<-beta
-      theta_j<-theta  
-      temp_j<-temp[1:i,]
-      phi_j<-phi[j,]
-    }
-  }
-  
-  results=list(coefs_j=coefs_j,
-               theta_j=theta_j,
-               temp_j=temp_j,
-               phi_j=phi_j)
-  return(results)
-}
+# M.step<-function(j){
+#   
+#   
+#   beta<-coefs[j,]                                                   # Retrieve beta & theta from
+#   theta<-theta_list[[j]]                                            # previous iteration
+# 
+#   
+#   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
+#   dat_j<-dat[dat[,"g"]==j,]                     # subset just the j'th gene
+#   
+#   
+#   for(i in 1:maxit_IRLS){
+#     eta <- 
+#       if(a==1 & i==1){
+#         matrix(rep(beta,times=n),nrow=n,byrow=TRUE)              # first initialization of eta
+#       }else if(a>1 & i==1){
+#         matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
+#       }else{eta}
+#     
+#     temp[i,]<-c(beta,phi[j,])
+#     
+#     for(c in 1:k){
+#       
+#       dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset data for j'th gene, c'th cluster
+#       
+#       family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
+#       
+#       linkinv<-family$linkinv              # g^(-1) (eta) = mu
+#       mu.eta<-family$mu.eta                # g' = d(mu)/d(eta)
+#       variance<-family$variance
+#       
+#       # Estimate beta #
+#       mu = linkinv(eta)
+#       mu.eta.val = mu.eta(eta)
+#       
+#       good <- (dat_jc[,"weights"]>0) & (mu.eta.val[,c] != 0)
+#       trans_y <- (eta[,c] - offset)[good] + (dat_jc[,"count"][good] - mu[,c][good]) / mu.eta.val[,c][good]    # subtract size factor from transf. y
+#       w <- sqrt(dat_jc[,"weights"][good]*mu.eta.val[,c][good]^2/variance(mu[,c])[good])     # weights used in IRLS
+#       
+#       beta[c] <-
+#         if(lambda1 != 0){
+#           ((lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
+#         } else { beta[c]<-sum(w*trans_y)/sum(w) }
+#       
+#       #in case beta goes to -inf/+inf: continue with warning
+#       if(beta[c]<(-100)){
+#         warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
+#         beta[c] = -100
+#       }
+#       if(beta[c]>100){
+#         warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
+#         beta[c] = 100
+#       }
+#       
+#       eta[,c]<-beta[c] + offset      # add back size factors to eta
+#       mu[,c]<-linkinv(eta[,c])
+#       
+#       
+#       # Estimate phi #
+#   
+#       # USING PENALIZED PHI ESTIMATION:::
+#       if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
+#         phi[j,c]<- phi.ml(y=dat_jc[,"count"],
+#              mu=mu[,c],
+#              weights=dat_jc[,"weights"],
+#              limit=100,trace=TRUE)$p0
+#       } else{phi[j,c]=0}
+#       # if condition sets phi = 0 if all observations in cluster are equal
+#       ########################################
+#       
+#     }
+#     
+#     
+#     # update on theta (beta_i - beta_j)
+#     for(c in 1:k){
+#       for(cc in 1:k){
+#         if(abs(theta[c,cc])>=tau){theta[c,cc]<-beta[c]-beta[cc]}        # TLP from Pan paper
+#         else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}
+#       }
+#     }
+#     
+#     # break conditions for IRLS
+#     if(i>1){
+#       if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){   # Sum of Squares of estimated parameters
+#         coefs_j<-beta
+#         theta_j<-theta
+#         temp_j<-temp[1:i,]
+#         phi_j<-phi[j,]
+#         break
+#       }
+#     }
+#     if(i==maxit_IRLS){
+#       coefs_j<-beta
+#       theta_j<-theta  
+#       temp_j<-temp[1:i,]
+#       phi_j<-phi[j,]
+#     }
+#   }
+#   
+#   results=list(coefs_j=coefs_j,
+#                theta_j=theta_j,
+#                temp_j=temp_j,
+#                phi_j=phi_j)
+#   return(results)
+# }
 
 
 
@@ -204,7 +209,7 @@ EM_run <- function(y, k,
   # adds 0.1 to all y
   y = y+0.1
   
-  no_cores<-detectCores()-1   # for parallel computing
+  #no_cores<-detectCores()-1   # for parallel computing
   
   
   # Stopping Criteria
@@ -293,14 +298,21 @@ EM_run <- function(y, k,
     
     par_X=rep(list(list()),g)
     
-    cl<-makeCluster(no_cores)
-    i=1               # (IRLS index) clusters crashed when this isn't defined
-    clusterExport(cl=cl,varlist=c(ls(),"phi.ml","soft_thresholding"),envir=environment())
-    clusterEvalQ(cl, library("MASS"))
+    # cl<-makeCluster(no_cores)
+    # i=1               # (IRLS index) clusters crashed when this isn't defined
+    # clusterExport(cl=cl,varlist=c(ls(),"phi.ml","soft_thresholding"),envir=environment())
+    # clusterEvalQ(cl, library("MASS"))
+    # 
+    # par_X<-parLapply(cl, 1:g, M.step)
     
-    par_X<-parLapply(cl, 1:g, M.step)
+    for(j in 1:g){
+      par_X[[j]] <- M_step(j=j,a=a,dat=dat,y=as.matrix(y),offset=offset,
+                           k=k,theta_list=theta_list,coefs=coefs,phi=phi,
+                           lambda1=lambda1,lambda2=lambda2,tau=tau,
+                           IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS)
+    }
     
-    stopCluster(cl)
+    #stopCluster(cl)
     
     for(j in 1:g){
       coefs[j,] <- par_X[[j]]$coefs_j
