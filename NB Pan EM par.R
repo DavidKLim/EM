@@ -8,11 +8,10 @@
 library(stats)
 library(MASS)
 library(permute)
-
 library(Rcpp)
 library(RcppArmadillo)
 
-sourceCpp("/Users/deelim/Documents/Research/Rcpp/M_step.cpp")
+sourceCpp("M_step.cpp")
 
 
 logsumexpc=function(v){  
@@ -199,7 +198,7 @@ EM_run <- function(y, k,
                    norm_y=y,
                    true_clusters=NA,
                    cls_init,
-                   maxit_EM=500){
+                   maxit_EM=100){
   
   start_time <- Sys.time()
   
@@ -306,12 +305,23 @@ EM_run <- function(y, k,
     # par_X<-parLapply(cl, 1:g, M.step)
     
     for(j in 1:g){
+      # print(paste("j=",j,"a=",a,"k=",k,"lambda1=",lambda1,"lambda2=",lambda2,"tau=",tau,"IRLS_tol=",IRLS_tol,"maxit_IRLS=",maxit_IRLS))
+      # print(paste("offset:",offset))
+      # print("dat:")
+      # print(head(dat))
+      # print("y:")
+      # print(head(y))
+      # print("theta_list[[1]]:")
+      # print(theta_list[[1]])
+      # print("coefs:")
+      # print(head(coefs))
+      # print("phi:")
+      # print(head(phi))
       par_X[[j]] <- M_step(j=j,a=a,dat=dat,y=as.matrix(y),offset=offset,
                            k=k,theta_list=theta_list,coefs=coefs,phi=phi,
                            lambda1=lambda1,lambda2=lambda2,tau=tau,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS)
     }
-    
     #stopCluster(cl)
     
     for(j in 1:g){

@@ -109,9 +109,11 @@ double phi_ml(arma::vec y, arma::vec mu, arma::vec wts, int limit, int trace){
     
     if(p0 < 0){
         p0 = 0;
+        if(trace==1){
         Rprintf("estimate truncated at zero \n");
+        }
     }
-    if(it == limit){
+    if(it == limit && trace==1){
         Rprintf("iteration limit reached \n");
     }
     
@@ -194,8 +196,10 @@ List M_step(int j, int a, arma::mat dat, arma::mat y, arma::vec offset, int k, L
     
             if(beta(c) < (-100)){
                 Rprintf("Cluster %d, gene %d goes to -infinity",c,j);
+                beta(c) = -100;
             } else if(beta(c)>100){
                 Rprintf("Cluster %d, gene %d goes to +infinity",c,j);
+                beta(c) = 100;
             }
     
             for(int ii=0; ii<n; ii++){
@@ -205,7 +209,7 @@ List M_step(int j, int a, arma::mat dat, arma::mat y, arma::vec offset, int k, L
     
             /* Estimate phi */
             
-            phi(j-1,c) = phi_ml(counts,mu.col(c),wts,100,0);
+            phi(j-1,c) = phi_ml(counts,mu.col(c),wts,10,0);
         }
     
     

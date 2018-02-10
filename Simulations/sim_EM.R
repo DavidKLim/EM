@@ -11,6 +11,7 @@ library("stats")
 library("data.table")
 library("DESeq2")
 library("mclust")
+library("parallel")
 
 
 # # # DESeq analysis
@@ -201,19 +202,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
                          gene_id=idx)
   }
     
-  
-  max_k<-rep(0,times=sim)
-  max_lambda1<-rep(0,times=sim)
-  max_lambda2<-rep(0,times=sim)
-  max_tau<-rep(0,times=sim)
-  temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
-  #temp_coefs<-list()
-  temp_nondisc<-rep(0,times=sim)
-  temp_ARI<-rep(0,times=sim)
-  temp_sensitivity<-rep(0,times=sim)
-  temp_falsepos<-rep(0,times=sim)
-  
-  for(ii in 1:sim){
+  # Function to run simulation in parallel
+  sim.run = function(ii){
     
     y = all_data[[ii]]$y
     true_clusters = all_data[[ii]]$true_clusters
@@ -234,8 +224,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       print(paste("Time:",X$time_elap,"seconds"))
     }
     
-    max_k[ii]=list_BIC[which.min(list_BIC[,2]),1]
-    print(max_k[ii])
+    max_k=list_BIC[which.min(list_BIC[,2]),1]
+    print(max_k)
     
     # Grid search
     
@@ -262,24 +252,86 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     #store optimal penalty parameters
     max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
-    max_tau[ii]<-list_BIC[max_index,3]
-    max_lambda1[ii]<-list_BIC[max_index,1]
-    max_lambda2[ii]<-list_BIC[max_index,2]
+    max_tau<-list_BIC[max_index,3]
+    max_lambda1<-list_BIC[max_index,1]
+    max_lambda2<-list_BIC[max_index,2]
     
-    print(list_BIC[max_index,])
+    print(paste("Dataset ", ii, "grid search results: ",list_BIC[max_index,]))
     
     if(length(max_index)>1){
       warning("more than one max index")
       max_index<-max_index[1]
-      max_tau[ii]<-list_BIC[max_index,3]
-      max_lambda1[ii]<-list_BIC[max_index,1]
-      max_lambda2[ii]<-list_BIC[max_index,2]
+      max_tau<-list_BIC[max_index,3]
+      max_lambda1<-list_BIC[max_index,1]
+      max_lambda2<-list_BIC[max_index,2]
     }
-    
     
     # Final run with optimal parameters
     
-    X<-EM(y=y,k=k,tau=max_tau[ii],lambda1=max_lambda1[ii],lambda2=max_lambda2[ii],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
+    X<-EM(y=y,k=k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
+    
+    print(paste("Time:",X$time_elap,"seconds"))
+    print(paste("Dataset ",ii,"complete"))
+    results=list(X=X,
+                 max_k=max_k,
+                 max_lambda1=max_lambda1,
+                 max_lambda2=max_lambda2,
+                 max_tau=max_tau,
+                 true_clusters=true_clusters,
+                 true_disc=true_disc)
+    return(results)
+  }
+  
+  
+  
+  temp_ks<-rep(0,times=sim)
+  temp_lambda1s<-rep(0,times=sim)
+  temp_lambda2s<-rep(0,times=sim)
+  temp_taus<-rep(0,times=sim)
+  temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
+  #temp_coefs<-list()
+  temp_nondisc<-rep(0,times=sim)
+  temp_ARI<-rep(0,times=sim)
+  temp_sensitivity<-rep(0,times=sim)
+  temp_falsepos<-rep(0,times=sim)
+
+  ## ADD PARALLELIZATION HERE ##
+  no_cores<-detectCores()-1   # for parallel computing
+  cl<-makeCluster(no_cores,outfile="myoutfile.txt")
+  clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterEvalQ(cl,{
+    library(stats)
+    library(MASS)
+    library(permute)
+    library(Rcpp)
+    library(RcppArmadillo)
+    library(mclust)
+    sourceCpp("M_step.cpp")
+    })
+  
+  # Store all results in list par_sim_res
+  par_sim_res=list(list())
+  par_sim_res<-parLapply(cl, 1:sim, sim.run)
+  
+  # # non parallel computation (for debugging)
+  # for(ii in 1:sim){
+  #   par_sim_res[[ii]] = sim.run(ii)
+  # }
+  
+  print("Finished parallel computations")
+  
+  
+  # Summarize results
+  for(ii in 1:sim){
+    X=par_sim_res[[ii]]$X
+    true_clusters=par_sim_res[[ii]]$true_clusters
+    true_disc=par_sim_res[[ii]]$true_disc
+    
+    temp_ks[ii] = par_sim_res[[ii]]$max_k
+    temp_lambda1s[ii] = par_sim_res[[ii]]$max_lambda1
+    temp_lambda2s[ii] = par_sim_res[[ii]]$max_lambda2
+    temp_taus[ii] = par_sim_res[[ii]]$max_tau
+    
     temp_pi[ii,]<-X$pi
     #temp_coefs[[ii]]<-X$coefs
     temp_nondisc[ii]<-mean(X$nondiscriminatory)
@@ -290,10 +342,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     if(tt<g){
       temp_falsepos[ii]<-sum(X$nondiscriminatory[true_disc==FALSE]==FALSE)/sum(true_disc==FALSE)
     } else {temp_falsepos[ii]<-NA}         # take into account genes omitted b/c rowSum of count was <100 (such genes are assumed nondiscriminatory)
-    
-    print(paste(temp_nondisc[ii],temp_ARI[ii],temp_sensitivity[ii],temp_falsepos[ii]))
-    print(paste("Time:",X$time_elap,"seconds"))
-  
   }
   
   mean_pi<-colSums(temp_pi)/sim
@@ -303,9 +351,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   mean_sensitivity<-mean(temp_sensitivity)
   mean_falsepos<-mean(temp_falsepos)
   
-  tab_k = table(max_k)
-  tab_lambda2 = table(max_lambda2)
-  tab_tau = table(max_tau)
+  tab_k = table(temp_ks)
+  tab_lambda2 = table(temp_lambda2s)
+  tab_tau = table(temp_taus)
   
   # Final_K, lambda2, tau represent most frequently found K, lambda2, and tau
   final_k = as.numeric(names(which.max(tab_k)))
