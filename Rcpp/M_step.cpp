@@ -11,6 +11,7 @@
 #include <R.h>
 #include <Rmath.h>
 #include <tgmath.h>
+#include <math.h>
 
 using namespace arma;
 using namespace Rcpp;
@@ -32,15 +33,15 @@ List score_info(int N, double ph, arma::vec mu, arma::vec y, arma::vec wts){
         
         inv_phMui = inv_ph + mui;
         
-        scorei = wtsi*(R::digamma(inv_ph+yi) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_phMui) - (yi+inv_ph)/(inv_phMui));
-        infoi = wtsi*(R::trigamma(inv_ph) + 2/(inv_phMui) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/pow(inv_phMui,2));
+        scorei = wtsi * (R::digamma(inv_ph+yi) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_phMui) - (yi+inv_ph)/(inv_phMui));
+        infoi = wtsi * (R::trigamma(inv_ph) + 2/(inv_phMui) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/pow(inv_phMui,2));
         
         score1 += scorei;
         info1 += infoi;
     }
     
-    double score = score1*(-inv_ph*inv_ph) + 2*lambda*ph;
-    double info = info1*pow(inv_ph,4) + 2*lambda;
+    double score = score1 * (-inv_ph*inv_ph) + 2*lambda*ph;
+    double info = info1 * pow(inv_ph,4) + 2*lambda;
     
     return List::create(score,info);
 }
@@ -55,7 +56,7 @@ double soft_thresh(double alpha, double lambda){
     if(fabs(alpha)-lambda<0){
         STval = 0;
     } else {
-        STval = sign(alpha)*(fabs(alpha)-lambda);
+        STval = sign(alpha) * (fabs(alpha)-lambda);
     }
     
     return(STval);
@@ -85,7 +86,7 @@ double phi_ml(arma::vec y, arma::vec mu, arma::vec wts, int limit, int trace){
     
     for(int i=0; i<n; i++){
         double wtsi=wts(i), yi=y(i), mui=mu(i);
-        p0 += wtsi*pow(yi/mui-1,2);
+        p0 += wtsi * pow(yi/mui-1,2);
     }
     p0 = p0/N;
     
