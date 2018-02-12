@@ -15,6 +15,7 @@
 
 using namespace arma;
 using namespace Rcpp;
+using namespace std;
 
 /* Create functions phi_ml() and soft_thresholding() here */
 
