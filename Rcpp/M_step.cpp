@@ -34,8 +34,8 @@ List score_info(int N, double ph, arma::vec mu, arma::vec y, arma::vec wts){
         
         inv_phMui = inv_ph + mui;
         
-        scorei = wtsi * (R::digamma(inv_ph+yi) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_phMui) - (yi+inv_ph)/(inv_phMui));
-        infoi = wtsi * (R::trigamma(inv_ph) + 2/(inv_phMui) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/pow(inv_phMui,2));
+        scorei = wtsi * (R::digamma(inv_ph+yi) - R::digamma(inv_ph) + std::log(inv_ph) + 1 - std::log(inv_phMui) - (yi+inv_ph)/(inv_phMui));
+        infoi = wtsi * (R::trigamma(inv_ph) + 2/(inv_phMui) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/std::pow(inv_phMui,2));
         
         score1 += scorei;
         info1 += infoi;
@@ -54,10 +54,10 @@ int sign(double x) {
 double soft_thresh(double alpha, double lambda){
     double STval;
     
-    if(fabs(alpha)-lambda<0){
+    if(std::fabs(alpha)-lambda<0){
         STval = 0;
     } else {
-        STval = sign(alpha) * (fabs(alpha)-lambda);
+        STval = sign(alpha) * (std::fabs(alpha)-lambda);
     }
     
     return(STval);
