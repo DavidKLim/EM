@@ -10,7 +10,7 @@ run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.3,0.5,1),num_disc=c(.
       cmd[3] = sprintf("save(X, file = '%s')", out2)
       cmdf = paste(cmd, collapse = "")
       write.table(cmdf, file = out, col.names = F, row.names = F, quote = F)
-      run = sprintf("bsub -M 6 -q week -n 10 -R \"span[hosts=1]\" -o /netscr/deelim/dump R CMD BATCH %s", out)
+      run = sprintf("bsub -M 10 -q week -n 10 -R \"span[hosts=1]\" -o /netscr/deelim/dump R CMD BATCH %s", out)
       system(run)
   }}}}}
 }
