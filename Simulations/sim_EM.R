@@ -233,7 +233,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     #create matrix for grid search values
     lambda1_search=1
-    lambda2_search=c(0.1,0.15,0.2,0.5,0.9)
+    lambda2_search=c(0.01,0.05,0.1,0.15,0.2)
     tau_search=seq(from=0.1,to=0.9,by=0.2)
     
     list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
@@ -296,7 +296,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   temp_falsepos<-rep(0,times=sim)
 
   ## ADD PARALLELIZATION HERE ##
-  no_cores <- 10   # for parallel computing
+  no_cores <- 2   # for parallel computing
   cl<-makeCluster(no_cores,outfile="myoutfile.txt")
   clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
   clusterEvalQ(cl,{
