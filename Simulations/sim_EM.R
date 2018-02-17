@@ -297,7 +297,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
 
   ## ADD PARALLELIZATION HERE ##
   no_cores <- 2   # for parallel computing
-  cl<-makeCluster(no_cores,outfile="myoutfile.txt")
+  cl<-makeCluster(no_cores)
   clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
   clusterEvalQ(cl,{
     library(stats)
