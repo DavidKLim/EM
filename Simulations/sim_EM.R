@@ -94,6 +94,11 @@ simulate_data_g=function(n,k,g,init_pi,b,size_factors,method,phi=rep(0,times=g))
 
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
+  
+  # Number of cores: 2 for laptop, 12 for Killdevil
+  #no_cores <- 2   # for parallel computing
+  no_cores <- 12
+  
   # max n = 100, max #
   
   if(method=="poisson"){
@@ -189,7 +194,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       rowZeroes[j] = mean(y[j,]==0)
     }          # Proportion of zeroes in each gene
     
-    idx <- (rowSums(y)>100 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
+    idx <- (rowMeans(y)>10 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
     
     y <- y[idx,]
     norm_y <- norm_y[idx,]
@@ -296,7 +301,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   temp_falsepos<-rep(0,times=sim)
 
   ## ADD PARALLELIZATION HERE ##
-  no_cores <- 2   # for parallel computing
   cl<-makeCluster(no_cores)
   clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
   clusterEvalQ(cl,{

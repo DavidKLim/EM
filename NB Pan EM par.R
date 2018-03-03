@@ -317,6 +317,7 @@ EM_run <- function(y, k,
       # print(head(coefs))
       # print("phi:")
       # print(head(phi))
+      if(a>=5 & all(theta_list[[j]]==0)){next}
       par_X[[j]] <- M_step(j=j,a=a,dat=dat,y=as.matrix(y),offset=offset,
                            k=k,theta_list=theta_list,coefs=coefs,phi=phi,
                            lambda1=lambda1,lambda2=lambda2,tau=tau,
@@ -325,6 +326,7 @@ EM_run <- function(y, k,
     #stopCluster(cl)
     
     for(j in 1:g){
+      if(a>=5 & all(theta_list[[j]]==0)){next}
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
@@ -399,7 +401,11 @@ EM_run <- function(y, k,
   m<-rep(0,times=g)
   nondiscriminatory=rep(FALSE,times=g)
   for(j in 1:g){
-    m[j] <- sum(theta_list[[j]][1,]!=0) + 1         # of parameters estimated
+    m_row=rep(0,k)
+    for(c in 1:k){
+      m_row[c] <- sum(theta_list[[j]][c,]!=0) + 1         # of parameters estimated
+    }
+    m[j]=min(m_row)
     if(m[j]==1){nondiscriminatory[j]=TRUE}
   }
   pred.nondiscriminatory<-mean(nondiscriminatory)
