@@ -100,7 +100,8 @@ compare <- function(y){
   }
   
   cl<-makeCluster(no_cores)
-  clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterExport(cl=cl,varlist=c("y","EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterExport(cl=cl,varlist=c("norm_y","size_factors"),envir=globalenv())
   clusterEvalQ(cl,{
     library(stats)
     library(MASS)
@@ -138,7 +139,8 @@ compare <- function(y){
     return(X$BIC)
   }
   cl<-makeCluster(no_cores)
-  clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterExport(cl=cl,varlist=c("y","max_k","EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterExport(cl=cl,varlist=c("norm_y","size_factors"),envir=globalenv())
   clusterEvalQ(cl,{
     library(stats)
     library(MASS)

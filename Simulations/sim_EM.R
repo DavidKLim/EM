@@ -194,7 +194,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       rowZeroes[j] = mean(y[j,]==0)
     }          # Proportion of zeroes in each gene
     
-    idx <- (rowMeans(y)>10 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
+    idx <- (rowMeans(norm_y)>15 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
     
     y <- y[idx,]
     norm_y <- norm_y[idx,]
