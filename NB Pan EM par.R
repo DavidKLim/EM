@@ -32,8 +32,8 @@ soft_thresholding=function(alpha,lambda){
     return(sign(alpha)*(abs(alpha)-lambda))
   }
 }
-# 
-# 
+ 
+ 
 # phi.ml <-
 #   function(y, mu, n = sum(weights), weights, limit = 10,
 #            eps = .Machine$double.eps^0.25,
@@ -191,12 +191,14 @@ soft_thresholding=function(alpha,lambda){
 
 
 
-
 EM_run <- function(y, k,
                    lambda1=0, lambda2=0, tau=0,
                    size_factors=rep(1,times=ncol(y)) ,
                    norm_y=y,
                    true_clusters=NA,
+                   init_parms=FALSE,
+                   init_coefs=matrix(0,nrow=nrow(y),ncol=k),
+                   init_phi=matrix(0,nrow=nrow(y),ncol=k),
                    cls_init,
                    maxit_EM=100){
   
@@ -260,7 +262,7 @@ EM_run <- function(y, k,
     cls<-all_clusts[[which.max(match_index)]]
   }
   ########################## SIMULATION ONLY #############################
-  
+
   # initialize weights
   wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   for(c in 1:k){
@@ -272,6 +274,9 @@ EM_run <- function(y, k,
   colnames(dat)[1]<-c("count")
   colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights","offset")
   
+  rm(list=c("vect_wts","vect_y","gene","clust_index","clusts"))
+  
+  # 4.34 gb used
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
@@ -280,9 +285,15 @@ EM_run <- function(y, k,
     dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
     
     if(a==1){         # Initializations for 1st EM iteration
+      if(init_parms){
+        coefs=init_coefs
+        phi=init_phi
+      }
       for(j in 1:g){
-        for(c in 1:k){
-          coefs[j,c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
+        if(!init_parms){
+          for(c in 1:k){
+            coefs[j,c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
+          }
         }
         beta <- coefs[j,]
         theta<-matrix(rep(0,times=k^2),nrow=k)
@@ -297,12 +308,6 @@ EM_run <- function(y, k,
     
     par_X=rep(list(list()),g)
     
-    # cl<-makeCluster(no_cores)
-    # i=1               # (IRLS index) clusters crashed when this isn't defined
-    # clusterExport(cl=cl,varlist=c(ls(),"phi.ml","soft_thresholding"),envir=environment())
-    # clusterEvalQ(cl, library("MASS"))
-    # 
-    # par_X<-parLapply(cl, 1:g, M.step)
     
     for(j in 1:g){
       # print(paste("j=",j,"a=",a,"k=",k,"lambda1=",lambda1,"lambda2=",lambda2,"tau=",tau,"IRLS_tol=",IRLS_tol,"maxit_IRLS=",maxit_IRLS))
@@ -317,16 +322,17 @@ EM_run <- function(y, k,
       # print(head(coefs))
       # print("phi:")
       # print(head(phi))
-      if(a>=5 & all(theta_list[[j]]==0)){next}
+      if((a>=5 & all(theta_list[[j]]==0))){next}
       par_X[[j]] <- M_step(j=j,a=a,dat=dat,y=as.matrix(y),offset=offset,
                            k=k,theta_list=theta_list,coefs=coefs,phi=phi,
                            lambda1=lambda1,lambda2=lambda2,tau=tau,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS)
     }
-    #stopCluster(cl)
+    
+    
     
     for(j in 1:g){
-      if(a>=5 & all(theta_list[[j]]==0)){next}
+      if((a>=5 & all(theta_list[[j]]==0))){next}
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
@@ -429,7 +435,9 @@ EM_run <- function(y, k,
                time_elap=time_elap,
                lambda1=lambda1,
                lambda2=lambda2,
-               tau=tau)
+               tau=tau,
+               size_factors=size_factors,
+               norm_y=norm_y)
   return(result)
   
 }
@@ -440,8 +448,13 @@ EM<-function(y, k,
              lambda1=0, lambda2=0, tau=0,
              size_factors=rep(1,times=ncol(y)) ,
              norm_y=y,
-             true_clusters=NA){
+             true_clusters=NA,
+             init_parms=FALSE,
+             init_coefs=matrix(0,nrow=nrow(y),ncol=k),
+             init_phi=matrix(0,nrow=nrow(y),ncol=k)){
   
+  n = ncol(y)
+  g = nrow(y)
   # Initial Clusterings
   
   ## Hierarchical Clustering
@@ -449,24 +462,145 @@ EM<-function(y, k,
   model<-hclust(d,method="complete")       # hierarchical clustering
   cls_hc <- cutree(model,k=k)
   
+  ############################## match #########################################
+  # if(init_parms){
+  #   all_perms=allPerms(1:k)
+  #   all_clusts=list()
+  #   temp_clust<-rep(0,times=n)
+  #   for(ii in 1:nrow(all_perms)){
+  #     for(i in 1:n){
+  #       temp_clust[i]<-all_perms[ii,cls_hc[i]]
+  #     }
+  #     all_clusts[[ii]]<-temp_clust
+  #   }
+  #   all_clusts[[nrow(all_perms)+1]]<-cls_hc     # contains all permutations of cluster indices
+  #   match_index<-rep(0,times=nrow(all_perms)+1)
+  #   for(ii in 1:(nrow(all_perms)+1)){
+  #     match_index[ii]<-EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=true_clusters,init_parms,
+  #                             init_coefs,init_phi,cls_init=all_clusts[[ii]],maxit_EM=1,match_cls=1)$Q     # compares each permutation to find best fit
+  #   }
+  #   cls_hc<-all_clusts[[which.max(match_index)]]
+  # }
+  ##############################################################################
+
+  
   ## K-means Clustering
   cls_km <- kmeans(t(norm_y),k)$cluster
+  
+  
+  
+  
+  ############################## match #########################################
+  # if(init_parms){
+  #   all_perms=allPerms(1:k)
+  #   all_clusts=list()
+  #   temp_clust<-rep(0,times=n)
+  #   for(ii in 1:nrow(all_perms)){
+  #     for(i in 1:n){
+  #       temp_clust[i]<-all_perms[ii,cls_km[i]]
+  #     }
+  #     all_clusts[[ii]]<-temp_clust
+  #   }
+  #   all_clusts[[nrow(all_perms)+1]]<-cls_km     # contains all permutations of cluster indices
+  #   match_index<-rep(0,times=nrow(all_perms)+1)
+  #   for(ii in 1:(nrow(all_perms)+1)){
+  #     match_index[ii]<-EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,init_parms,
+  #                             init_coefs,init_phi,cls_init=all_clusts[[ii]],maxit_EM=1,match_cls=1)$Q     # compares each permutation to find best fit
+  #   }
+  #   cls_km<-all_clusts[[which.max(match_index)]]
+  # }
+  ##############################################################################
+  
   
   
   # Iterate through 2-it EM with each initialization
   all_init_cls <- cbind(cls_hc,cls_km)
   init_cls_BIC <- rep(0,times=ncol(all_init_cls))
   for(i in 1:ncol(all_init_cls)){
-    init_cls_BIC[i] <- EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=all_init_cls[,i], maxit_EM=2)$BIC
+    init_cls_BIC[i] <- EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,
+                              init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,
+                              cls_init=all_init_cls[,i], maxit_EM=2)$BIC
   }
   
   final_init_cls <- all_init_cls[,which.min(init_cls_BIC)]
 
   print(colnames(all_init_cls)[which.min(init_cls_BIC)])
   
+  # cor_cls=rep(0,n)
+  # if(init_parms==TRUE){
+  #   for(i in 1:n){
+  #     cor_cls[i]=which.max(cor(log(norm_y[,i]+0.1),init_coefs))
+  #   }
+  #   final_init_cls = cor_cls
+  # }
+  
+  # random_cls = sample(1:k,n,replace=TRUE)
+  # final_init_cls=random_cls    #TESTING RANDOM CLUSTERING
+  
   # Final run based on optimal initialization
-  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=final_init_cls)
+  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=final_init_cls,
+                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
   return(results)
+}
+
+predictions <- function(X,newdata,new_sizefactors){
+  # X is the output object from the EM() function
+  init_coefs=X$coefs
+  init_phi=X$phi
+  init_lambda1=X$lambda1
+  init_lambda2=X$lambda2
+  init_tau=X$tau
+  
+  ##### EXPORT THIS?? #####
+  # library(DESeq2)
+  # row_names<-paste("gene",seq(nrow(newdata)))
+  # col_names<-paste("subj",seq(ncol(newdata)))
+  # cts<-as.matrix(newdata)
+  # rownames(cts)<-row_names
+  # colnames(cts)<-col_names
+  # coldata<-data.frame(matrix(paste("cl"),nrow=ncol(newdata)))
+  # rownames(coldata)<-colnames(cts)
+  # colnames(coldata)<-"cluster"
+  # dds<-DESeqDataSetFromMatrix(countData = cts,
+  #                             colData = coldata,
+  #                             design = ~ 1)
+  # DESeq_dds<-DESeq(dds)
+  # init_size_factors<-sizeFactors(DESeq_dds)
+  # init_norm_y<-counts(DESeq_dds,normalized=TRUE)
+  ##########################
+  
+  # results = EM(newdata,ncol(init_coefs),init_lambda1,init_lambda2,init_tau,init_size_factors,init_norm_y,
+  #              true_clusters=NA,init_parms=TRUE,init_coefs=init_coefs,init_phi=init_phi)
+  
+  init_size_factors = new_sizefactors
+  offset=log(init_size_factors)
+  n=ncol(newdata)
+  k=ncol(init_coefs)
+  
+  # nb log(f_k(y_i))
+  l<-matrix(rep(0,times=k*n),nrow=k)
+  for(i in 1:n){
+    for(c in 1:k){
+      l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=exp(init_coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+    }    # subtract out 0.1 that was added earlier
+  }
+  
+  pi=Xtrain$pi
+  
+  # E step
+  # Estimate weights
+  wts = matrix(0,nrow=k,ncol=n)
+  logdenom = apply(log(pi) + l, 2,logsumexpc)
+  for(c in 1:k){
+    wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
+  }
+  
+  final_clusters<-rep(0,times=n)
+  for(i in 1:n){
+    final_clusters[i]<-which.max(wts[,i])
+  }
+  
+  return(list(final_clusters=final_clusters,wts=wts))
 }
 
 

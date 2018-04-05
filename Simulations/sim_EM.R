@@ -202,6 +202,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,
+                         size_factors=size_factors,
                          norm_y=norm_y,
                          true_disc=true_disc,
                          gene_id=idx)
@@ -225,7 +226,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
       X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)  # no penalty
       list_BIC[aa,2]<-X$BIC
       print(list_BIC[aa,])
-      print(paste("Cluster agreement:", adjustedRandIndex(X$init_clusters,X$final_clusters)))
+      print(paste("Cluster agreement:", mean(X$init_clusters==X$final_clusters)))
       print(paste("Time:",X$time_elap,"seconds"))
     }
     
@@ -249,10 +250,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     #search for optimal penalty parameters
     for(aa in 1:nrow(list_BIC)){
-      X<-EM(y=y,k=k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
+      X<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
       list_BIC[aa,4]<-X$BIC
       print(list_BIC[aa,])
       print(paste("Time:",X$time_elap,"seconds"))
+      print(paste("Cluster agreement:",mean(X$init_clusters==X$final_clusters)))
     }
     
     #store optimal penalty parameters
@@ -323,6 +325,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   # }
   
   print("Finished parallel computations")
+  
+  
   
   
   # Summarize results

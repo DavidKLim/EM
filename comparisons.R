@@ -35,8 +35,8 @@ normalizations <- function(dat){
 compare <- function(y){
   
   # Number of cores: 2 for laptop, 12 for Killdevil
-  #no_cores <- 2   # for parallel computing
-  no_cores <- 12
+  no_cores <- 2   # for parallel computing
+  #no_cores <- 12
   
   # list of K to search over
   K_search = c(2:7)
@@ -118,7 +118,7 @@ compare <- function(y){
   max_k=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
   
   lambda1_search=1
-  lambda2_search=c(0.01,0.05,0.1,0.15,0.2,0.25)
+  lambda2_search=c(2.5, 3, 3.5, 4, 4.5)
   tau_search=seq(from=0.1,to=0.9,by=0.2)
   
   list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
@@ -201,44 +201,35 @@ setwd("/netscr/deelim/out")
 
 # DATA PREP
 
-NSCLC_anno <- read.table("NSCLC_anno.txt",sep="\t",header=TRUE)
-NSCLC_dat <- read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
-rownames(NSCLC_dat)<-toupper(NSCLC_dat[,1])
-NSCLC_subtypes <- NSCLC_anno$Adeno.Squamous
-NSCLC_dat<-round(NSCLC_dat[,-1],digits=0)
-
-
-# PRE-FILTERING
-
-## DESeq2 to find top significant genes in clustering
-colnames(NSCLC_dat)<-toupper(colnames(NSCLC_dat))
-coldata<-NSCLC_anno[,-1]
-rownames(coldata)<-toupper(NSCLC_anno[,1])
-coldata<-coldata[,c("Adeno.Squamous","Tumor.location")]
-dds<-DESeqDataSetFromMatrix(countData = NSCLC_dat,
-                            colData = coldata,
-                            design = ~ Adeno.Squamous)
-DESeq_dds<-DESeq(dds)
-
-## Using DESeq2
-# res<-results(DESeq_dds,alpha=0.05)
-# signif_res<-res[is.na(res$padj)==FALSE,]
-# signif_res<-signif_res[order(signif_res$padj),]
-# signif_res<-signif_res[1:100,]
-# subs_NSCLC_dat <- NSCLC_dat[rownames(signif_res),]
-
-## Using Row MAD
-#row_mad <- apply(NSCLC_dat,1,mad)
-#NSCLC_dat <- NSCLC_dat[order(-row_mad),]
-
-
-# RUN
-fit <- normalizations(NSCLC_dat)    # Normalizations done on full dataset
-size_factors <- fit$size_factors
-norm_y <- fit$norm_y
-y1 <- NSCLC_dat[rowMeans(NSCLC_dat)>=10,]
-
-X1<-compare(y1)
+# NSCLC_anno <- read.table("NSCLC_anno.txt",sep="\t",header=TRUE)
+# NSCLC_dat <- read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
+# rownames(NSCLC_dat)<-toupper(NSCLC_dat[,1])
+# NSCLC_subtypes <- NSCLC_anno$Adeno.Squamous
+# NSCLC_dat<-round(NSCLC_dat[,-1],digits=0)
+# 
+# 
+# # PRE-FILTERING
+# 
+# ## DESeq2 to find top significant genes in clustering
+# colnames(NSCLC_dat)<-toupper(colnames(NSCLC_dat))
+# coldata<-NSCLC_anno[,-1]
+# rownames(coldata)<-toupper(NSCLC_anno[,1])
+# coldata<-coldata[,c("Adeno.Squamous","Tumor.location")]
+# dds<-DESeqDataSetFromMatrix(countData = NSCLC_dat,
+#                             colData = coldata,
+#                             design = ~ Adeno.Squamous)
+# DESeq_dds<-DESeq(dds)
+# 
+# 
+# # RUN
+# fit <- normalizations(NSCLC_dat)    # Normalizations done on full dataset
+# size_factors <- fit$size_factors
+# norm_y <- fit$norm_y
+# rm(fit)
+# y1 <- NSCLC_dat[rowMeans(NSCLC_dat)>=10,]
+# norm_y1 = norm_y[rowMeans(NSCLC_dat)>=10,]
+# 
+# X1<-compare(y1)
 
 
 
@@ -256,12 +247,13 @@ library(genefilter)
 load(file="TCGA_BRCA_exp.rda")
 BRCA_cts <- round(assay(data),digits=0)             # default gives raw count
 BRCA_anno <- colData(data)@listData
+rm(data)
+
 BRCA_subtypes <- BRCA_anno$subtype_PAM50.mRNA
 
 idy <- (!is.na(BRCA_subtypes) & BRCA_subtypes != "Normal-like")
 BRCA_cts <- BRCA_cts[!duplicated(BRCA_cts[,1:ncol(BRCA_cts)]),idy]
-
-BRCA_dat <- BRCA_cts
+BRCA_subtypes = BRCA_subtypes[idy]
 
 
 # PRE-FILTERING
@@ -278,16 +270,21 @@ BRCA_dat <- BRCA_cts
 # RUN
 
 #subs_BRCA_dat <- BRCA_dat[1:10000,]
-fit <- normalizations(BRCA_dat)
+
+fit <- normalizations(BRCA_cts)
 size_factors <- fit$size_factors
 norm_y <- fit$norm_y
 
-y2 <- BRCA_dat[rowMeans(BRCA_dat)>=10,]
+filterID = rowMeans(BRCA_cts)>=10
+norm_y = norm_y[filterID,]
+y2 <- BRCA_cts[filterID,]
+
+rm(list=c("BRCA_cts","fit"))
 
 X2 <- compare(y2)
 
 
-save(X1,file="NSCLC_compare.out")
+#save(X1,file="NSCLC_compare.out")
 save(X2,file="BRCA_compare.out")
 
 
