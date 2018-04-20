@@ -18,13 +18,13 @@ using namespace std;
 
 /* Create functions phi_ml() and soft_thresholding() here */
 
-List score_info(int N, double ph, arma::vec mu, arma::vec y, arma::vec wts){
+List score_info(int N, double ph, arma::vec mu, arma::vec y, arma::rowvec wts){
     double lambda = 1e-50;
     double score1 = 0, info1 = 0;
     double inv_ph = 1/ph;
     double mui, yi, wtsi, scorei, infoi, inv_phMui;
     
-    int n=y.n_rows;
+    int n=y.size();
     
     for(int i=0; i<n; i++){
         yi = y(i);
@@ -62,17 +62,17 @@ double soft_thresh(double alpha, double lambda){
     return(STval);
 }
 
-double phi_ml(arma::vec y, arma::vec mu, arma::vec wts, int limit, int trace){
+double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace){
     double eps = 0.0001220703; /* from R */
     double p0 = 0;
     int N = accu(wts);
-    int n = y.n_rows;
+    int n = y.size();
     
     arma::uvec wts_one_ids = find(wts == 1);
     arma::vec y_one = y(wts_one_ids);
     
     int all_equal=0;
-    for(int i=0; i<y_one.n_rows; i++){
+    for(int i=0; i<y_one.size(); i++){
         if(i > 0){
             if(y_one(i)!=y_one(i-1)){
                 all_equal=1;
@@ -129,16 +129,13 @@ double phi_ml(arma::vec y, arma::vec mu, arma::vec wts, int limit, int trace){
 
 
 // [[Rcpp::export]]
-List M_step(int j, int a, arma::mat dat, arma::mat y, arma::vec offset, int k, List theta_list, arma::mat coefs, arma::mat phi, double lambda1, double lambda2, double tau, double IRLS_tol, int maxit_IRLS){
+List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, List theta_list, arma::mat coefs, arma::mat phi, double lambda1, double lambda2, double tau, double IRLS_tol, int maxit_IRLS){
 
     arma::mat beta = coefs.row(j-1), theta = theta_list[j-1], temp(maxit_IRLS, (2*k));
     temp.zeros();
     
-    arma::uvec ids_j = find(dat.col(k+2) == j);
-    arma::mat dat_j = dat.rows(ids_j);
     
-    
-    int n = dat_j.n_rows/k;
+    int n = y_j.size();
     arma::mat eta(n,k), mu(n,k);
     eta.zeros();
     mu.zeros();
@@ -164,11 +161,8 @@ List M_step(int j, int a, arma::mat dat, arma::mat y, arma::vec offset, int k, L
         /* CDA */
         for(int c=0; c<k; c++){
     
-            arma::uvec ids_jc = find(dat_j.col(k+1) == c+1);
-            arma::mat dat_jc = dat_j.rows(ids_jc);
-    
-            arma::vec counts = dat_jc.col(0);
-            arma::vec wts = dat_jc.col(k+3);
+            
+            arma::rowvec wts_c = all_wts.row(c);
     
             /* First calculate all trans_y, w, and products */
             arma::vec all_trans_y(n);
@@ -176,13 +170,13 @@ List M_step(int j, int a, arma::mat dat, arma::mat y, arma::vec offset, int k, L
             arma::vec all_prod_w_trans_y(n);
     
             for(int ii=0; ii<n; ii++){
-                all_trans_y(ii) = ( eta(ii,c)-offset(ii) ) + (counts(ii)-mu(ii,c))/mu(ii, c);
-                all_w(ii) = sqrt(wts(ii)*mu(ii,c)*mu(ii,c)/(mu(ii,c)+mu(ii,c)*mu(ii,c)*phi(j-1,c)));
+                all_trans_y(ii) = ( eta(ii,c)-offset(ii) ) + (y_j(ii)-mu(ii,c))/mu(ii, c);
+                all_w(ii) = sqrt(wts_c(ii)*mu(ii,c)*mu(ii,c)/(mu(ii,c)+mu(ii,c)*mu(ii,c)*phi(j-1,c)));
                 all_prod_w_trans_y(ii) = all_trans_y(ii)*all_w(ii);
             }
     
             /* Subset just the values of trans_y, w, and products where weight != 0 */
-            arma::uvec good_ids = find(wts != 0);
+            arma::uvec good_ids = find(wts_c != 0);
     
             arma::vec trans_y = all_trans_y.rows(good_ids);
             arma::vec w = all_w.rows(good_ids);
@@ -210,7 +204,7 @@ List M_step(int j, int a, arma::mat dat, arma::mat y, arma::vec offset, int k, L
     
             /* Estimate phi */
             
-            phi(j-1,c) = phi_ml(counts,mu.col(c),wts,10,0);
+            phi(j-1,c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
         }
     
     

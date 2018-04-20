@@ -3,13 +3,14 @@
 #library(fpc)
 #library(amap)
 #library(gplots)
-
 #library(parallel)
+
 library(stats)
 library(MASS)
 library(permute)
 library(Rcpp)
 library(RcppArmadillo)
+library(pryr)
 
 sourceCpp("M_step.cpp")
 
@@ -228,11 +229,6 @@ EM_run <- function(y, k,
   temp_list <- list()             # store temp to see progression of IRLS
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
   
-  # Flatten data: one observation per each cluster, gene, and subject
-  vect_y<-rep(as.vector(t(y)),each=k)
-  gene<-rep(1:g,each=k*n) # gene for each corresponding new_y
-  clusts<-matrix(rep(t(diag(k)),times=n*g),byrow=TRUE,ncol=k) # cluster indicators
-  clust_index<-rep((1:k),times=n*g)
   offset=log(size_factors)
   #offset=rep(0,times=n)            # no offsets
   
@@ -269,20 +265,12 @@ EM_run <- function(y, k,
     wts[c,]=(cls==c)^2
   }
   
-  vect_wts<-rep(as.vector(wts),times=g)
-  dat<-cbind(vect_y,clusts,clust_index,gene,vect_wts, rep(rep(offset,each=k),times=g) ) # this is k*g*n rows. cols: count, indicator for cl1, cl2, cl3, genes, wts
-  colnames(dat)[1]<-c("count")
-  colnames(dat)[(k+2):ncol(dat)]<-c("clusts","g","weights","offset")
-  
-  rm(list=c("vect_wts","vect_y","gene","clust_index","clusts"))
-  
   # 4.34 gb used
+  print(paste("Memory used before EM:",mem_used()))
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
     
-    # M step
-    dat[,"weights"]<-rep(as.vector(wts),times=g) # update weights column in dat
     
     if(a==1){         # Initializations for 1st EM iteration
       if(init_parms){
@@ -323,12 +311,14 @@ EM_run <- function(y, k,
       # print("phi:")
       # print(head(phi))
       if((a>=5 & all(theta_list[[j]]==0))){next}
-      par_X[[j]] <- M_step(j=j,a=a,dat=dat,y=as.matrix(y),offset=offset,
+      sourceCpp("M_step.cpp")
+      par_X[[j]] <- M_step(j=j, a=a, y_j=as.integer(y[j,]), all_wts=wts, offset=offset,
                            k=k,theta_list=theta_list,coefs=coefs,phi=phi,
                            lambda1=lambda1,lambda2=lambda2,tau=tau,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS)
     }
     
+    print(paste("Memory used after M step iteration",a,":",mem_used()))
     
     
     for(j in 1:g){
@@ -395,6 +385,7 @@ EM_run <- function(y, k,
         }
       }
     }
+    print(paste("Iteration ",a,", memory used:",mem_used()))
   }
   
   num_warns=length(warnings())
@@ -422,7 +413,8 @@ EM_run <- function(y, k,
   end_time <- Sys.time()
   time_elap <- as.numeric(end_time)-as.numeric(start_time)
   
-  result<-list(pi=pi,
+  result<-list(k=k,
+               pi=pi,
                coefs=coefs,
                Q=Q[1:a],
                BIC=BIC,
@@ -534,8 +526,8 @@ EM<-function(y, k,
   #   final_init_cls = cor_cls
   # }
   
-  # random_cls = sample(1:k,n,replace=TRUE)
-  # final_init_cls=random_cls    #TESTING RANDOM CLUSTERING
+  random_cls = sample(1:k,n,replace=TRUE)
+  final_init_cls=random_cls    #TESTING RANDOM CLUSTERING
   
   # Final run based on optimal initialization
   results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=final_init_cls,
