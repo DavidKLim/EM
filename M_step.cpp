@@ -204,7 +204,10 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
     
             /* Estimate phi */
             
-            phi(j-1,c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
+            /*phi(j-1,c) = phi_ml(y_j,mu.col(c),wts_c,10,0);*/
+             
+            /* Testing fixing phi to be = 0 */
+            phi(j-1,c) = 0;
         }
     
     

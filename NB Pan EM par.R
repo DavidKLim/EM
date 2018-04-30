@@ -235,29 +235,6 @@ EM_run <- function(y, k,
   Q<-rep(0,times=maxit_EM)
   
   cls=cls_init
-  ########################## SIMULATION ONLY #############################
-  if(is.na(true_clusters)==FALSE){
-    all_perms=allPerms(1:k)
-    all_clusts=list()
-    temp_clust<-rep(0,times=n)
-    
-    for(ii in 1:nrow(all_perms)){
-      for(i in 1:n){
-        temp_clust[i]<-all_perms[ii,cls[i]]
-      }
-      all_clusts[[ii]]<-temp_clust
-    }
-    
-    all_clusts[[nrow(all_perms)+1]]<-cls     # contains all permutations of cluster indices
-    match_index<-rep(0,times=nrow(all_perms)+1)
-    
-    for(ii in 1:(nrow(all_perms)+1)){
-      match_index[ii]<-mean(true_clusters==all_clusts[[ii]])     # compares each permutation to true --> % of match
-    }
-    
-    cls<-all_clusts[[which.max(match_index)]]
-  }
-  ########################## SIMULATION ONLY #############################
 
   # initialize weights
   wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
@@ -317,8 +294,6 @@ EM_run <- function(y, k,
                            lambda1=lambda1,lambda2=lambda2,tau=tau,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS)
     }
-    
-    print(paste("Memory used after M step iteration",a,":",mem_used()))
     
     
     for(j in 1:g){
@@ -385,7 +360,20 @@ EM_run <- function(y, k,
         }
       }
     }
-    print(paste("Iteration ",a,", memory used:",mem_used()))
+    
+    current_clusters<-rep(0,times=n)
+    for(i in 1:n){
+      current_clusters[i]<-which.max(wts[,i])
+    }
+    
+    #print(current_clusters)
+    print(paste("EM iter",a,"% of cls unchanged (from initial):",sum(current_clusters==cls_init)/n))
+    print(paste("Gene1: # of IRLS iterations used in M step:",nrow(temp_list[[1]][rowSums(temp_list[[1]])!=0,])))
+    print(paste("coef:",coefs[1,]))
+    print(paste("phi:",phi[1,]))
+    print(wts)
+    
+    
   }
   
   num_warns=length(warnings())
@@ -454,83 +442,69 @@ EM<-function(y, k,
   model<-hclust(d,method="complete")       # hierarchical clustering
   cls_hc <- cutree(model,k=k)
   
-  ############################## match #########################################
-  # if(init_parms){
-  #   all_perms=allPerms(1:k)
-  #   all_clusts=list()
-  #   temp_clust<-rep(0,times=n)
-  #   for(ii in 1:nrow(all_perms)){
-  #     for(i in 1:n){
-  #       temp_clust[i]<-all_perms[ii,cls_hc[i]]
-  #     }
-  #     all_clusts[[ii]]<-temp_clust
-  #   }
-  #   all_clusts[[nrow(all_perms)+1]]<-cls_hc     # contains all permutations of cluster indices
-  #   match_index<-rep(0,times=nrow(all_perms)+1)
-  #   for(ii in 1:(nrow(all_perms)+1)){
-  #     match_index[ii]<-EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=true_clusters,init_parms,
-  #                             init_coefs,init_phi,cls_init=all_clusts[[ii]],maxit_EM=1,match_cls=1)$Q     # compares each permutation to find best fit
-  #   }
-  #   cls_hc<-all_clusts[[which.max(match_index)]]
-  # }
-  ##############################################################################
-
-  
   ## K-means Clustering
   cls_km <- kmeans(t(norm_y),k)$cluster
-  
-  
-  
-  
-  ############################## match #########################################
-  # if(init_parms){
-  #   all_perms=allPerms(1:k)
-  #   all_clusts=list()
-  #   temp_clust<-rep(0,times=n)
-  #   for(ii in 1:nrow(all_perms)){
-  #     for(i in 1:n){
-  #       temp_clust[i]<-all_perms[ii,cls_km[i]]
-  #     }
-  #     all_clusts[[ii]]<-temp_clust
-  #   }
-  #   all_clusts[[nrow(all_perms)+1]]<-cls_km     # contains all permutations of cluster indices
-  #   match_index<-rep(0,times=nrow(all_perms)+1)
-  #   for(ii in 1:(nrow(all_perms)+1)){
-  #     match_index[ii]<-EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,init_parms,
-  #                             init_coefs,init_phi,cls_init=all_clusts[[ii]],maxit_EM=1,match_cls=1)$Q     # compares each permutation to find best fit
-  #   }
-  #   cls_km<-all_clusts[[which.max(match_index)]]
-  # }
-  ##############################################################################
-  
-  
-  
+
   # Iterate through 2-it EM with each initialization
   all_init_cls <- cbind(cls_hc,cls_km)
   init_cls_BIC <- rep(0,times=ncol(all_init_cls))
+  
   for(i in 1:ncol(all_init_cls)){
-    init_cls_BIC[i] <- EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,
+    ########################## SIMULATION ONLY #############################
+    if(is.na(true_clusters)==FALSE){
+      all_perms=allPerms(1:k)
+      all_clusts=list()
+      temp_clust<-rep(0,times=n)
+      
+      for(iii in 1:nrow(all_perms)){
+        for(ii in 1:n){
+          temp_clust[ii]<-all_perms[iii,all_init_cls[ii,i]]
+        }
+        all_clusts[[iii]]<-temp_clust
+      }
+      
+      all_clusts[[nrow(all_perms)+1]]<-all_init_cls[,i]     # contains all permutations of cluster indices
+      match_index<-rep(0,times=nrow(all_perms)+1)
+      
+      for(ii in 1:(nrow(all_perms)+1)){
+        match_index[ii]<-mean(true_clusters==all_clusts[[ii]])     # compares each permutation to true --> % of match
+      }
+      
+      all_init_cls[,i]<-all_clusts[[which.max(match_index)]]
+    }
+    ########################## SIMULATION ONLY #############################
+    fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,
                               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,
-                              cls_init=all_init_cls[,i], maxit_EM=2)$BIC
+                              cls_init=all_init_cls[,i], maxit_EM=2)
+    init_cls_BIC[i] <- fit$BIC
   }
   
   final_init_cls <- all_init_cls[,which.min(init_cls_BIC)]
 
-  print(colnames(all_init_cls)[which.min(init_cls_BIC)])
+  if(init_cls_BIC[1]==init_cls_BIC[2]){
+    print("Identical initializations")
+  } else{ print(colnames(all_init_cls)[which.min(init_cls_BIC)])}
   
-  # cor_cls=rep(0,n)
-  # if(init_parms==TRUE){
-  #   for(i in 1:n){
-  #     cor_cls[i]=which.max(cor(log(norm_y[,i]+0.1),init_coefs))
-  #   }
-  #   final_init_cls = cor_cls
-  # }
+  #TESTING RANDOM CLUSTERING
+  r_it=100
+  rand_inits = matrix(0,nrow=n,ncol=r_it)
+  rand_init_BIC = rep(0,r_it)
+  for(r in 1:r_it){
+    set.seed(r)
+    random_cls = sample(1:k,n,replace=TRUE)
+    rand_inits[,r] = random_cls
+    rand_init_BIC[r] = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,
+                              init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,
+                              cls_init=random_cls, maxit_EM=2)$BIC
+    print(rand_init_BIC[r])
+  }
   
-  random_cls = sample(1:k,n,replace=TRUE)
-  final_init_cls=random_cls    #TESTING RANDOM CLUSTERING
+  rand_final_cls = rand_inits[,which.min(rand_init_BIC)]
   
   # Final run based on optimal initialization
-  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=final_init_cls,
+  #results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=final_init_cls,
+  #               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
+  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=rand_final_cls,
                  init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
   return(results)
 }
@@ -569,8 +543,9 @@ predictions <- function(X,newdata,new_sizefactors){
   n=ncol(newdata)
   k=ncol(init_coefs)
   
+  
   # nb log(f_k(y_i))
-  l<-matrix(rep(0,times=k*n),nrow=k)
+  l<-matrix(0,nrow=k,ncol=n)
   for(i in 1:n){
     for(c in 1:k){
       l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=exp(init_coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
