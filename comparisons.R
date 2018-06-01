@@ -20,12 +20,14 @@ normalizations <- function(dat){
   dds<-DESeqDataSetFromMatrix(countData = cts,
                               colData = coldata,
                               design = ~ 1)
-  DESeq_dds<-DESeq(dds)
-  size_factors<-sizeFactors(DESeq_dds)
-  norm_y<-counts(DESeq_dds,normalized=TRUE)
+  dds<-DESeq(dds)
+  size_factors<-sizeFactors(dds)
+  norm_y<-counts(dds,normalized=TRUE)
+  idx <- rowSums( counts(dds, normalized=TRUE) >= 20) >= 5
   
   res <- list(size_factors=size_factors,
-              norm_y=norm_y)
+              norm_y=norm_y,
+              idx=idx)
   return(res)
 }
 
@@ -34,9 +36,12 @@ normalizations <- function(dat){
 
 compare <- function(y){
   
+  true_cls = as.numeric(NSCLC_anno$Adeno.Squamous)
+  true_k = 2
+  
   # Number of cores: 2 for laptop, 12 for Killdevil
-  no_cores <- 2   # for parallel computing
-  #no_cores <- 12
+  #no_cores <- 2   # for parallel computing
+  no_cores <- 12
   
   # list of K to search over
   K_search = c(2:7)
@@ -83,11 +88,13 @@ compare <- function(y){
   
   # my method #
   source("NB Pan EM par.R")
+  dir_name = "NSCLC"
   
   EM_tune_start <- Sys.time()
   
   list_BIC=matrix(0,nrow=length(K_search),ncol=2)
   list_BIC[,1]=K_search
+  
   
   # for(aa in 1:nrow(list_BIC)){
   #   list_BIC[aa,2]<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y)$BIC   # no penalty Pan
@@ -95,13 +102,13 @@ compare <- function(y){
   # }
   
   order.select <- function(c){
-    X<-EM(y=y,k=c,lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=NA)
+    X<-EM(y=y,k=c,lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_cls,prefix="order",dir=dir_name)
     return(X$BIC)
   }
   
   cl<-makeCluster(no_cores)
-  clusterExport(cl=cl,varlist=c("y","EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
-  clusterExport(cl=cl,varlist=c("norm_y","size_factors"),envir=globalenv())
+  clusterExport(cl=cl,varlist=c(ls(envir=environment()),"y","EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterExport(cl=cl,varlist=c(ls(envir=globalenv()),"norm_y","size_factors"),envir=globalenv())
   clusterEvalQ(cl,{
     library(stats)
     library(MASS)
@@ -109,6 +116,7 @@ compare <- function(y){
     library(Rcpp)
     library(RcppArmadillo)
     library(mclust)
+    library(pryr)
     sourceCpp("M_step.cpp")
   })
   
@@ -117,8 +125,34 @@ compare <- function(y){
   
   max_k=list_BIC[which(list_BIC[,2]==min(list_BIC[,2])),1]
   
-  lambda1_search=1
-  lambda2_search=c(2.5, 3, 3.5, 4, 4.5)
+  fit = EM(y=y,k=c,lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_cls,dir=dir_name)
+  compare_finalcls = fit$final_clusters
+  compare_wts = fit$wts
+  
+  sink(file=sprintf("Diagnostics/%s/final_order.txt",dir_name))
+  
+  max_k=list_BIC[which.min(list_BIC[,2]),1]
+  print(paste("True order:",true_k))
+  print(paste("Optimal order selected:",max_k))
+  print("RUN WITH CORRECT ORDER:")
+  print(paste("ARI:",adjustedRandIndex(compare_finalcls,true_cls)))
+  print(paste("PPs:"))
+  print(compare_wts)
+  
+  sink()
+  
+  pdf(file=sprintf("Diagnostics/%s/final_order.pdf",dir_name))
+  for(c in 1:true_k){
+    cl_ids = true_cls==c
+    boxplot(compare_wts[c,cl_ids],main=sprintf("Boxplot of PP for cl%d",c))
+  }
+  dev.off()
+  
+  
+  
+  
+  lambda1_search=seq(from=0.1,to=2.1,by=0.2)
+  lambda2_search=c(0.5,1,1.5,2,2.5,3,3.5,4)
   tau_search=seq(from=0.1,to=0.9,by=0.2)
   
   list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
@@ -135,12 +169,12 @@ compare <- function(y){
   # }
   
   grid.search <- function(row){
-    X<-EM(y=y,k=max_k,lambda1=list_BIC[row,3],lambda2=list_BIC[row,1],tau=list_BIC[row,2],size_factors=size_factors,norm_y=norm_y,true_clusters=NA)
+    X<-EM(y=y,k=max_k,lambda1=list_BIC[row,3],lambda2=list_BIC[row,1],tau=list_BIC[row,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_cls,prefix="tuning",dir=dir_name)
     return(X$BIC)
   }
   cl<-makeCluster(no_cores)
-  clusterExport(cl=cl,varlist=c("y","max_k","EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
-  clusterExport(cl=cl,varlist=c("norm_y","size_factors"),envir=globalenv())
+  clusterExport(cl=cl,varlist=c(ls(envir=environment()),"y","max_k","EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterExport(cl=cl,varlist=c(ls(envir=globalenv()),"norm_y","size_factors"),envir=globalenv())
   clusterEvalQ(cl,{
     library(stats)
     library(MASS)
@@ -148,6 +182,7 @@ compare <- function(y){
     library(Rcpp)
     library(RcppArmadillo)
     library(mclust)
+    library(pryr)
     sourceCpp("M_step.cpp")
   })
   
@@ -174,7 +209,7 @@ compare <- function(y){
   EM_tune_time <- as.numeric(EM_tune_end)-as.numeric(EM_tune_start)
   
   EM_start <- Sys.time()
-  X<-EM(y=y,k=max_k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=NA)
+  X<-EM(y=y,k=max_k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_cls,prefix="final",dir=dir_name)
   EM_end <- Sys.time()
   EM_time <- as.numeric(EM_end)-as.numeric(EM_start)
   
@@ -201,16 +236,16 @@ setwd("/netscr/deelim/out")
 
 # DATA PREP
 
-# NSCLC_anno <- read.table("NSCLC_anno.txt",sep="\t",header=TRUE)
-# NSCLC_dat <- read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
-# rownames(NSCLC_dat)<-toupper(NSCLC_dat[,1])
-# NSCLC_subtypes <- NSCLC_anno$Adeno.Squamous
-# NSCLC_dat<-round(NSCLC_dat[,-1],digits=0)
-# 
-# 
-# # PRE-FILTERING
-# 
-# ## DESeq2 to find top significant genes in clustering
+NSCLC_anno <- read.table("NSCLC_anno.txt",sep="\t",header=TRUE)
+NSCLC_dat <- read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
+rownames(NSCLC_dat)<-toupper(NSCLC_dat[,1])
+NSCLC_subtypes <- NSCLC_anno$Adeno.Squamous
+NSCLC_dat<-round(NSCLC_dat[,-1],digits=0)
+
+
+# pre-filtering DESEQ significant genes
+
+## DESeq2 to find top significant genes in clustering
 # colnames(NSCLC_dat)<-toupper(colnames(NSCLC_dat))
 # coldata<-NSCLC_anno[,-1]
 # rownames(coldata)<-toupper(NSCLC_anno[,1])
@@ -219,17 +254,24 @@ setwd("/netscr/deelim/out")
 #                             colData = coldata,
 #                             design = ~ Adeno.Squamous)
 # DESeq_dds<-DESeq(dds)
-# 
-# 
-# # RUN
-# fit <- normalizations(NSCLC_dat)    # Normalizations done on full dataset
-# size_factors <- fit$size_factors
-# norm_y <- fit$norm_y
-# rm(fit)
-# y1 <- NSCLC_dat[rowMeans(NSCLC_dat)>=10,]
-# norm_y1 = norm_y[rowMeans(NSCLC_dat)>=10,]
-# 
-# X1<-compare(y1)
+
+
+# RUN
+fit <- normalizations(NSCLC_dat)    # Normalizations done on full dataset
+size_factors <- fit$size_factors
+norm_y <- fit$norm_y
+
+filt_id = fit$idx & rowMedians(norm_y)>=15           # pre-filtering rowmedians >=100
+#rm(fit)
+
+y1 <- NSCLC_dat[filt_id,]
+norm_y = norm_y[filt_id,]
+rownames(y1) = rownames(NSCLC_dat)[filt_id]
+rownames(norm_y) = rownames(y1)
+colnames(y1) = colnames(NSCLC_dat)
+colnames(norm_y) = colnames(y1)
+
+X1<-compare(y1)
 
 
 
@@ -239,21 +281,21 @@ setwd("/netscr/deelim/out")
 
 ################################ BRCA (Breast Cancer) Data #######################################
 
-library(SummarizedExperiment)
-library(genefilter)
-
-# DATA PREP
-
-load(file="TCGA_BRCA_exp.rda")
-BRCA_cts <- round(assay(data),digits=0)             # default gives raw count
-BRCA_anno <- colData(data)@listData
-rm(data)
-
-BRCA_subtypes <- BRCA_anno$subtype_PAM50.mRNA
-
-idy <- (!is.na(BRCA_subtypes) & BRCA_subtypes != "Normal-like")
-BRCA_cts <- BRCA_cts[!duplicated(BRCA_cts[,1:ncol(BRCA_cts)]),idy]
-BRCA_subtypes = BRCA_subtypes[idy]
+# library(SummarizedExperiment)
+# library(genefilter)
+# 
+# # DATA PREP
+# 
+# load(file="TCGA_BRCA_exp.rda")
+# BRCA_cts <- round(assay(data),digits=0)             # default gives raw count
+# BRCA_anno <- colData(data)@listData
+# rm(data)
+# 
+# BRCA_subtypes <- BRCA_anno$subtype_PAM50.mRNA
+# 
+# idy <- (!is.na(BRCA_subtypes) & BRCA_subtypes != "Normal-like")
+# BRCA_cts <- BRCA_cts[!duplicated(BRCA_cts[,1:ncol(BRCA_cts)]),idy]
+# BRCA_subtypes = BRCA_subtypes[idy]
 
 
 # PRE-FILTERING
@@ -271,21 +313,25 @@ BRCA_subtypes = BRCA_subtypes[idy]
 
 #subs_BRCA_dat <- BRCA_dat[1:10000,]
 
-fit <- normalizations(BRCA_cts)
-size_factors <- fit$size_factors
-norm_y <- fit$norm_y
+# fit <- normalizations(BRCA_cts)
+# size_factors <- fit$size_factors
+# norm_y <- fit$norm_y
+# 
+# filterID = rowMedians(BRCA_cts)>=50
+# norm_y2 = norm_y[filterID,]
+# y2 <- BRCA_cts[filterID,]
+# rownames(y2) = rownames(BRCA_cts)[filterID]
+# rownames(norm_y2) = rownames(y2)
+# colnames(y2) = colnames(BRCA_cts)
+# colnames(norm_y2) = colnames(y2)
+# 
+# rm(list=c("BRCA_cts","fit"))
+# 
+# X2 <- compare(y2)
 
-filterID = rowMeans(BRCA_cts)>=10
-norm_y = norm_y[filterID,]
-y2 <- BRCA_cts[filterID,]
 
-rm(list=c("BRCA_cts","fit"))
-
-X2 <- compare(y2)
-
-
-#save(X1,file="NSCLC_compare.out")
-save(X2,file="BRCA_compare.out")
+save(X1,file="NSCLC_compare.out")
+#save(X2,file="BRCA_compare.out")
 
 
 

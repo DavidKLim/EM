@@ -11,6 +11,7 @@ library(permute)
 library(Rcpp)
 library(RcppArmadillo)
 library(pryr)
+library(mclust)
 
 sourceCpp("M_step.cpp")
 
@@ -196,10 +197,11 @@ EM_run <- function(y, k,
                    lambda1=0, lambda2=0, tau=0,
                    size_factors=rep(1,times=ncol(y)) ,
                    norm_y=y,
-                   true_clusters=NA,
+                   true_clusters=NA, true_disc=NA,
                    init_parms=FALSE,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
                    init_phi=matrix(0,nrow=nrow(y),ncol=k),
+                   cl_phi=1,
                    cls_init,
                    maxit_EM=100){
   
@@ -236,14 +238,31 @@ EM_run <- function(y, k,
   
   cls=cls_init
 
-  # initialize weights
+  # Initialize weights
   wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   for(c in 1:k){
     wts[c,]=(cls==c)^2
   }
   
+  # Initialize 0.8 and rest 0.2 weights
+  # wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
+  # for(c in 1:k){
+  #   wts[c,]=0.8*(cls==c)^2 + (0.2/(k-1))*(cls!=c)^2
+  # }
+  
   # 4.34 gb used
-  print(paste("Memory used before EM:",mem_used()))
+  #print(paste("Memory used before EM:",mem_used()))
+  
+  # For use in CEM in E step #
+  Tau = 2000
+  cat(paste("Tau =",Tau,"\n"))
+  
+  phi_g = rep(0,times=g)
+  if(cl_phi==0){
+    for(j in 1:g){
+      phi_g[j]=1/(glm.nb(y[j,]~1)$theta)
+    }
+  }
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
@@ -257,8 +276,12 @@ EM_run <- function(y, k,
       for(j in 1:g){
         if(!init_parms){
           for(c in 1:k){
-            coefs[j,c]<-log(mean(as.numeric(y[j,cls==c])))               # Initialize beta
-          }
+            if(sum(cls==c)==0){
+              coefs[j,c]=log(0.1)
+              next
+              }
+            coefs[j,c]<-log(glm(as.numeric(y[j,cls==c])~1)$coef)               # Initialize beta
+          } # include if statement case for no subjects in cluster --> 0
         }
         beta <- coefs[j,]
         theta<-matrix(rep(0,times=k^2),nrow=k)
@@ -288,11 +311,11 @@ EM_run <- function(y, k,
       # print("phi:")
       # print(head(phi))
       if((a>=5 & all(theta_list[[j]]==0))){next}
-      sourceCpp("M_step.cpp")
-      par_X[[j]] <- M_step(j=j, a=a, y_j=as.integer(y[j,]), all_wts=wts, offset=offset,
-                           k=k,theta_list=theta_list,coefs=coefs,phi=phi,
+      par_X[[j]] <- M_step(j=j, a=a, y_j=as.integer(y[j,]), all_wts=as.matrix(wts), offset=offset,
+                           k=k,theta_list=theta_list,coefs=coefs,phi=phi,cl_phi,phi_g,
                            lambda1=lambda1,lambda2=lambda2,tau=tau,
-                           IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS)
+                           IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
+                           )
     }
     
     
@@ -325,6 +348,7 @@ EM_run <- function(y, k,
     for(i in 1:n){
       for(c in 1:k){
         l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        #l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phis,mu=exp(coefs[,c] + offset[i]),log=TRUE))
       }    # subtract out 0.1 that was added earlier
     }
     
@@ -339,43 +363,85 @@ EM_run <- function(y, k,
       break
     }}
     if(a==maxit_EM){finalwts<-wts}
-    
+  
     
     # E step
     
-    # update on weights
-    logdenom = apply(log(pi) + l, 2,logsumexpc)
-    for(c in 1:k){
-      wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
+    prev_clusters<-rep(0,times=n)
+    for(i in 1:n){
+      prev_clusters[i]<-which.max(wts[,i])
     }
+    if(a==1 & sum(is.na(true_clusters))==0){
+      cat(paste("Initial ARI:",adjustedRandIndex(prev_clusters,true_clusters),"\n"))
+    }
+    
+    # update on weights
+    # logdenom = apply(log(pi) + l, 2,logsumexpc)
+    # for(c in 1:k){
+    #   wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
+    # }
+    
+    # CEM update on weights
+    logdenom = apply((1/Tau)*(log(pi)+l),2,logsumexpc)
+    for(c in 1:k){
+      wts[c,]<-exp((1/Tau)*(log(pi[c])+l[c,])-logdenom)
+    }
+    Tau = 0.9*Tau
     
     # UB and LB on weights
     for(i in 1:n){
       for(c in 1:k){
-        if(wts[c,i]<1E-50){
+        if(is.na(wts[c,i])){
           wts[c,i]=1E-50
-        }
-        if(wts[c,i]>(1-1E-50)){
+        } else if(wts[c,i]<1E-50){
           wts[c,i]=1E-50
+        } else if(wts[c,i]>(1-1E-50)){
+          wts[c,i]=1-1E-50
         }
       }
     }
+
+    # SEM
+    # for(i in 1:n){
+    #   wts[,i] = rmultinom(1,1,wts[,i])
+    # }
     
+    # Diagnostics Tracking
     current_clusters<-rep(0,times=n)
     for(i in 1:n){
       current_clusters[i]<-which.max(wts[,i])
     }
     
     #print(current_clusters)
-    print(paste("EM iter",a,"% of cls unchanged (from initial):",sum(current_clusters==cls_init)/n))
-    print(paste("Gene1: # of IRLS iterations used in M step:",nrow(temp_list[[1]][rowSums(temp_list[[1]])!=0,])))
-    print(paste("coef:",coefs[1,]))
-    print(paste("phi:",phi[1,]))
-    print(wts)
-    
+    cat(paste("EM iter",a,"% of cls unchanged (from previous):",sum(current_clusters==prev_clusters)/n,"\n"))
+    if(sum(is.na(true_clusters))==0){cat(paste("ARI =",adjustedRandIndex(true_clusters,current_clusters),"\n"))}
+    cat(paste("Cluster proportions:",pi,"\n"))
+    if(sum(is.na(true_disc))==0){
+      if(sum(true_disc)==0){
+        disc_gene=1
+        cat("No discriminatory genes. Printing Gene1 instead\n")
+        } else{ disc_gene = which(true_disc^2==1)[1] }
+      if(sum(true_disc)==length(true_disc)){
+        nondisc_gene=2
+        cat("No nondiscriminatory genes. Printing Gene1 instead\n")
+      } else{ nondisc_gene = which(true_disc^2==0)[1] }
+      cat(paste("Disc Gene",disc_gene,": # of IRLS iterations used in M step:",nrow(temp_list[[disc_gene]][rowSums(temp_list[[disc_gene]])!=0,]),"\n"))
+      cat(paste("coef:",coefs[disc_gene,],"\n"))
+      cat(paste("phi:",phi[disc_gene,],"\n"))
+      cat(paste("Nondisc Gene",nondisc_gene,": # of IRLS iterations used in M step:",nrow(temp_list[[nondisc_gene]][rowSums(temp_list[[nondisc_gene]])!=0,]),"\n"))
+      cat(paste("coef:",coefs[nondisc_gene,],"\n"))
+      cat(paste("phi:",phi[nondisc_gene,],"\n"))
+    } else{
+      cat(paste("Gene1: # of IRLS iterations used in M step:",nrow(temp_list[[1]][rowSums(temp_list[[1]])!=0,]),"\n"))
+      cat(paste("coef:",coefs[1,],"\n"))
+      cat(paste("phi:",phi[1,],"\n"))
+    }
+    cat(paste("Samp1: PP:",wts[,1],"\n"))
+    cat("-------------------------------------\n")
     
   }
   
+  cat("-------------------------------------\n")
   num_warns=length(warnings())
   
   final_clusters<-rep(0,times=n)
@@ -428,13 +494,24 @@ EM<-function(y, k,
              lambda1=0, lambda2=0, tau=0,
              size_factors=rep(1,times=ncol(y)) ,
              norm_y=y,
-             true_clusters=NA,
+             true_clusters=NA, true_disc=NA,
              init_parms=FALSE,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
-             init_phi=matrix(0,nrow=nrow(y),ncol=k)){
+             init_phi=matrix(0,nrow=nrow(y),ncol=k),
+             cl_phi=1,
+             prefix="", dir="NA"){
+  
+  diag_file = sprintf("Diagnostics/%s/diag_%s_%d_%f_%f_%f.txt",dir,prefix,k,lambda1,lambda2,tau)
+  dir.create(sprintf("Diagnostics/%s",dir))
+  sink(file=diag_file)
   
   n = ncol(y)
   g = nrow(y)
+  
+  cat(paste(sprintf("n=%d, g=%d, k=%d, l1=%f, l2=%f, tau=%f, ",n,g,k,lambda1,lambda2,tau),"\n"))
+  cat("True clusters:\n")
+  write.table(true_clusters,quote=F,col.names=F)
+  
   # Initial Clusterings
   
   ## Hierarchical Clustering
@@ -451,7 +528,7 @@ EM<-function(y, k,
   
   for(i in 1:ncol(all_init_cls)){
     ########################## SIMULATION ONLY #############################
-    if(is.na(true_clusters)==FALSE){
+    if(sum(is.na(true_clusters))==0 & k>1){
       all_perms=allPerms(1:k)
       all_clusts=list()
       temp_clust<-rep(0,times=n)
@@ -473,39 +550,52 @@ EM<-function(y, k,
       all_init_cls[,i]<-all_clusts[[which.max(match_index)]]
     }
     ########################## SIMULATION ONLY #############################
-    fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,
-                              init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,
+    
+    cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
+    fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
+                              init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,cl_phi=cl_phi,
                               cls_init=all_init_cls[,i], maxit_EM=2)
     init_cls_BIC[i] <- fit$BIC
   }
   
-  final_init_cls <- all_init_cls[,which.min(init_cls_BIC)]
-
-  if(init_cls_BIC[1]==init_cls_BIC[2]){
-    print("Identical initializations")
-  } else{ print(colnames(all_init_cls)[which.min(init_cls_BIC)])}
-  
   #TESTING RANDOM CLUSTERING
-  r_it=100
+  r_it=10
   rand_inits = matrix(0,nrow=n,ncol=r_it)
   rand_init_BIC = rep(0,r_it)
   for(r in 1:r_it){
     set.seed(r)
-    random_cls = sample(1:k,n,replace=TRUE)
-    rand_inits[,r] = random_cls
-    rand_init_BIC[r] = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters=NA,
-                              init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,
-                              cls_init=random_cls, maxit_EM=2)$BIC
-    print(rand_init_BIC[r])
+    rand_inits[,r] = sample(1:k,n,replace=TRUE)
+    while(sum(1:k %in% rand_inits[,r]) < k){
+      rand_inits[,r] = sample(1:k,n,replace=TRUE)
+    }
+    cat(paste("INITIAL CLUSTERING: RANDOM",r,"\n"))
+    rand_init_BIC[r] = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
+                              init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,cl_phi=cl_phi,
+                              cls_init=rand_inits[,r], maxit_EM=2)$BIC
+  }
+
+  cat("FINAL INITIALIZATION:\n")
+  
+  if(min(init_cls_BIC) <= min(rand_init_BIC)){
+    if(init_cls_BIC[1]==init_cls_BIC[2]){
+      cat("Identical initializations\n")
+    } else{ cat(paste(colnames(all_init_cls)[which.min(init_cls_BIC)],"\n"))}
+    final_init_cls = all_init_cls[,which.min(init_cls_BIC)[1]]
+  } else{
+    cat(paste("Random initialization", which.min(rand_init_BIC),"\n"))
+    final_init_cls = rand_inits[,which.min(rand_init_BIC)[1]]
   }
   
-  rand_final_cls = rand_inits[,which.min(rand_init_BIC)]
+  # sink()
+  # 
+  # final_file = sprintf("Diagnostics/%s/final_%s_%d_%f_%f_%f.txt",prefix,k,lambda1,lambda2,tau)
+  # sink(file=final_file)
   
-  # Final run based on optimal initialization
-  #results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=final_init_cls,
-  #               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
-  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,cls_init=rand_final_cls,
-                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
+  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,cls_init=final_init_cls,
+                 cl_phi=cl_phi,init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
+
+  
+  sink()
   return(results)
 }
 
