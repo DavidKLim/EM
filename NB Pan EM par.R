@@ -201,8 +201,8 @@ EM_run <- function(y, k,
                    init_parms=FALSE,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
                    init_phi=matrix(0,nrow=nrow(y),ncol=k),
-                   cl_phi=1,
-                   cls_init,
+                   cl_phi=1,cls_init,
+                   CEM=F,init_Tau=2,SEM=F,
                    maxit_EM=100){
   
   start_time <- Sys.time()
@@ -254,13 +254,13 @@ EM_run <- function(y, k,
   #print(paste("Memory used before EM:",mem_used()))
   
   # For use in CEM in E step #
-  Tau = 2000
+  Tau = init_Tau
   cat(paste("Tau =",Tau,"\n"))
   
   phi_g = rep(0,times=g)
   if(cl_phi==0){
     for(j in 1:g){
-      phi_g[j]=1/(glm.nb(y[j,]~1)$theta)
+      phi_g[j]=1/(glm.nb(as.integer(y[j,])~1)$theta)
     }
   }
   
@@ -324,10 +324,24 @@ EM_run <- function(y, k,
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
-      phi[j,] <- par_X[[j]]$phi_j
+      if(cl_phi==1){
+        phi[j,] <- par_X[[j]]$phi_j
+      } else if(cl_phi==0){
+        phi_g[j] <- (par_X[[j]]$phi_j)[1]
+      }
+      
+      ids = list()
+      for(c in 1:k){
+        ids[[c]]=which(theta_list[[j]][c,]==0)
+        coefs[j,ids[[c]]] = rep(mean(coefs[j,ids[[c]]]),times=length(ids[[c]]))
+      }
     }
     
-    phi_list[[a]] <- phi
+    if(cl_phi==1){
+      phi_list[[a]] <- phi
+    } else if(cl_phi==0){
+      phi_list[[a]] <- phi_g
+    }
     
     
     # update on pi_hat, and UB & LB on pi
@@ -347,7 +361,11 @@ EM_run <- function(y, k,
     l<-matrix(rep(0,times=k*n),nrow=k)
     for(i in 1:n){
       for(c in 1:k){
-        l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        if(cl_phi==1){
+          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        } else if(cl_phi==0){
+          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi_g,mu=exp(coefs[,c] + offset[i]),log=TRUE))
+        }
         #l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phis,mu=exp(coefs[,c] + offset[i]),log=TRUE))
       }    # subtract out 0.1 that was added earlier
     }
@@ -375,18 +393,20 @@ EM_run <- function(y, k,
       cat(paste("Initial ARI:",adjustedRandIndex(prev_clusters,true_clusters),"\n"))
     }
     
-    # update on weights
-    # logdenom = apply(log(pi) + l, 2,logsumexpc)
-    # for(c in 1:k){
-    #   wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
-    # }
-    
-    # CEM update on weights
-    logdenom = apply((1/Tau)*(log(pi)+l),2,logsumexpc)
-    for(c in 1:k){
-      wts[c,]<-exp((1/Tau)*(log(pi[c])+l[c,])-logdenom)
+    if(!CEM){
+      # update on weights
+      logdenom = apply(log(pi) + l, 2,logsumexpc)
+      for(c in 1:k){
+        wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
+      }
+    } else if(CEM){
+      # CEM update on weights
+      logdenom = apply((1/Tau)*(log(pi)+l),2,logsumexpc)
+      for(c in 1:k){
+        wts[c,]<-exp((1/Tau)*(log(pi[c])+l[c,])-logdenom)
+      }
+      Tau = 0.9*Tau
     }
-    Tau = 0.9*Tau
     
     # UB and LB on weights
     for(i in 1:n){
@@ -401,10 +421,12 @@ EM_run <- function(y, k,
       }
     }
 
-    # SEM
-    # for(i in 1:n){
-    #   wts[,i] = rmultinom(1,1,wts[,i])
-    # }
+    if(SEM){
+      # SEM
+      for(i in 1:n){
+        wts[,i] = rmultinom(1,1,wts[,i])
+      }
+    }
     
     # Diagnostics Tracking
     current_clusters<-rep(0,times=n)
@@ -427,14 +449,26 @@ EM_run <- function(y, k,
       } else{ nondisc_gene = which(true_disc^2==0)[1] }
       cat(paste("Disc Gene",disc_gene,": # of IRLS iterations used in M step:",nrow(temp_list[[disc_gene]][rowSums(temp_list[[disc_gene]])!=0,]),"\n"))
       cat(paste("coef:",coefs[disc_gene,],"\n"))
-      cat(paste("phi:",phi[disc_gene,],"\n"))
+      if(cl_phi==1){
+        cat(paste("phi:",phi[disc_gene,],"\n"))
+      } else if(cl_phi==0){
+        cat(paste("phi:",phi_g[disc_gene],"\n"))
+      }
       cat(paste("Nondisc Gene",nondisc_gene,": # of IRLS iterations used in M step:",nrow(temp_list[[nondisc_gene]][rowSums(temp_list[[nondisc_gene]])!=0,]),"\n"))
       cat(paste("coef:",coefs[nondisc_gene,],"\n"))
-      cat(paste("phi:",phi[nondisc_gene,],"\n"))
+      if(cl_phi==1){
+        cat(paste("phi:",phi[nondisc_gene,],"\n"))
+      } else if(cl_phi==0){
+        cat(paste("phi:",phi_g[nondisc_gene],"\n"))
+      }
     } else{
       cat(paste("Gene1: # of IRLS iterations used in M step:",nrow(temp_list[[1]][rowSums(temp_list[[1]])!=0,]),"\n"))
       cat(paste("coef:",coefs[1,],"\n"))
-      cat(paste("phi:",phi[1,],"\n"))
+      if(cl_phi==1){
+        cat(paste("phi:",phi[1,],"\n"))
+      } else if(cl_phi==0){
+        cat(paste("phi:",phi_g[1],"\n"))
+      }
     }
     cat(paste("Samp1: PP:",wts[,1],"\n"))
     cat("-------------------------------------\n")
@@ -462,10 +496,18 @@ EM_run <- function(y, k,
   pred.nondiscriminatory<-mean(nondiscriminatory)
   
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
-  BIC=-2*log_L+log(n*g)*(sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params, sum(m): total # of discriminatory genes
-  
+  if(cl_phi==1){
+    BIC=-2*log_L+log(n*g)*(2*sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params,
+                                                 # 2*sum(m): total # of discriminatory beta parameters + phi parameters (no redundancies), k-1: df of cluster proportions, 
+  } else if(cl_phi==0){
+    BIC=-2*log_L+log(n*g)*(sum(m)+(k-1)+g)       # g: dispersion parameters
+  }
   end_time <- Sys.time()
   time_elap <- as.numeric(end_time)-as.numeric(start_time)
+  
+  if(cl_phi==0){
+    phi = phi_g
+  }
   
   result<-list(k=k,
                pi=pi,
@@ -498,10 +540,25 @@ EM<-function(y, k,
              init_parms=FALSE,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
              init_phi=matrix(0,nrow=nrow(y),ncol=k),
-             cl_phi=1,
+             cl_phi=0,
+             method="EM", init_Tau=2,
              prefix="", dir="NA"){
   
-  diag_file = sprintf("Diagnostics/%s/diag_%s_%d_%f_%f_%f.txt",dir,prefix,k,lambda1,lambda2,tau)
+  if(method=="EM"){
+    CEM=F
+    SEM=F
+  } else if(method=="CEM"){
+    CEM=T
+    SEM=F
+  } else if(method=="SEM"){
+    CEM=F
+    SEM=T
+  } else if(method=="CSEM"){
+    CEM=T
+    SEM=T
+  }
+  
+  diag_file = sprintf("Diagnostics/%s/diag_%s_%d_%s_%d_%f_%f_%f.txt",dir,method,init_Tau,prefix,k,lambda1,lambda2,tau)
   dir.create(sprintf("Diagnostics/%s",dir))
   sink(file=diag_file)
   
@@ -525,6 +582,9 @@ EM<-function(y, k,
   # Iterate through 2-it EM with each initialization
   all_init_cls <- cbind(cls_hc,cls_km)
   init_cls_BIC <- rep(0,times=ncol(all_init_cls))
+  
+  # initial Tau search for CEM #
+  Tau_vals = c(2,5,20,50,100,1000,5000,10000,50000,100000)
   
   for(i in 1:ncol(all_init_cls)){
     ########################## SIMULATION ONLY #############################
@@ -552,9 +612,21 @@ EM<-function(y, k,
     ########################## SIMULATION ONLY #############################
     
     cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
+  
+    for(t in 1:length(Tau_vals)){
+      fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
+                   init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,cl_phi=cl_phi,
+                   cls_init=all_init_cls[,i], CEM=CEM,init_Tau=Tau_vals[t] ,SEM=SEM, maxit_EM=1)
+      if(all(fit$wts < 0.95 & fit$wts > 0.05)){
+        break
+      }
+    }
+    
+    print(Tau_vals[t])
+    
     fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
                               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,cl_phi=cl_phi,
-                              cls_init=all_init_cls[,i], maxit_EM=2)
+                              cls_init=all_init_cls[,i], CEM=CEM,init_Tau=Tau_vals[t],SEM=SEM, maxit_EM=2)
     init_cls_BIC[i] <- fit$BIC
   }
   
@@ -571,7 +643,7 @@ EM<-function(y, k,
     cat(paste("INITIAL CLUSTERING: RANDOM",r,"\n"))
     rand_init_BIC[r] = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
                               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,cl_phi=cl_phi,
-                              cls_init=rand_inits[,r], maxit_EM=2)$BIC
+                              cls_init=rand_inits[,r], CEM=CEM,init_Tau=init_Tau,SEM=SEM,maxit_EM=2)$BIC
   }
 
   cat("FINAL INITIALIZATION:\n")
@@ -592,7 +664,7 @@ EM<-function(y, k,
   # sink(file=final_file)
   
   results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,cls_init=final_init_cls,
-                 cl_phi=cl_phi,init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
+                 CEM=CEM,init_Tau=init_Tau,SEM=SEM,cl_phi=cl_phi,init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
 
   
   sink()
