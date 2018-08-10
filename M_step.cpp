@@ -16,7 +16,119 @@ using namespace arma;
 using namespace Rcpp;
 using namespace std;
 
-/* Create functions phi_ml() and soft_thresholding() here */
+List score_info_g(int N, double ph, arma::mat mu, arma::vec y, arma::mat wts){
+    double lambda = 1e-25;
+    double score1 = 0, info1 = 0;
+    double inv_ph = 1/ph + lambda;  // try adding lambda to stabilize (when phi very large)?
+    ph=ph/(1+ph*1e-25);
+    double muic, yi, wtsci, scoreic, infoic, inv_phMuic;
+    
+    int n=y.size();
+    int k = mu.n_cols;
+    
+    for(int i=0; i<n; i++){
+        for(int c=0; c<k; c++){
+            yi = y(i);
+            muic = mu(i,c);
+            wtsci = wts(c,i);
+            
+            inv_phMuic = inv_ph + muic;
+            
+            scoreic = wtsci * (R::digamma(inv_ph+yi) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_phMuic) - (yi+inv_ph)/(inv_phMuic));
+            infoic = wtsci * (R::trigamma(inv_ph) + 2/(inv_phMuic) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/pow(inv_phMuic,2));
+            
+            score1 += scoreic;
+            info1 += infoic;
+        }
+    }
+    
+    double score = score1 * (-inv_ph*inv_ph) + 2*lambda*ph;
+    double info = info1 * pow(inv_ph,4) + 2*lambda;
+    
+    return List::create(score,info);
+}
+
+double phi_ml_g(arma::vec y, arma::mat mu, arma::mat wts, int limit, int trace){
+    double eps = 0.0001220703; /* from R */
+    double p0 = 0;
+    double N = accu(wts);
+    int n = y.size();
+    int k = mu.n_cols;
+    arma::mat wtd_y(n,k);
+    
+    /*int equal=0;*/
+    if(n==1){
+        return(p0=0);
+    } /*else {
+       for(int i=0; i<n; i++){
+       for(int c=0; c<k; c++){
+       wtd_y(i,c)=y(i)*wts(i,c);
+       }
+       }
+       }
+       
+       double sum_wtd_y = accu(wtd_y);
+       for(int i=0; i<n; i++){
+       for(int c=0; c<k, c++){
+       if(wtd_y(i,c)==sum_wtd_y){
+       return(p0=0);
+       }
+       if(i<n-1){
+       if(wtd_y(i,c) == wtd_y(i+1,c)){
+       equal++;
+       }
+       }
+       }
+       }
+       
+       if(equal==(n-1)){
+       return(p0=0);
+       }  */ /* I DONT THINK THIS IS NECESSARY?? */
+    if(accu(mu)<1e-13){
+        return(p0=0);
+    }
+    
+    for(int i=0; i<n; i++){
+        for(int c=0; c<k; c++){
+            double wtsci=wts(c,i), yi=y(i), muic=mu(i,c);
+            p0 += wtsci * pow(yi/muic-1,2);
+        }
+    }
+    p0 = p0/N;
+    
+    int it=0;
+    double del=1;
+    
+    if(trace==1){
+        Rprintf("phi_ml: iter %d 'phi = %f' \n",it,p0);
+    }
+    while(it < limit && fabs(del) > eps){
+        it += 1;
+        p0 = fabs(p0);
+        List scoreinfo = score_info_g(N,p0,mu,y,wts);
+        double score=scoreinfo[0], info=scoreinfo[1];
+        del = score/info;
+        p0 += del;
+        if(trace==1){
+            Rprintf("score: %f\n",score);
+            Rprintf("info: %f\n",info);
+            Rprintf("phi_ml: iter %d 'phi = %f' \n",it,p0);
+        }
+    }
+    
+    if(p0 < 0){
+        p0 = 0;
+        if(trace==1){
+            Rprintf("estimate truncated at zero \n");
+        }
+    }
+    if(it == limit && trace==1){
+        Rprintf("iteration limit reached \n");
+    }
+    
+    return(p0);
+}
+
 
 List score_info(int N, double ph, arma::vec mu, arma::vec y, arma::rowvec wts){
     double lambda = 1e-25;
@@ -175,9 +287,10 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
 
 
 // [[Rcpp::export]]
-List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, List theta_list, arma::mat coefs, arma::mat phi, int cl_phi, arma::vec phi_g, double lambda1, double lambda2, double tau, double IRLS_tol, int maxit_IRLS){
+List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, double lambda1, double lambda2, double tau, double IRLS_tol, int maxit_IRLS){
 
-    arma::mat beta = coefs.row(j-1), theta = theta_list[j-1], temp(maxit_IRLS, (2*k));
+    arma::vec beta = coefs_j;
+    arma::mat temp(maxit_IRLS, (2*k));
     temp.zeros();
     
     
@@ -185,6 +298,31 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
     arma::mat eta(n,k), mu(n,k);
     eta.zeros();
     mu.zeros();
+    
+    /*
+    arma::vec eta_g(n),mu_g(n);
+    eta_g.zeros();
+    mu_g.zeros();
+    
+    
+    double logmeany = log(mean(y_j));
+    
+    for(int ii=0;ii<n;ii++){
+        eta_g(ii) = logmeany + offset(ii);
+        mu_g(ii) = exp(eta_g(ii));
+        Rprintf("Sample %d: eta_g = %f, mu_g = %f",ii+1, eta_g(ii),mu_g(ii));
+    } */
+    
+    /*arma::rowvec n_ones(n);
+    n_ones.ones();
+    
+    if(cl_phi==0){
+        phi_g = phi_ml(y_j,mu_g,n_ones,10,0);
+        for(int c=0;c<k;c++){
+            phi_j(c) = phi_g(j-1);
+        }
+    } */ /* THIS IS WRONG */
+    
     
     /* IRLS */
     for(int i=0; i<maxit_IRLS; i++){
@@ -201,14 +339,31 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
                 }
             }
         }
+        
+        if(cl_phi==0){
+            phi_g = phi_ml_g(y_j,mu,all_wts,10,0);
+            for(int c=0; c<k; c++){
+                phi_j(c) = phi_g;
+            }
+        }
+        
+        
         /* Initiate temp matrix to track IRLS */
-        temp.row(i) = join_rows(beta.row(0),phi.row(j-1));
+        int idx = 0;
+        for(int ii=0; ii<k; ii++){
+            temp(i,idx) = beta(ii);
+            idx++;
+        }
+        for(int ii=0; ii<k; ii++){
+            temp(i,idx) = phi_j(ii);
+            idx++;
+        }
     
         /* CDA */
         for(int c=0; c<k; c++){
             
             /* Testing gene-wise phi (ADD TO INPUT IN RCPP "arma::vec fixed_phi" AND FUNCTION & LogLike IN R AS WELL) */
-            /* phi(j-1,c) = fixed_phi(j-1); */
+            /* phi_j(c) = fixed_phi(j-1); */
     
             
             arma::rowvec wts_c = all_wts.row(c);
@@ -220,7 +375,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
     
             for(int ii=0; ii<n; ii++){
                 all_trans_y(ii) = ( eta(ii,c)-offset(ii) ) + (y_j(ii)-mu(ii,c))/mu(ii, c);
-                all_w(ii) = sqrt(wts_c(ii)*mu(ii,c)*mu(ii,c)/(mu(ii,c)+mu(ii,c)*mu(ii,c)*phi(j-1,c)));
+                all_w(ii) = sqrt(wts_c(ii)*mu(ii,c)*mu(ii,c)/(mu(ii,c)+mu(ii,c)*mu(ii,c)*phi_j(c)));
                 all_prod_w_trans_y(ii) = all_trans_y(ii)*all_w(ii);
             }
     
@@ -254,13 +409,11 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             /* Estimate phi */
             //Rprintf("phi.ml iter %d, cluster %d \n",i+1,c+1);
             if(cl_phi==1){
-                phi(j-1,c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
-            } else if(cl_phi==0){
-                phi(j-1,c) = phi_g(j-1);
+                phi_j(c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
             }
             
             /* Testing fixing phi to be = 10 */
-            /* phi(j-1,c) = 10; */
+            /* phi_j(c) = 10; */
             
         }
     
@@ -290,8 +443,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         }
     }
     
-    arma::mat final_phi = phi.row(j-1);
     
-    return List::create(Rcpp::Named("coefs_j")=beta,Rcpp::Named("theta_j")=theta,Rcpp::Named("temp_j")=temp,Rcpp::Named("phi_j")=final_phi);
+    return List::create(Rcpp::Named("coefs_j")=beta,Rcpp::Named("theta_j")=theta,Rcpp::Named("temp_j")=temp,Rcpp::Named("phi_j")=phi_j);
     
 }

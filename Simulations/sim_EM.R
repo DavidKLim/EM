@@ -4,7 +4,7 @@ init_y<-read.table("init_y.txt")
 #init_size_factors<-as.numeric(read.table("init_size_factors.txt")[,1])
 #init_norm_y<-read.table("init_norm_y.txt")
 
-init_y<-cbind(init_y,init_y,init_y,init_y,init_y)
+init_y<-cbind(init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y)
 
 
 library("stats")
@@ -12,6 +12,7 @@ library("data.table")
 library("DESeq2")
 library("mclust")
 library("parallel")
+library("pheatmap")
 
 
 # # # DESeq analysis
@@ -34,7 +35,7 @@ library("parallel")
 
 
 # Function to simulate data
-simulate_data=function(n,k,g,init_pi,b,size_factors,method,phi=matrix(0,nrow=g,ncol=k)){
+simulate_data=function(n,k,g,init_pi,b,size_factors,distrib,phi=matrix(0,nrow=g,ncol=k)){
   y<-matrix(rep(0,times=g*n),nrow=g)
   z = rmultinom(n,1,init_pi)
   if(ncol(b)!=k){
@@ -45,13 +46,13 @@ simulate_data=function(n,k,g,init_pi,b,size_factors,method,phi=matrix(0,nrow=g,n
   for(c in 1:k){
     cl[z[c,]==1] = c
   }
-  if(method=="poisson"){
+  if(distrib=="poisson"){
     for(j in 1:g){
       for(i in 1:n){
         y[j,i] = rpois( 1, lambda = size_factors[i]*exp(b[j,cl[i]]))
       }
     }
-  } else if(method=="nb"){
+  } else if(distrib=="nb"){
     for(j in 1:g){
       for(i in 1:n){
         y[j,i] = rnbinom( 1, size = 1/phi[j,cl[i]], mu = size_factors[i]*exp(b[j,cl[i]]))
@@ -63,7 +64,7 @@ simulate_data=function(n,k,g,init_pi,b,size_factors,method,phi=matrix(0,nrow=g,n
 }
 
 # Simulate data with gene-wise dispersion parameters
-simulate_data_g=function(n,k,g,init_pi,b,size_factors,method,phi=rep(0,times=g)){
+simulate_data_g=function(n,k,g,init_pi,b,size_factors,distrib,phi=rep(0,times=g)){
   y<-matrix(rep(0,times=g*n),nrow=g)
   z = rmultinom(n,1,init_pi)
   if(ncol(b)!=k){
@@ -74,13 +75,13 @@ simulate_data_g=function(n,k,g,init_pi,b,size_factors,method,phi=rep(0,times=g))
   for(c in 1:k){
     cl[z[c,]==1] = c
   }
-  if(method=="poisson"){
+  if(distrib=="poisson"){
     for(j in 1:g){
       for(i in 1:n){
         y[j,i] = rpois( 1, lambda = size_factors[i]*exp(b[j,cl[i]]))
       }
     }
-  } else if(method=="nb"){
+  } else if(distrib=="nb"){
     for(j in 1:g){
       for(i in 1:n){
         y[j,i] = rnbinom( 1, size = 1/phi[j], mu = size_factors[i]*exp(b[j,cl[i]]))
@@ -91,22 +92,82 @@ simulate_data_g=function(n,k,g,init_pi,b,size_factors,method,phi=rep(0,times=g))
   return(result)
 }
 
+NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
+  # Algorithm based on Mi et al 2015
+  n = ncol(y)
+  g = nrow(y)
+  R = nsim
+  r0 = rep(0,times=n)
+  pMC = rep(0,times=g)
+  
+  for(j in 1:g){
+    start = Sys.time()
+    cat("gene",j,"/",g,"\n")
+    fit0 = glm.nb(as.numeric(y[j,]) ~ 1 + offset(log(size_factors)))
+    #fit0 = glm.nb(y[j,] ~ 1)
+    
+    r0 = residuals(fit0,type="pearson")
+    theta0 = fit0$theta
+    coef0 = fit0$coefficients
+    mu0 = exp(coef0)
+    rh = matrix(0,nrow=R,ncol=n)
+    
+    for(h in 1:R){
+      yh = rnbinom(n,size=theta0,mu=mu0)
+      #rh[h,] = (yh-mu0)/sqrt(mu0+mu0^2/theta0)            # referring to model fit0
+      fith = glm.nb(yh ~ 1)      # Fitting a new model make sense??
+      rh[h,] = residuals(fith,type="pearson")
+      rh[h,]=rh[h,order(rh[h,])]
+    }
+    
+    r2.5 = rep(0,n)
+    r50 = rep(0,n)
+    r97.5 = rep(0,n)
+    
+    for(i in 1:n){
+      r2.5[i] = quantile(rh[,i],.025)
+      r50[i] = quantile(rh[,i],.5)
+      r97.5[i] = quantile(rh[,i],.975)
+    }
+    
+    r0=r0[order(r0)]
+    # plot(r0,r50,ylim=c(-3,4))
+    # points(r0,r2.5,col="red")
+    # points(r0,r97.5,col="blue")
+    
+    d0 = sum((r0-r50)^2)
+    dh = rep(0,R)
+    for(h in 1:R){
+      dh[h] = sum((rh[h,]-r50)^2)
+    }
+    
+    pMC[j] = (sum((dh >= d0)^2)+1) / (R+1)
+    cat("pval =",pMC[j],"\n")
+    end = Sys.time()
+    cat("time_elap =",as.numeric(end-start),"\n")
+  }
+  return(pMC)
+}
+
 
 # Function to perform EM on simulated data
-sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
+sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefilter=F,pval_thresh=0.4,disp="gene"){
+  # disp: "gene" or "cluster"
   
   # Number of cores: 2 for laptop, 12 for Killdevil
-  #no_cores <- 2   # for parallel computing
-  no_cores <- 12
+  no_cores <- 1   # for parallel computing
+  #no_cores <- 12
+  
+  dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s",n,g,true.K,fold.change,num.disc,distrib)
   
   # max n = 100, max #
   
-  if(method=="poisson"){
+  if(distrib=="poisson"){
     source("Pan EM.R")
-  } else if(method=="nb"){
+  } else if(distrib=="nb"){
     source("NB Pan EM par.R")
   } else{
-    print("no method input. Defaulting to Poisson")
+    print("no distrib input. Defaulting to Poisson")
     source("Pan EM.R")
   }
   true_clusters<-NA        # TRUE clusters not known for real data
@@ -124,42 +185,70 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   dds<-DESeqDataSetFromMatrix(countData = cts,
                               colData = coldata,
                               design = ~ 1)
-  DESeq_dds<-DESeq(dds)
-  init_size_factors<-sizeFactors(DESeq_dds)
-  init_norm_y<-counts(DESeq_dds,normalized=TRUE)
+  dds<-DESeq(dds)
+  init_size_factors<-sizeFactors(dds)
+  init_norm_y<-counts(dds,normalized=TRUE)
   
   # Unpenalized run to find initial cluster estimates based on K=k
   k=true.K
   
-  X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters)
+  X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters,prefix="init",dir=dir_name,method=method,disp=disp)
   init_coefs<-X_init$coefs              # save init estimates for coefs & pi
   init_pi<-X_init$pi
   init_phi<-X_init$phi
   
-  # to prevent error:
-   for(j in 1:g){
-     for(c in 1:k){
-       if(init_coefs[j,c]>12){init_coefs[j,c]=12}
-     }
-   }
+  # # Advanced modeling phi based on diff in coefs
+  # absdiff = abs(init_coefs[,2]-init_coefs[,1])
+  # coef_diff = abs(init_coefs[,2]-init_coefs[,1])
+  # plot(coef_diff,init_phi)
+  # 
+  # coef_diff2= coef_diff[coef_diff<30 & init_phi<20]
+  # init_phi2= init_phi[coef_diff<30 & init_phi<20]
+  # coef1 = init_coefs[coef_diff<30 & init_phi<20,1]
+  # 
+  # model=lm(init_phi2~ poly(coef_diff2,3)+poly(coef1,2))
+  # summary(model)
+  # plot(coef_diff2,init_phi2)
+  # lines(sort(coef_diff2),fitted(model)[order(coef_diff2)],col='red',type='b')
+  # init_phi = predict(model,list(coef_diff2=absdiff,coef1=init_coefs[,1]))
+  # init_phi[which(init_phi<0)] = 0
   
+  # to prevent error:
+   # for(j in 1:g){
+   #   for(c in 1:k){
+   #     if(init_coefs[j,c]>12){init_coefs[j,c]=12}
+   #   }
+   # }
   # Mean over clusters, controlled fold change
+
+  size_factors<-init_size_factors    # use this for all simulations
   
   sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
-  
   fold_change<-fold.change
   nondisc_fold_change<-0         # fixed nondisc fold change
-  
   tt<-floor(num.disc*g)
   sim_coefs[1:tt,]<-matrix(rep( fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=tt),nrow=tt,byrow=TRUE)+sim_coefs[1:tt,]
   #sim_coefs[(tt+1):g,]<-matrix(rep( nondisc_fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]         # nondisc fold change = 0 so this doesn't get changed
-
   sim_pi<-rep(1/true.K,times=true.K)
   
-  size_factors<-init_size_factors    # use this for all simulations
+  #sim_coefs = init_coefs
+  #sim_pi = init_pi
   
   
-  
+  sink(file=sprintf("Diagnostics/%s/sim_parms_%s_%s.txt",dir_name,method,disp))
+  cat("SIMULATED CLUSTER PROPORTIONS:\n")
+  cat(sim_pi)
+  cat("\n==========================================")
+  cat("SIZE FACTORS:\n")
+  cat(size_factors)
+  cat("\n==========================================")
+  cat("SIMULATED COEFFICIENTS:\n")
+  write.table(sim_coefs,quote=F)
+  cat("\n==========================================")
+  cat("SIMULATED DISPERSION PARMS:\n")
+  write.table(init_phi,quote=F)
+  cat("\n==========================================")
+  sink()
   
   
   #### SIMULATIONS ####
@@ -173,10 +262,16 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
   for(ii in 1:sim){
     
     # Simulate data based on initial estimates/estimate size factors
-    #init_phi=matrix(0.5,nrow=g,ncol=k)
-    init_phi=10/exp(sim_coefs)^2
-    sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method,phi=init_phi) # same disp param
-    #sim.dat<-simulate_data_g(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,method=method,phi=init_phi) # same disp param
+    ## to simulate phi to be very small (fixed +10 extrapoisson variation)
+    #init_phi=10/exp(rowMeans(sim_coefs))^2
+    #init_phi = rchisq(g,2)
+    #init_phi = rep(0,g)
+    
+    if(!is.null(ncol(init_phi))){    # check for whether init_phi is of dimension 1
+      sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,distrib=distrib,phi=init_phi) # cluster-wise disp param
+    } else{
+      sim.dat<-simulate_data_g(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,distrib=distrib,phi=init_phi) # gene-specific disp param
+    }
     y<-sim.dat$y
     z<-sim.dat$z
     true_clusters<-rep(0,times=n)
@@ -189,13 +284,13 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     }
     true_disc=c(rep(TRUE,tt),rep(FALSE,(g-tt)))
     
-    rowZeroes<-rep(0,times=g)
-    for(j in 1:g){
-      rowZeroes[j] = mean(y[j,]==0)
-    }          # Proportion of zeroes in each gene
+    # rowZeroes<-rep(0,times=g)
+    # for(j in 1:g){
+    #   rowZeroes[j] = mean(y[j,]==0)
+    # }          # Proportion of zeroes in each gene
+    # idx <- (rowMeans(norm_y)>15 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
     
-    idx <- (rowMeans(norm_y)>15 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
-    
+    idx <- rowMedians(norm_y) >= 20
     y <- y[idx,]
     norm_y <- norm_y[idx,]
     true_disc <- true_disc[idx]
@@ -204,8 +299,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
                          true_clusters=true_clusters,
                          size_factors=size_factors,
                          norm_y=norm_y,
-                         true_disc=true_disc,
-                         gene_id=idx)
+                         true_disc=true_disc
+                         ,gene_id=idx
+                        )
   }
     
   # Function to run simulation in parallel
@@ -215,23 +311,70 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     true_clusters = all_data[[ii]]$true_clusters
     norm_y = all_data[[ii]]$norm_y
     true_disc = all_data[[ii]]$true_disc
+    idx = all_data[[ii]]$gene_id
+    
+    if(prefilter){
+      pvals = NB.GOF(y=y,size_factors=size_factors,nsim=1000)
+      # pre-filtering by pval
+      filt_ids = (pvals <= pval_thresh)
+      y=y[filt_ids,]
+      norm_y=norm_y[filt_ids,]
+      true_disc=true_disc[filt_ids]
+    }
     
     # Order selection
-    K_search=c(2:7)
+    K_search=c(1:7)
     list_BIC=matrix(0,nrow=length(K_search),ncol=2)
     list_BIC[,1]=K_search
     print(paste("Dataset",ii,"Order Selection:"))
     
     for(aa in 1:nrow(list_BIC)){
-      X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)  # no penalty
+      pref = sprintf("order%d",ii)
+      X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # no penalty
       list_BIC[aa,2]<-X$BIC
+      if(list_BIC[aa,1]==true.K){
+        compare_X = X
+      }
       print(list_BIC[aa,])
-      print(paste("Cluster agreement:", mean(X$init_clusters==X$final_clusters)))
       print(paste("Time:",X$time_elap,"seconds"))
     }
     
+    
+    sink(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.txt",dir_name,method,disp,ii))
+    
     max_k=list_BIC[which.min(list_BIC[,2]),1]
-    print(max_k)
+    cat(paste("True order:",true.K,"\n"))
+    cat(paste("Optimal order selected:",max_k,"\n"))
+    cat("RUN WITH CORRECT ORDER:\n")
+    MSE_coefs = sum((compare_X$coefs - sim_coefs[idx,])^2)/(sum(idx)*true.K)
+    if(is.null(ncol(init_phi))){
+      MSE_phi = sum((init_phi[idx]-compare_X$phi)^2)/(sum(idx)*true.K) # test
+    } else{
+      MSE_phi = sum(((10/exp(sim_coefs[idx,])^2)-compare_X$phi)^2)/(sum(idx)*true.K) # test
+    }
+    cat(paste("ARI:",adjustedRandIndex(compare_X$final_clusters,true_clusters),"\n"))
+    cat(paste("MSE of true vs discovered coefs:",MSE_coefs,"\n"))
+    cat(paste("MSE of true vs discovered phi:",MSE_phi,"\n"))
+    cat(paste("% of correctly ID'ed disc genes:",sum(!compare_X$nondiscriminatory==true_disc)/sum(true_disc),"\n"))
+    cat(paste("PPs (n x k):\n"))
+    write.table(t(compare_X$wts),quote=F,col.names=F)
+    
+    sink()
+    
+    pdf(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.pdf",dir_name,method,disp,ii))
+    for(c in 1:true.K){
+      cl_ids = true_clusters==c
+      for(cc in 1:true.K){
+        boxplot(compare_X$wts[cc,cl_ids],main=sprintf("Boxplot of PP for subjects of true cl%d being in cl%d",c,cc))
+      }
+    }
+    annotation_col = data.frame(cbind(true_clusters,compare_X$final_clusters))
+    colnames(annotation_col)=c("True","Derived")
+    rownames(annotation_col)=c(1:ncol(norm_y))
+    colnames(norm_y)=c(1:ncol(norm_y))
+    annotation_col2 = annotation_col[order(true_clusters),]
+    pheatmap(log(norm_y[,order(compare_X$final_clusters)]+0.1),cluster_cols = F,scale="row",annotation_col = annotation_col2)
+    dev.off()
     
     # Grid search
     
@@ -250,7 +393,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     
     #search for optimal penalty parameters
     for(aa in 1:nrow(list_BIC)){
-      X<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
+      pref = sprintf("grid%d",ii)
+      X<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method)
       list_BIC[aa,4]<-X$BIC
       print(list_BIC[aa,])
       print(paste("Time:",X$time_elap,"seconds"))
@@ -274,8 +418,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     }
     
     # Final run with optimal parameters
-    
-    X<-EM(y=y,k=k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters)
+    pref = sprintf("final%d",ii)
+    X<-EM(y=y,k=k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
     
     print(paste("Time:",X$time_elap,"seconds"))
     print(paste("Dataset ",ii,"complete"))
@@ -312,6 +456,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     library(Rcpp)
     library(RcppArmadillo)
     library(mclust)
+    library(pryr)
+    library(pheatmap)
     sourceCpp("M_step.cpp")
     })
   
@@ -345,10 +491,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
     temp_nondisc[ii]<-mean(X$nondiscriminatory)
     temp_ARI[ii]<-adjustedRandIndex(true_clusters,X$final_clusters)
     if(tt>0){
-      temp_sensitivity[ii]<-sum(X$nondiscriminatory[true_disc==TRUE]==FALSE)/sum(true_disc==TRUE)
+      temp_sensitivity[ii]<-sum(!X$nondiscriminatory[true_disc])/sum(true_disc)
     } else {temp_sensitivity[ii]<-NA}
     if(tt<g){
-      temp_falsepos[ii]<-sum(X$nondiscriminatory[true_disc==FALSE]==FALSE)/sum(true_disc==FALSE)
+      temp_falsepos[ii]<-sum(!X$nondiscriminatory[!true_disc])/sum(!true_disc)
     } else {temp_falsepos[ii]<-NA}         # take into account genes omitted b/c rowSum of count was <100 (such genes are assumed nondiscriminatory)
   }
   
@@ -376,7 +522,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, method){
                 nondisc=mean_nondisc,
                 sens=mean_sensitivity,
                 falsepos=mean_falsepos,
-                all_data)
+                all_data=all_data)
   
   return(results)
 }
