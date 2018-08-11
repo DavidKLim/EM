@@ -570,7 +570,7 @@ EM<-function(y, k,
     SEM=T
   }
   
-  diag_file = sprintf("Diagnostics/%s/diag_%s_%s_%d_%s_%d_%f_%f_%f.txt",dir,method,disp,prefix,k,lambda1,lambda2,tau)
+  diag_file = sprintf("Diagnostics/%s/%s_%s_%s_%d_%f_%f_%f.txt",dir,method,disp,prefix,k,lambda1,lambda2,tau)
   dir.create(sprintf("Diagnostics/%s",dir))
   sink(file=diag_file)
   
