@@ -1,0 +1,299 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{graphicx,psfrag,epsf}
+\usepackage{enumerate}
+\usepackage{natbib}
+\usepackage{url} % not crucial - just used below for the URL 
+
+
+
+%\pdfminorversion=4
+% NOTE: To produce blinded version, replace "0" with "1" below.
+\newcommand{\blind}{1}
+
+% DON'T change margins - should be 1 inch all around.
+\addtolength{\oddsidemargin}{-.5in}%
+\addtolength{\evensidemargin}{-.5in}%
+\addtolength{\textwidth}{1in}%
+\addtolength{\textheight}{-.3in}%
+\addtolength{\topmargin}{-.8in}%
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+
+
+
+%\bibliographystyle{natbib}
+
+\def\spacingset#1{\renewcommand{\baselinestretch}%
+{#1}\small\normalsize} \spacingset{1}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\DeclarePairedDelimiter\abs{\lvert}{\rvert}%
+\DeclarePairedDelimiter\norm{\lVert}{\rVert}%
+
+\makeatletter
+\let\oldabs\abs
+\def\abs{\@ifstar{\oldabs}{\oldabs*}}
+%
+\let\oldnorm\norm
+\def\norm{\@ifstar{\oldnorm}{\oldnorm*}}
+\makeatother
+
+\if1\blind
+{
+  \title{\bf Mixture Negative Binomial Expectation Maximization (NB-EM) Algorithm for Unsupervised Clustering}
+  \author{David Lim\thanks{
+    The authors gratefully acknowledge \textit{please remember to list all relevant funding sources in the unblinded version}}\hspace{.2cm}\\
+    Department of Biostatistics, UNC, Chapel Hill\\
+    Naim Rashid \\
+    Department of Biostatistics, UNC, Chapel Hill \\
+    Joseph Ibrahim \\
+    Department of Biostatistics, UNC, Chapel Hill}
+
+  \maketitle
+} \fi
+
+\if0\blind
+{
+  \bigskip
+  \bigskip
+  \bigskip
+  \begin{center}
+    {\LARGE\bf Mixture Negative Binomial Expectation Maximization (NB-EM) Algorithm for Unsupervised Clustering}
+\end{center}
+  \medskip
+} \fi
+
+\bigskip
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% 0. ABSTRACT %%%%%
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{abstract}
+Clustering is a form of unsupervised learning that aims to uncover latent groups within data based on similarity across a set of features. A common application of this in biomedical research is in deriving novel cancer subtypes from patient gene expression data, given a set of informative genes. However, it is typically unknown a priori what genes may be informative in discriminating between clusters, and what the optimal number of clusters is. Few methods exist for unsupervised clustering of RNA-seq data that can simultaneously adjust for between-sample normalization factors, account for effects of potential confounding variables, and cluster patients while selecting cluster-discriminatory genes. To address this issue, we propose a mixture model EM algorithm with a group truncated lasso penalty. The maximization is done by coordinate-wise descent using the IRLS algorithm, allowing us to include normalization factors and predictors into our modeling framework. The EM framework allows for subtype prediction in new patients via posterior probabilities of cluster membership given the fitted model. Based on simulations and real data, we show the utility of our method.
+\end{abstract}
+
+\noindent%
+{\it Keywords:}  unsupervised clustering, genomics, EM
+\vfill
+
+\newpage
+\spacingset{1.45} % DON'T change the spacing!
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% 1. INTRODUCTION %%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+\label{sec:intro}
+
+Introduction
+Body of paper.  Margins in this document are roughly 0.75 inches all
+around, letter size paper.
+
+%\begin{figure}
+%\begin{center}
+%\includegraphics[width=3in]{fig1.pdf}
+%\end{center}
+%\caption{Consistency comparison in fitting surrogate model in the tidal
+%power example. \label{fig:first}}
+%\end{figure}
+
+% \begin{table}
+% \caption{D-optimality values for design $X$ under five different scenarios.  \label{tab:tabone}}
+% \begin{center}
+% \begin{tabular}{rrrrr}
+% one & two & three & four & five\\\hline
+% 1.23 & 3.45 & 5.00 & 1.21 & 3.41 \\
+% 1.23 & 3.45 & 5.00 & 1.21 & 3.42 \\
+% 1.23 & 3.45 & 5.00 & 1.21 & 3.43 \\
+% \end{tabular}
+% \end{center}
+% \end{table}
+
+%\begin{itemize}
+%\item Note that figures and tables (such as Figure~\ref{fig:first} and
+%Table~\ref{tab:tabone}) should appear in the paper, not at the end or
+%in separate files.
+%\item In the latex source, near the top of the file the command
+%\verb+\newcommand{\blind}{1}+ can be used to hide the authors and acknowledgements, producing the required blinded version.
+%\item Remember that in the blind version, you should not identify authors indirectly in the text.  That is, don't say ``In Smith et. al.  (2009) we showed that ...''.  Instead, say ``Smith et. al. (2009) showed that ...''.
+%\item These points are only intended to remind you of some requirements. Please refer to the instructions for authors at \url{http://amstat.tandfonline.com/action/authorSubmission?journalCode=uasa20&page=instructions#.VFkk7fnF_0c}
+%\item For more about ASA\ style, please see \url{http://journals.taylorandfrancis.com/amstat/asa-style-guide/}
+%\item If you have supplementary material (e.g., software, data, technical proofs), identify them in the section below.  In early stages of the submission process, you may be unsure what to include as supplementary material.  Don't worry---this is something that can be worked out at later stages.
+%\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%
+%%%%% 2. METHODS %%%%%
+%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Methods}
+\label{sec:meth}
+Don't take any of these section titles seriously.  They're just for
+illustration.
+
+
+Our novel method utilizes the widely known Expectation-Maximization algorithm. Most model-based methods dealing with this type of data typically proceed with the assumption of an underlying Poisson distribution on the dataset. However, there is much evidence to suggest that the Poisson assumption is too conservative for this type of genomic data. Thus, we proceed with the more liberal assumption of a negative binomial distribution, with a gene-wise(?) overdispersion parameter that accounts for the extra-Poisson variation.
+
+Our main goal is two-fold: 1. to determine discriminatory genes based on differential expression of RNA-seq data, and 2. to cluster subjects based on similar expression profiles of genes. Also, we believe that our method is special in that it may be used to derive posterior probabilities of a sample's subtype based on the model that is fit on the dataset, which may be especially useful in prediction.
+
+%%% 2.1 Obj fx %%%
+\subsection{Likelihood Model}
+The objective function is the well-known Q function, which is the conditional expectation of the complete data log-likelihood function, which is given by 
+
+\begin{equation}
+log[L(\Psi)]=\sum_{i=1}^{n} \sum_{k=1}^{K} z_{ik} \{log(\pi_k)+log[f_k(\boldsymbol{y_i}; \boldsymbol{\beta_k},\boldsymbol{\phi_k})]\}+p_\lambda(\beta)
+\end{equation}
+
+where $z_{ik}=I(z_i=k)$ denotes the indicator of subject $i$ being in cluster $k$ and $f_k(y_i; \beta_k)=\prod_{j=1}^{g} f_{jk}(y_{ij}; \beta_{jk},\phi_{jk})$. Given $y_{ij}$ is the count of the i'th subject for the j'th gene, where $i=1,...,n$ and $j=1,...,g$. The cluster means are given by $\beta_{jk}$ where $k=1,...,K$. The cluster proportions are given by $\pi_k$. The underlying assumption here is that the expression of each gene is uncorrelated to that of any other gene.
+
+Because $z_{ik}$ is unobservable, we estimate this quantity by the conditional expectation of $z_{ik}$ and the parameters estimated from the $m$th step. In this model, we implement gene-by-gene an iteratively reweighted least squares method, using coordinate-wise descent along the clusters. We include an elastic net penalty, which helps shrink the means of each cluster closer together.
+
+
+% 2.1.1 Penalty
+\subsubsection{Penalty}
+The penalty is the so-called grouped truncated lasso, which is discussed in Pan et al (2013).
+\begin{equation}
+p_{\lambda}(\beta)=\frac{\lambda_1}{2}\sum_{k<l} \norm{\beta_k-\beta_l-\theta_{kl}}_2^2 + \lambda_2 \sum_{k<l}TLP(\norm{\theta_{kl}}_2;\tau)
+\end{equation}
+
+where $\theta_{kl}=\beta_k-\beta_l$ is a reparametrization to store the difference between cluster means in the previous iteration, and $TLP(\alpha;\tau)=min(\abs{\alpha},\tau)$
+
+%%% 2.2 Computation %%%
+\subsection{Computation}
+% 2.2.1 E Step
+\subsubsection{E Step}
+We calculate the conditional expectation of the $z_{ik}$ given the current estimates of the parameters. We denote $\hat{z}_{ik}^{(m)} = E[z_{ik} \mid \mathbf{y}, \boldsymbol{\hat{\beta}^{(m)}}, \boldsymbol{\hat{\pi}^{(m)}}]$. Another way to think about this quantity is as the posterior probability of cluster membership. Because of the formulation of the objective function, these quantities can be thought of as weights on the objective function used in the maximization step. The update on these weights are:
+
+\begin{equation}
+\hat{z}_{ik}^{(m)}=\dfrac{\hat{\pi}_k^{(m)}f_k(\boldsymbol{y_i};\boldsymbol{\hat{\beta}_k^{(m)},\hat{\phi}_k^{(m)}})}{\sum_{l=1}^{K}\hat{\pi}_l^{(m)}f_l(\boldsymbol{y_i};\boldsymbol{\hat{\beta}_l^{(m)},\hat{\phi}_l^{(m)}})}
+\end{equation}
+
+There are some variants of the E step that have been proposed by Biernacki et al in 2003. Replacing the E step update with classification and/or stochastic E step updates has been shown to help the EM algorithm to not get stuck at a local maxima. In our numerical analyses, we will explore the effects of using these alternate E step updates on performance.
+
+
+%%% 2.2.2 M Step %%%
+\subsubsection{M Step}
+In the M step of the EM algorithm, we update the current estimates of the parameters to maximize the penalized objective function. The maximization of $\pi_k$ and $\beta_{jk}$ are separable, thus they can be done independently.
+
+
+%Est of beta
+The maximization of the cluster means and dispersion parameter(s) is performed by iteratively reweighted least squares using a coordinate-wise descent algorithm. We first maximize the penalized objective function to estimate the cluster means. This is accomplished by using a transformed response, as implemented in Breheny et al (2011) (ncvreg paper). We fix a gene j, and transform the responses by the following:
+
+$$\tilde{y}_{ik}=\hat{\eta_k}+(\frac{y_i-g(\hat{\eta}_k)}{g'(\hat{\eta}_k)})$$
+
+Here, $g()$ refers to the inverse link function for the Negative Binomial family with log link, thus $g(\eta)=\mu$, where $g^{-1}(\mu)=log(\mu)$ is the standard log link function.
+
+The transformation is applied for each $k=1,...K$, so the response is multiplied by the number of clusters: $n*K$ transformed responses. $\hat{\mu_k}$ and $\hat{\eta_k}$ are iteratively updated within the IRLS algorithm until convergence. Using the transformation, the transformed penalized objective function (Breheny 2011) is:
+
+\begin{equation}
+Q_j(\boldsymbol{\beta}) \approx \frac{1}{2n}(\mathbf{\tilde{y}}-\mathbf{X}\boldsymbol{\beta})'\mathbf{W}(\mathbf{\tilde{y}}-\mathbf{X}\boldsymbol{\beta})+\sum_{k=1}^{K}p_{\boldsymbol{\lambda}}(\beta_{jk})
+\end{equation}
+
+where X is an $(nK)$x$K$ matrix of 1's and 0's that represent the indicator of each cluster for each transformed response, and W is the matrix of the E step weights. In this framework, we pass on $\hat{z}^{(m)}_{ik}$ as the weights in regressing $\tilde{y}_{ik}$ on X.
+
+Therefore, we have $w_{ik}=\sqrt{\dfrac{\hat{z}^{(m)}_{ik} g'(\eta)^2}{V(\mu)}}$, where the variance is $V(\mu)=\mu + \phi\mu^2$ for the Negative Binomial. Equation 3 is maximized for each value of $j=1,...,g$. The update equations become:
+
+\begin{equation}
+\begin{split}
+\hat{\beta}_k^{(m+1)}&=\dfrac{\frac{1}{n}\sum_{i=1}^{nK}w_{ik}x_{ik}\tilde{y}_{ik}+\lambda_1[\sum_{l>k}(\hat{\beta}_l^{(m)}+\hat{\theta}_{kl}^{(m)})+\sum_{l<k}(\hat{\beta}_l^{(m+1)}-\hat{\theta}_{lk}^{(m)})]}{\lambda_1(K-1)+\frac{1}{n}\sum_{i=1}^{nK}w_{ik} x_{ik}} \\
+\hat{\theta}_{kl}^{(m+1)}&=\begin{cases} 
+      \hat{\beta}_k^{(m+1)}-\hat{\beta}_l^{(m+1)} & \norm*{\hat{\theta}_{kl}^{(m)}}_2 \geq \tau \\
+      ST(\hat{\beta}_k^{(m+1)}-\hat{\beta}_l^{(m+1)},\frac{\lambda_2}{\lambda_1}) & otherwise
+   \end{cases}
+\end{split}
+\end{equation}
+
+with $ST(\alpha,\lambda)=sign(\alpha)(\lvert \alpha \rvert-\lambda)_+$ denoting the usual soft-thresholding rule. $x_{ik}$ denotes 1 if entry i is in cluster k, and 0 if it is not, where $i=1,...,nK$. Remember that the gene j is fixed, so the above procedure is repeated for every gene $j=1, ..., g$. Note also that in this case, i represents the index for each subject for each cluster, i.e. each subject has K entries, with $X_i$ denoting a different cluster in each entry.
+
+In this framework, $\hat{\theta}$ represents shrinkage on the cluster means, with the cluster means being identified as "equal" when they are within $\frac{\lambda_2}{\lambda_1}$ from each other.
+
+
+
+%Est of phi
+After sequentially updating the cluster means, we estimate the overdispersion parameter $\phi$ using a maximum likelihood (ML) approach. However, this approach is limited due to instability when sample size is small. To mitigate this, we include a very small penalty (order of $10^{-50}$) on the ML estimation of $\phi$ to stabilize the estimate in the low sample setting.
+
+We also compared the effects of using gene-specific and cluster-specific dispersion parameters. It is not known which would be more appropriate for this type of data. Cluster-specific dispersion parameters may provide a better fitting model to the data, but gene-specific dispersion parameters will allow for more sparsity and avoid the issue of overfitting. The function in the R package will include the option to use either scheme.
+
+
+% 2.2.3 Convergence
+\subsubsection{Stopping Criteria}
+The stopping criterion for the EM algorithm is based on a threshold on the Q function. The algorithm is considered to have "converged" if $\lvert Q^{(m+1)}-Q^{(m)} \rvert< \epsilon_1$
+
+The stopping criterion for the IRLS in the M step is based on a threshold on the sum of squares of the parameters. The algorithm is considered to have converged if $\lvert \boldsymbol{\beta}^{(l+1)}-\boldsymbol{\beta}^{(l)} \rvert + \lvert \boldsymbol{\phi}^{(l+1)}-\boldsymbol{\phi}^{(l)} \rvert < \epsilon_2$
+
+We set both $\epsilon_1 = 10^{-6}$ and $\epsilon_2 = 10^{-6}$.
+
+% 2.2.4 Tuning Parameters
+\subsubsection{Tuning Parameters}
+
+The optimal number of clusters K is found by searching over a range of values $K=(1, ...,7)$ and comparing the fit using the yielded BIC values.
+
+\begin{figure}
+\begin{center}
+<<echo=FALSE,fig=TRUE>>=
+load("Project1/list_BIC_n621_g865_K3.Rout")
+plot(list_BIC,ylab="BIC",xlab="K",main="Plot of BIC vs. order")
+@
+\end{center}
+\caption{Order selection is done by choosing the order (K) that minimizes the BIC. Here, the true order is K = 3 in a simulated dataset of n = 621 and g = 835 (after pre-filtering low count genes).}
+\label{fig:one}
+\end{figure}
+
+Optimal tuning parameters for \(\lambda_2\) and \(\tau\) are also found by using the BIC criterion. The algorithm searches over a grid of values, and selects the combination that yields the lowest BIC. Pan proposed fixing the shrinkage parameter $\lambda_1=1$, varying the thresholding parameters $\lambda_2$ and $\tau$. We set $\lambda_1=1$ and search over $\lambda_2=(0.01, 0.05, 0.1, 0.15, 0.2)$ and $\tau=(0.1, 0.3, 0.5, 0.7, 0.9)$. Pan further proposed re-running the algorithm after doubling the value of $\lambda_1$ upon convergence in order to prevent the algorithm from being stuck at local maxima. For the sake of computation time, we instead implemented the classification and stochastic E step weights as an alternative solution to this issue.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% 3. Numerical Examples %%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Numerical Examples}
+\label{sec:examples}
+
+%%% 3.1 Simulations %%%
+\subsection{Simulations}
+
+%%% 3.2 Real Data %%%
+\subsection{Real Data}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% 4. DISCUSSION %%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Discussion}
+\label{sec:disc}
+
+%\cite{Campbell02}, \cite{Schubert13}, \cite{Chi81}
+
+\bigskip
+\begin{center}
+{\large\bf SUPPLEMENTARY MATERIAL}
+\end{center}
+
+\begin{description}
+
+\item[Title:] Brief description. (file type)
+
+\item[R-package for  MYNEW routine:] R-package ÒMYNEWÓ containing code to perform the diagnostic methods described in the article. The package also contains all datasets used as examples in the article. (GNU zipped tar file)
+
+\item[HIV data set:] Data set used in the illustration of MYNEW method in Section~ 3.2. (.txt file)
+
+\end{description}
+
+\section{BibTeX}
+
+We hope you've chosen to use BibTeX!\ If you have, please feel free to use the package natbib with any bibliography style you're comfortable with. The .bst file agsm has been included here for your convenience. 
+
+\bibliographystyle{Chicago}
+
+\bibliography{Bibliography-MM-MC}
+
+
+
+\end{document}
