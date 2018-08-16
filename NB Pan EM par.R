@@ -590,8 +590,22 @@ EM<-function(y, k,
   ## K-means Clustering
   cls_km <- kmeans(t(norm_y),k)$cluster
   
+  #TESTING RANDOM CLUSTERING
+  
+  r_it=3
+  rand_inits = matrix(0,nrow=n,ncol=r_it)
+  rand_init_BIC = rep(0,r_it)
+  
+  for(r in 1:r_it){
+    set.seed(r)
+    rand_inits[,r] = sample(1:k,n,replace=TRUE)
+    while(sum(1:k %in% rand_inits[,r]) < k){
+      rand_inits[,r] = sample(1:k,n,replace=TRUE)
+    }
+  }
+  
   # Iterate through 2-it EM with each initialization
-  all_init_cls <- cbind(cls_hc,cls_km)
+  all_init_cls <- cbind(cls_hc,cls_km,rand_inits)
   init_cls_BIC <- rep(0,times=ncol(all_init_cls))
   
   # initial Tau search for CEM #
@@ -637,10 +651,12 @@ EM<-function(y, k,
       cat(paste("Init Tau:",Tau_vals[t],"\n"))
       init_cls_Tau[i] <- Tau_vals[t]
     }
-    
+    if(CEM){
+      maxit_search = 5
+    } else { maxit_search = 2 }
     fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
                               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                              cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_cls_Tau[i],SEM=SEM, maxit_EM=5)
+                              cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_cls_Tau[i],SEM=SEM, maxit_EM=maxit_search)
     init_cls_BIC[i] <- fit$BIC
   }
   
