@@ -5,6 +5,9 @@
 \usepackage{enumerate}
 \usepackage{natbib}
 \usepackage{url} % not crucial - just used below for the URL 
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage[noabbrev,capitalize]{cleveref}
 
 
 
@@ -95,25 +98,6 @@ Introduction
 Body of paper.  Margins in this document are roughly 0.75 inches all
 around, letter size paper.
 
-%\begin{figure}
-%\begin{center}
-%\includegraphics[width=3in]{fig1.pdf}
-%\end{center}
-%\caption{Consistency comparison in fitting surrogate model in the tidal
-%power example. \label{fig:first}}
-%\end{figure}
-
-% \begin{table}
-% \caption{D-optimality values for design $X$ under five different scenarios.  \label{tab:tabone}}
-% \begin{center}
-% \begin{tabular}{rrrrr}
-% one & two & three & four & five\\\hline
-% 1.23 & 3.45 & 5.00 & 1.21 & 3.41 \\
-% 1.23 & 3.45 & 5.00 & 1.21 & 3.42 \\
-% 1.23 & 3.45 & 5.00 & 1.21 & 3.43 \\
-% \end{tabular}
-% \end{center}
-% \end{table}
 
 %\begin{itemize}
 %\item Note that figures and tables (such as Figure~\ref{fig:first} and
@@ -133,9 +117,6 @@ around, letter size paper.
 
 \section{Methods}
 \label{sec:meth}
-Don't take any of these section titles seriously.  They're just for
-illustration.
-
 
 Our novel method utilizes the widely known Expectation-Maximization algorithm. Most model-based methods dealing with this type of data typically proceed with the assumption of an underlying Poisson distribution on the dataset. However, there is much evidence to suggest that the Poisson assumption is too conservative for this type of genomic data. Thus, we proceed with the more liberal assumption of a negative binomial distribution, with a gene-wise(?) overdispersion parameter that accounts for the extra-Poisson variation.
 
@@ -151,7 +132,7 @@ log[L(\Psi)]=\sum_{i=1}^{n} \sum_{k=1}^{K} z_{ik} \{log(\pi_k)+log[f_k(\boldsymb
 
 where $z_{ik}=I(z_i=k)$ denotes the indicator of subject $i$ being in cluster $k$ and $f_k(y_i; \beta_k)=\prod_{j=1}^{g} f_{jk}(y_{ij}; \beta_{jk},\phi_{jk})$. Given $y_{ij}$ is the count of the i'th subject for the j'th gene, where $i=1,...,n$ and $j=1,...,g$. The cluster means are given by $\beta_{jk}$ where $k=1,...,K$. The cluster proportions are given by $\pi_k$. The underlying assumption here is that the expression of each gene is uncorrelated to that of any other gene.
 
-Because $z_{ik}$ is unobservable, we estimate this quantity by the conditional expectation of $z_{ik}$ and the parameters estimated from the $m$th step. In this model, we implement gene-by-gene an iteratively reweighted least squares method, using coordinate-wise descent along the clusters. We include an elastic net penalty, which helps shrink the means of each cluster closer together.
+Because $z_{ik}$ is unobservable, we estimate this quantity by the conditional expectation of $z_{ik}$ and the parameters estimated from the $m$th step. In this algorithm, we implement gene-by-gene iteratively reweighted least squares method, using coordinate-wise descent along the clusters. We include an elastic net penalty, which shrinks the means of each cluster closer together and selects genes by thresholding the differences to 0.
 
 
 % 2.1.1 Penalty
@@ -161,19 +142,19 @@ The penalty is the so-called grouped truncated lasso, which is discussed in Pan 
 p_{\lambda}(\beta)=\frac{\lambda_1}{2}\sum_{k<l} \norm{\beta_k-\beta_l-\theta_{kl}}_2^2 + \lambda_2 \sum_{k<l}TLP(\norm{\theta_{kl}}_2;\tau)
 \end{equation}
 
-where $\theta_{kl}=\beta_k-\beta_l$ is a reparametrization to store the difference between cluster means in the previous iteration, and $TLP(\alpha;\tau)=min(\abs{\alpha},\tau)$
+where $\theta_{kl}=\beta_k-\beta_l$ is a reparametrization to store the difference between cluster means in the previous iteration, and $TLP(\alpha;\tau)=min(\abs{\alpha},\tau)$. In this penalization scheme, $\lambda_1$ is the parameter that controls shrinkage of the cluster means towards one another, and $\lambda_2$ is the parameter that controls selection by thresholding two cluster means to be equal if they are close enough together. The $\tau$ parameter is a threshold that introduces no further penalty when the difference between cluster means is sufficiently large.
 
 %%% 2.2 Computation %%%
 \subsection{Computation}
 % 2.2.1 E Step
 \subsubsection{E Step}
-We calculate the conditional expectation of the $z_{ik}$ given the current estimates of the parameters. We denote $\hat{z}_{ik}^{(m)} = E[z_{ik} \mid \mathbf{y}, \boldsymbol{\hat{\beta}^{(m)}}, \boldsymbol{\hat{\pi}^{(m)}}]$. Another way to think about this quantity is as the posterior probability of cluster membership. Because of the formulation of the objective function, these quantities can be thought of as weights on the objective function used in the maximization step. The update on these weights are:
+We calculate the conditional expectation of the $z_{ik}$ given the current estimates of the parameters. We denote $\hat{z}_{ik}^{(m)} = E[z_{ik} \mid \mathbf{y}, \boldsymbol{\hat{\beta}^{(m)}}, \boldsymbol{\hat{\pi}^{(m)}}]$. Another way to think about this quantity is as the posterior probability of subject $i$ being in cluster $k$. These quantities are passed through as weights in the estimation of the coefficients in the maximization step. The update on these weights are:
 
 \begin{equation}
 \hat{z}_{ik}^{(m)}=\dfrac{\hat{\pi}_k^{(m)}f_k(\boldsymbol{y_i};\boldsymbol{\hat{\beta}_k^{(m)},\hat{\phi}_k^{(m)}})}{\sum_{l=1}^{K}\hat{\pi}_l^{(m)}f_l(\boldsymbol{y_i};\boldsymbol{\hat{\beta}_l^{(m)},\hat{\phi}_l^{(m)}})}
 \end{equation}
 
-There are some variants of the E step that have been proposed by Biernacki et al in 2003. Replacing the E step update with classification and/or stochastic E step updates has been shown to help the EM algorithm to not get stuck at a local maxima. In our numerical analyses, we will explore the effects of using these alternate E step updates on performance.
+There are some variants of the E step that have been proposed by Biernacki et al (2003). Replacing the E step update with classification and/or stochastic E step updates has been shown to help the EM algorithm to not get stuck at a local maxima. In our numerical analyses, we will explore the effects of using these alternate E step updates on performance.
 
 
 %%% 2.2.2 M Step %%%
@@ -188,7 +169,8 @@ $$\tilde{y}_{ik}=\hat{\eta_k}+(\frac{y_i-g(\hat{\eta}_k)}{g'(\hat{\eta}_k)})$$
 
 Here, $g()$ refers to the inverse link function for the Negative Binomial family with log link, thus $g(\eta)=\mu$, where $g^{-1}(\mu)=log(\mu)$ is the standard log link function.
 
-The transformation is applied for each $k=1,...K$, so the response is multiplied by the number of clusters: $n*K$ transformed responses. $\hat{\mu_k}$ and $\hat{\eta_k}$ are iteratively updated within the IRLS algorithm until convergence. Using the transformation, the transformed penalized objective function (Breheny 2011) is:
+% The transformation is applied for each $k=1,...K$, so the response is multiplied by the number of clusters: $n*K$ transformed responses. $\hat{\mu_k}$ and $\hat{\eta_k}$ are iteratively updated within the IRLS algorithm until convergence.
+Using this transformation, the penalized objective function (Breheny 2011) becomes:
 
 \begin{equation}
 Q_j(\boldsymbol{\beta}) \approx \frac{1}{2n}(\mathbf{\tilde{y}}-\mathbf{X}\boldsymbol{\beta})'\mathbf{W}(\mathbf{\tilde{y}}-\mathbf{X}\boldsymbol{\beta})+\sum_{k=1}^{K}p_{\boldsymbol{\lambda}}(\beta_{jk})
@@ -200,17 +182,17 @@ Therefore, we have $w_{ik}=\sqrt{\dfrac{\hat{z}^{(m)}_{ik} g'(\eta)^2}{V(\mu)}}$
 
 \begin{equation}
 \begin{split}
-\hat{\beta}_k^{(m+1)}&=\dfrac{\frac{1}{n}\sum_{i=1}^{nK}w_{ik}x_{ik}\tilde{y}_{ik}+\lambda_1[\sum_{l>k}(\hat{\beta}_l^{(m)}+\hat{\theta}_{kl}^{(m)})+\sum_{l<k}(\hat{\beta}_l^{(m+1)}-\hat{\theta}_{lk}^{(m)})]}{\lambda_1(K-1)+\frac{1}{n}\sum_{i=1}^{nK}w_{ik} x_{ik}} \\
+\hat{\beta}_k^{(m+1)}&=\dfrac{\frac{1}{n}\sum_{i=1}^{n}w_{ik}\tilde{y}_{ik}+\lambda_1[\sum_{l>k}(\hat{\beta}_l^{(m)}+\hat{\theta}_{kl}^{(m)})+\sum_{l<k}(\hat{\beta}_l^{(m+1)}-\hat{\theta}_{lk}^{(m)})]}{\lambda_1(K-1)+\frac{1}{n}\sum_{i=1}^{n}w_{ik}} \\
 \hat{\theta}_{kl}^{(m+1)}&=\begin{cases} 
       \hat{\beta}_k^{(m+1)}-\hat{\beta}_l^{(m+1)} & \norm*{\hat{\theta}_{kl}^{(m)}}_2 \geq \tau \\
-      ST(\hat{\beta}_k^{(m+1)}-\hat{\beta}_l^{(m+1)},\frac{\lambda_2}{\lambda_1}) & otherwise
+      ST(\hat{\beta}_k^{(m+1)}-\hat{\beta}_l^{(m+1)},\lambda_2) & otherwise
    \end{cases}
 \end{split}
 \end{equation}
 
-with $ST(\alpha,\lambda)=sign(\alpha)(\lvert \alpha \rvert-\lambda)_+$ denoting the usual soft-thresholding rule. $x_{ik}$ denotes 1 if entry i is in cluster k, and 0 if it is not, where $i=1,...,nK$. Remember that the gene j is fixed, so the above procedure is repeated for every gene $j=1, ..., g$. Note also that in this case, i represents the index for each subject for each cluster, i.e. each subject has K entries, with $X_i$ denoting a different cluster in each entry.
+with $ST(\alpha,\lambda)=sign(\alpha)(\lvert \alpha \rvert-\lambda)_+$ denoting the usual soft-thresholding rule. The gene $j$ is fixed, and the above procedure is repeated for every gene $j=1, ..., g$. 
 
-In this framework, $\hat{\theta}$ represents shrinkage on the cluster means, with the cluster means being identified as "equal" when they are within $\frac{\lambda_2}{\lambda_1}$ from each other.
+In this framework, $\hat{\theta}$ represents shrinkage on the cluster means, with the cluster means set as equal when they are within $\lambda_2$ from each other.
 
 
 
@@ -231,17 +213,17 @@ We set both $\epsilon_1 = 10^{-6}$ and $\epsilon_2 = 10^{-6}$.
 % 2.2.4 Tuning Parameters
 \subsubsection{Tuning Parameters}
 
-The optimal number of clusters K is found by searching over a range of values $K=(1, ...,7)$ and comparing the fit using the yielded BIC values.
+The optimal number of clusters K is found by searching over a range of values $K=(1, ...,7)$ and comparing the fit using the yielded BIC values. \cref{fig:1} gives a graphical representation of the procedure on an example simulated dataset
 
 \begin{figure}
 \begin{center}
 <<echo=FALSE,fig=TRUE>>=
-load("Project1/list_BIC_n621_g865_K3.Rout")
+load("Project1/list_BIC_n100_g865_K3.Rout")
 plot(list_BIC,ylab="BIC",xlab="K",main="Plot of BIC vs. order")
 @
 \end{center}
-\caption{Order selection is done by choosing the order (K) that minimizes the BIC. Here, the true order is K = 3 in a simulated dataset of n = 621 and g = 835 (after pre-filtering low count genes).}
-\label{fig:one}
+\caption{Order selection is done by choosing the order (K) that minimizes the BIC. Here, the true order is K = 3 in a simulated dataset of n = 100 and g = 835 (after pre-filtering low count genes), and 20 \% discriminatory genes with log fold change of 2.}
+\label{fig:1}
 \end{figure}
 
 Optimal tuning parameters for \(\lambda_2\) and \(\tau\) are also found by using the BIC criterion. The algorithm searches over a grid of values, and selects the combination that yields the lowest BIC. Pan proposed fixing the shrinkage parameter $\lambda_1=1$, varying the thresholding parameters $\lambda_2$ and $\tau$. We set $\lambda_1=1$ and search over $\lambda_2=(0.01, 0.05, 0.1, 0.15, 0.2)$ and $\tau=(0.1, 0.3, 0.5, 0.7, 0.9)$. Pan further proposed re-running the algorithm after doubling the value of $\lambda_1$ upon convergence in order to prevent the algorithm from being stuck at local maxima. For the sake of computation time, we instead implemented the classification and stochastic E step weights as an alternative solution to this issue.
@@ -256,10 +238,83 @@ Optimal tuning parameters for \(\lambda_2\) and \(\tau\) are also found by using
 
 %%% 3.1 Simulations %%%
 \subsection{Simulations}
+(WILL ADD: GENE-WISE vs CLUSTER-WISE DISPERSION PARAMETERS. Concern: ie. 10\% disc, LFC=1, n=100, g=1000, K=2 not choosing correct order. noise? at 20\%, correct order chosen. also at LFC=0.5, never finding correct order. More inaccurate as K increases. Cl-wise gave better results (previously))
+
+We simulated 100 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change (LFC), number of clusters (K), number of samples (n), number of genes (g), and proportion of discriminatory genes (pdisc). (ALSO INCLUDE VARYING NOISE?) In order to portray an accurate relationship between expression level and noise, we simulated genes based on the coefficient and dispersion estimates of the genes from the TCGA breast cancer dataset, then (for discriminatory genes) we imposed the LFC across the simulated clusters on the mean.
+
+<<xtable1, results=tex, echo=FALSE>>==
+library(xtable)
+load("/Users/deelim/Documents/Research/Simulations/final_table_nb.out")
+colnames(tab) = c("n","g","lfc","true.K","true.pdisc","K","pdisc","lambda2","tau","ARI","sens","false.pos")
+tab1 = xtable(tab[,c(6,3,5,7,10:12)],
+              digits=2,
+              table.placement="!h",
+              caption="Varying log fold change (lfc) and proportion of discriminatory genes (true.pdisc) for K=3, n=50, g=1000",
+              label = "tab:1")      # K=3, n=50, g=1000
+print(tab1,include.rownames=F)
+@
+
+(NOTE: table is inaccurate. For incorrectly selected order, ARI here is based on input correct order. Also, this table was based on cluster-specific dispersion parameters) We note from \cref{tab:1} that the order is incorrectly estimated in the case of a small proportion of discriminatory genes. Also, as the LFC is increased, we see a general increase in the ARI, indicating greater clustering accuracy when the differential between clusters is larger.
+
+Another useful feature of our algorithm is the ability to uncover which genes are discriminatory across clusters. Our method seems to uncover the true proportion of discriminatory genes with perfect sensitivity, and very low false positive rates (FPR). We expect to see performance decrease with a smaller LFC, since the algorithm will have a harder time distinguishing the clusters. However, we see the FPR is quite low even in the relatively small LFC of $0.03$. 
+
+(WILL INCLUDE MORE TABLES VARYING n, g, and K)
 
 %%% 3.2 Real Data %%%
 \subsection{Real Data}
 
+\subsubsection{TCGA Breast Cancer Dataset}
+
+We performed our clustering analysis on The Cancer Genome Atlas breast cancer dataset. This dataset contained 1215 subjects and 19682 genes. Of these subjects, we narrowed down to subjects who had prior annotated subtypes in the dataset based on the PAM50 genes. We also dropped the normal-like subtype, which occurred in just 8 cases out of 521 subjects. Then, we pre-filtered genes with low count, yielding 13970 total genes (based on genes with median count $\geq 40$). (ADD ARI and SILHOUETTE DERIVED for CEM, and rerun for current EM)
+
+We compared our method to a popular integrative clustering method called iCluster+ (Mo et al 2012). We used the same criterion (BIC) to search for the optimal order and tuning parameters. As shown in \cref{tab:2}, our method found the correct order of 4, while iCluster+ favored a higher number of clusters. Our method also yielded a greater agreement (ARI) to the annotated clusters, as well as a higher mean silhouette value. (SHOULD I INCLUDE EQUATIONS FOR ARI/silhouette here? Ge et al 2017 provides equation for silhouette)
+
+<<xtable2,results=tex,echo=F>>=
+library(mclust)
+library(cluster)
+load("/Users/deelim/Documents/Research/BRCA_env.Rdata")
+load("/Users/deelim/Documents/Research/X2.out")
+true_K = length(levels(droplevels(as.factor(BRCA_subtypes))))
+EM_K = X2$EM_maxK
+EM_ARI=adjustedRandIndex(X2$EM_clusters,BRCA_subtypes)
+i_K = X2$i_maxK
+i_ARI=adjustedRandIndex(X2$i_clusters,BRCA_subtypes)
+
+# Silhouette
+load("/Users/deelim/Documents/Research/Sweave/Project1/BRCA_dist.out")
+i_sil = silhouette(X2$i_clusters,d)
+EM_sil = silhouette(X2$EM_clusters,d)
+
+EMclust = c(EM_K,EM_ARI,mean(EM_sil[,3]))
+iclust = c(i_K,i_ARI,mean(i_sil[,3]))
+
+
+tab2 = data.frame(rbind(round(EMclust,3),round(iclust,3)))
+colnames(tab2) = c("K","ARI","Silhouette")
+rownames(tab2) = c("EM","iCluster+")
+
+tab2 = xtable(tab2,caption="Comparing iCluster+ with EM method. True (annotated) order is 4. Values of ARI closer to 1 indicate better clustering results with respect to the true (annotated) clusters. Silhouette values cluster to 1 indicate better clustering results based on dissimilarity matrix on normalized counts.",label="tab:2")
+print(tab2)
+
+#aggregate(EM_sil[,3], list(EM_sil[,1]), mean)   # See silhouette value means per cluster
+#aggregate(i_sil[,3], list(i_sil[,1]), mean)
+
+@
+
+It it known that the PAM50 genes are genes of significant interest for breast cancer. Thus, we performed further analysis on just the PAM50 genes. \cref{fig:2} is a heatmap of the known PAM50 genes, ordered by the clustering results of our CEM, and using cluster-specific dispersion parameters. (NOTE TO SELF: with initial Tau = 2. need to be re-run and made bigger to see gene labels)
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics{/Users/deelim/Documents/Research/Sweave/Project1/BRCA_pam50_CEM.png}
+\end{center}
+\caption{Heatmap of TCGA Breast Cancer PAM50 genes, comparing annotated clusters with CEM and EM algorithms.}
+\label{fig:2}
+\end{figure}
+
+
+Using just these genes, we found $ARI = 0.407$ using the cluster-specific dispersion parameters, and $ARI = 0.523$ using the gene-specific dispersion parameters.
+
+\subsubsection{TCGA Pancreatic Cancer Dataset}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%

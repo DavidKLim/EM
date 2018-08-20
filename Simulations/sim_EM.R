@@ -1,11 +1,14 @@
 #setwd("C:/Users/David/Desktop/Research/EM")
 
-init_y<-read.table("init_y.txt")
+# NSCLC
+#init_y<-read.table("init_y.txt")
 #init_size_factors<-as.numeric(read.table("init_size_factors.txt")[,1])
 #init_norm_y<-read.table("init_norm_y.txt")
+#init_y<-cbind(init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y)
 
-init_y<-cbind(init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y)
-
+# BRCA
+load('BRCA_env.Rdata')
+init_y = y
 
 library("stats")
 library("data.table")
@@ -13,23 +16,6 @@ library("DESeq2")
 library("mclust")
 library("parallel")
 library("pheatmap")
-
-
-# # # DESeq analysis
-# row_names<-paste("gene",seq(g))
-# col_names<-paste("subj",seq(n))
-# cts<-as.matrix(y)
-# rownames(cts)<-row_names
-# colnames(cts)<-col_names
-# coldata<-data.frame(matrix(paste("cl",true_clusters,sep=""),nrow=n))
-# rownames(coldata)<-colnames(cts)
-# colnames(coldata)<-"cluster"
-# dds<-DESeqDataSetFromMatrix(countData = cts,
-#                             colData = coldata,
-#                             design = ~ cluster)
-# DESeq_dds<-DESeq(dds)
-# size_factors<-sizeFactors(DESeq_dds)
-# norm_y<-counts(DESeq_dds,normalized=TRUE)
 
 
 
@@ -151,15 +137,28 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
 
 
 # Function to perform EM on simulated data
-sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefilter=F,pval_thresh=0.4,disp="gene"){
+sim.EM<-function(true.K, fold.change, num.disc, g, n, 
+                 distrib,method="EM",prefilter=F,pval_thresh=0.4,
+                 disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
+                 ncores=10){
+  
   # disp: "gene" or "cluster"
+  # low: coef 3.75-3.84, phi 0.13-0.15
+  # med: coef 6.59-6.62, phi 0.32-0.38
+  # high: coef 7.84-7.85, phi 1.00-1.32
+  
+  # Fixed phi: scalar for gene-wise, vector of length K for cluster-wise
+  
   
   # Number of cores: 2 for laptop, 12 for Killdevil
-  no_cores <- 1   # for parallel computing
-  #no_cores <- 12
+  no_cores <- ncores   # number of cores
+  sim = no_cores       # number of sims (set eq to number of cores for now)
   
-  dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s",n,g,true.K,fold.change,num.disc,distrib)
-  
+  if(!fixed_parms){
+    dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s",n,g,true.K,fold.change,num.disc,distrib)
+  } else{
+    dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_fixed_%f_%f",n,g,true.K,fold.change,num.disc,distrib,fixed_coef,fixed_phi)
+  }
   # max n = 100, max #
   
   if(distrib=="poisson"){
@@ -191,36 +190,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefil
   
   # Unpenalized run to find initial cluster estimates based on K=k
   k=true.K
+  if(!fixed_parms){
+    X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters,prefix="init",dir=dir_name,method=method,disp=disp)
+    init_coefs<-X_init$coefs              # save init estimates for coefs & pi
+    init_phi<-X_init$phi
+  } else{
+    # fixed coefs and phi
+    init_coefs <- matrix(fixed_coef,nrow=g,ncol=n)
+    if(disp=="gene"){
+      init_phi <- rep(fixed_phi,g)
+    } else{ init_phi <- matrix(fixed_phi,nrow=g,ncol=n,byrow=T) }
+  }
   
-  X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters,prefix="init",dir=dir_name,method=method,disp=disp)
-  init_coefs<-X_init$coefs              # save init estimates for coefs & pi
-  init_pi<-X_init$pi
-  init_phi<-X_init$phi
   
-  # # Advanced modeling phi based on diff in coefs
-  # absdiff = abs(init_coefs[,2]-init_coefs[,1])
-  # coef_diff = abs(init_coefs[,2]-init_coefs[,1])
-  # plot(coef_diff,init_phi)
-  # 
-  # coef_diff2= coef_diff[coef_diff<30 & init_phi<20]
-  # init_phi2= init_phi[coef_diff<30 & init_phi<20]
-  # coef1 = init_coefs[coef_diff<30 & init_phi<20,1]
-  # 
-  # model=lm(init_phi2~ poly(coef_diff2,3)+poly(coef1,2))
-  # summary(model)
-  # plot(coef_diff2,init_phi2)
-  # lines(sort(coef_diff2),fitted(model)[order(coef_diff2)],col='red',type='b')
-  # init_phi = predict(model,list(coef_diff2=absdiff,coef1=init_coefs[,1]))
-  # init_phi[which(init_phi<0)] = 0
-  
-  # to prevent error:
-   # for(j in 1:g){
-   #   for(c in 1:k){
-   #     if(init_coefs[j,c]>12){init_coefs[j,c]=12}
-   #   }
-   # }
-  # Mean over clusters, controlled fold change
-
   size_factors<-init_size_factors    # use this for all simulations
   
   sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
@@ -231,8 +213,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefil
   #sim_coefs[(tt+1):g,]<-matrix(rep( nondisc_fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]         # nondisc fold change = 0 so this doesn't get changed
   sim_pi<-rep(1/true.K,times=true.K)
   
-  #sim_coefs = init_coefs
-  #sim_pi = init_pi
   
   
   sink(file=sprintf("Diagnostics/%s/sim_parms_%s_%s.txt",dir_name,method,disp))
@@ -254,8 +234,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefil
   #### SIMULATIONS ####
   
   # Simulations to find K (Order Selection)
-  
-  sim=100
   
   all_data <- list(list())
   
@@ -284,16 +262,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefil
     }
     true_disc=c(rep(TRUE,tt),rep(FALSE,(g-tt)))
     
-    # rowZeroes<-rep(0,times=g)
-    # for(j in 1:g){
-    #   rowZeroes[j] = mean(y[j,]==0)
-    # }          # Proportion of zeroes in each gene
-    # idx <- (rowMeans(norm_y)>15 & rowZeroes<0.5)      # mark only genes with >100 count total: take out genes with excess 0's or too low count
-    
-    idx <- rowMedians(norm_y) >= 20
-    y <- y[idx,]
-    norm_y <- norm_y[idx,]
-    true_disc <- true_disc[idx]
+    # # Filtering
+    # idx <- rowMedians(norm_y) >= 20
+    # y <- y[idx,]
+    # norm_y <- norm_y[idx,]
+    # true_disc <- true_disc[idx]
     
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,
@@ -382,7 +355,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefil
     
     #create matrix for grid search values
     lambda1_search=1
-    lambda2_search=c(0.01,0.05,0.1,0.15,0.2)
+    lambda2_search=c(0.05,0.1,0.2,0.5,1,1.5,2)
     tau_search=seq(from=0.1,to=0.9,by=0.2)
     
     list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
@@ -419,7 +392,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n, distrib,method="EM",prefil
     
     # Final run with optimal parameters
     pref = sprintf("final%d",ii)
-    X<-EM(y=y,k=k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
+    X<-EM(y=y,k=max_k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
     
     print(paste("Time:",X$time_elap,"seconds"))
     print(paste("Dataset ",ii,"complete"))
