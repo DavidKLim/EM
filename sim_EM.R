@@ -159,6 +159,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   } else{
     dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_fixed_%f_%f",n,g,true.K,fold.change,num.disc,distrib,fixed_coef,fixed_phi)
   }
+  dir.create(sprintf("Diagnostics/%s",dir_name))
+  
   # max n = 100, max #
   
   if(distrib=="poisson"){
@@ -196,7 +198,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     init_phi<-X_init$phi
   } else{
     # fixed coefs and phi
-    init_coefs <- matrix(fixed_coef,nrow=g,ncol=n)
+    init_coefs <- matrix(fixed_coef,nrow=g,ncol=k)
     if(disp=="gene"){
       init_phi <- rep(fixed_phi,g)
     } else{ init_phi <- matrix(fixed_phi,nrow=g,ncol=n,byrow=T) }
@@ -267,6 +269,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     # y <- y[idx,]
     # norm_y <- norm_y[idx,]
     # true_disc <- true_disc[idx]
+    
+    # No filtering
+    idx = rep(T,g)
     
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,

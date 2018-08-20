@@ -1,13 +1,16 @@
-run.sim = function(prefix="",true_k=c(1:7),fold_change=c(0.5,1,2),num_disc=c(.1,.2),g=c(300,1000),n=c(50,100,200),
-                   distrib="nb",method="EM",disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
+run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.1,.2),g=c(300,1000),n=c(50,100,200),
+                   distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,
                    ncores=10){
   setwd("/netscr/deelim/out")
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n)){
       cmd = rep(0, 3)
       cmd[1] = "unlink('.RData') \n source('sim_EM.R') \n"
-      cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d, distrib='%s', method='%s', disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=%f, ncores=%d)\n",
-                       true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,disp,fixed_parms.fixed_coef,ncores)
-      if(!fixed_parms){
+      cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d,
+                       distrib='%s', method='%s', prefilter=F, pval_thresh=0.4,
+                       disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=%f,
+                       ncores=%d)\n",
+                       true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,disp,fixed_parms,fixed_coef,fixed_phi,ncores)
+      if(fixed_parms=="F"){
         out = sprintf("/netscr/deelim/run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d",
                     prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m])
       } else{
@@ -23,14 +26,14 @@ run.sim = function(prefix="",true_k=c(1:7),fold_change=c(0.5,1,2),num_disc=c(.1,
   }}}}}
 }
 
-collect.sim = function(prefix="",true_k=c(1:7),fold_change=c(0.5,1,2),num_disc=c(.1,.2),g=c(300,1000),n=c(50,100,200),
-                       distrib="nb",method="EM",disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35){
+collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.1,.2),g=c(300,1000),n=c(50,100,200),
+                       distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n)
   tab<-matrix(0,nrow=nsims,ncol=12)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI","sens","false.pos")
   ii=1
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n)){
-      if(!fixed_parms){
+      if(fixed_parms=="F"){
         out = sprintf("/netscr/deelim/run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d",
                       prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m])
       } else{
@@ -52,7 +55,7 @@ collect.sim = function(prefix="",true_k=c(1:7),fold_change=c(0.5,1,2),num_disc=c
       tab[ii,12]<-X$falsepos
       ii=ii+1
   }}}}}
-  if(!fixed_parms){
+  if(fixed_parms=="F"){
     final_results = sprintf("final_table_%s_%s_%s",distrib,method,disp)
   } else{
     final_results = sprintf("final_table_%s_%s_%s_final_%f_%f",distrib,method,disp,fixed_coef,fixed_phi)

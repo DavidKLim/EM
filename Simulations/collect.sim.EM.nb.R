@@ -1,7 +1,8 @@
 rm(list=ls())
 
-setwd("/netscr/deelim")
+setwd("/netscr/deelim/out")
 
-source("out/sim.fx.EM.R")
+source("sim.fx.EM.R")
 
-collect.sim(method="nb")
+collect.sim(distrib="nb",method="EM",disp="gene")
+collect.sim(distrib="nb",method="EM",disp="cluster")
