@@ -201,7 +201,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     init_coefs <- matrix(fixed_coef,nrow=g,ncol=k)
     if(disp=="gene"){
       init_phi <- rep(fixed_phi,g)
-    } else{ init_phi <- matrix(fixed_phi,nrow=g,ncol=n,byrow=T) }
+    } else{ init_phi <- matrix(fixed_phi,nrow=g,ncol=k,byrow=T) }
   }
   
   
@@ -300,6 +300,13 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       true_disc=true_disc[filt_ids]
     }
     
+    # # rowVar filtering method
+    library(genefilter)
+    filt_ids2 = rowVars(y) > (rowMeans(y) + 0.5*rowMeans(y)^2)
+    y=y[filt_ids2,]
+    norm_y=norm_y[filt_ids2,]
+    true_disc=true_disc[filt_ids2]
+    
     # Order selection
     K_search=c(1:7)
     list_BIC=matrix(0,nrow=length(K_search),ncol=2)
@@ -317,7 +324,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       print(paste("Time:",X$time_elap,"seconds"))
     }
     
-    
+  
     sink(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.txt",dir_name,method,disp,ii))
     
     max_k=list_BIC[which.min(list_BIC[,2]),1]

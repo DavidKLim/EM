@@ -609,7 +609,8 @@ EM<-function(y, k,
   init_cls_BIC <- rep(0,times=ncol(all_init_cls))
   
   # initial Tau search for CEM #
-  Tau_vals = c(2,5,20,50,100,1000,5000,10000,50000,100000)
+  Tau_vals = c(2,20,200)
+  #Tau_vals = c(2,5,20,50,100,1000,5000,10000,50000,100000)
   init_cls_Tau = rep(0,ncol(all_init_cls))
   
   for(i in 1:ncol(all_init_cls)){
