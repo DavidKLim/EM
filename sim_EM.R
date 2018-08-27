@@ -89,7 +89,7 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
   for(j in 1:g){
     start = Sys.time()
     cat("gene",j,"/",g,"\n")
-    fit0 = glm.nb(as.numeric(y[j,]) ~ 1 + offset(log(size_factors)))
+    fit0 = glm.nb(as.numeric(y[j,]) ~ 1 + offset(log(size_factors)),trace=3)
     #fit0 = glm.nb(y[j,] ~ 1)
     
     r0 = residuals(fit0,type="pearson")
@@ -298,14 +298,15 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       y=y[filt_ids,]
       norm_y=norm_y[filt_ids,]
       true_disc=true_disc[filt_ids]
+      idx=filt_ids                # given no filtering done in the simulation step
     }
     
-    # # rowVar filtering method
-    library(genefilter)
-    filt_ids2 = rowVars(y) > (rowMeans(y) + 0.5*rowMeans(y)^2)
-    y=y[filt_ids2,]
-    norm_y=norm_y[filt_ids2,]
-    true_disc=true_disc[filt_ids2]
+    # # # rowVar filtering method
+    # library(genefilter)
+    # filt_ids2 = rowVars(y) > (rowMeans(y) + 0.5*rowMeans(y)^2)
+    # y=y[filt_ids2,]
+    # norm_y=norm_y[filt_ids2,]
+    # true_disc=true_disc[filt_ids2]
     
     # Order selection
     K_search=c(1:7)
@@ -362,6 +363,13 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     dev.off()
     
     # Grid search
+    
+    # Use prefiltering just on the order selection step? This will reset all genes
+    y = all_data[[ii]]$y
+    true_clusters = all_data[[ii]]$true_clusters
+    norm_y = all_data[[ii]]$norm_y
+    true_disc = all_data[[ii]]$true_disc
+    idx = all_data[[ii]]$gene_id
     
     print(paste("Dataset",ii,"Grid Search:"))    # track iteration
     
@@ -433,7 +441,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
 
   ## ADD PARALLELIZATION HERE ##
   cl<-makeCluster(no_cores)
-  clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding"),envir=environment())
+  clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding","NB.GOF"),envir=environment())
   clusterEvalQ(cl,{
     library(stats)
     library(MASS)
