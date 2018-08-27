@@ -141,7 +141,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       pvals = NB.GOF(y=y,size_factors=size_factors,nsim=1000)
       FDR_pvals = p.adjust(pvals,"fdr")
       # pre-filtering by pval
-      filt_ids = (pvals <= pval_thresh)
+      #filt_ids = (pvals <= pval_thresh)
+      filt_ids = pvals <= quantile(pvals,0.25)
     } else if(filt_method=="mad"){
       mads = rep(0,g)
       for(j in 1:g){
