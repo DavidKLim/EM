@@ -9,5 +9,5 @@ fixed_phis=c(0.15, 0.35, 1)
 
 for(i in 1:length(fixed_coefs)){for(j in 1:length(fixed_phis)){
     run.sim(distrib="nb",method="EM",disp="gene",fixed_parms="T",fixed_coef=fixed_coefs[i],fixed_phi=fixed_phis[j],ncores=10,
-            prefilter="T",pval_thresh=0.4)
+            filt_method="mad",filt_quant=0.25)
   }}

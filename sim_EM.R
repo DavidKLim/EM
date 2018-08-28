@@ -138,7 +138,7 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
 
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
-                 distrib,method="EM",prefilter=F,pval_thresh=0.4,
+                 distrib,method="EM",filt_quant = 0.25,filt_method=c("pval","mad","none"),
                  disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
                  ncores=10){
   
@@ -271,14 +271,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     # true_disc <- true_disc[idx]
     
     # No filtering
-    idx = rep(T,g)
+    #idx = rep(T,g)
     
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,
                          size_factors=size_factors,
                          norm_y=norm_y,
                          true_disc=true_disc
-                         ,gene_id=idx
+                         #,gene_id=idx
                         )
   }
     
@@ -289,17 +289,22 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     true_clusters = all_data[[ii]]$true_clusters
     norm_y = all_data[[ii]]$norm_y
     true_disc = all_data[[ii]]$true_disc
-    idx = all_data[[ii]]$gene_id
+    #idx = all_data[[ii]]$gene_id
     
-    if(prefilter){
+    if(filt_method=="pval"){
       pvals = NB.GOF(y=y,size_factors=size_factors,nsim=1000)
+      FDR_pvals = p.adjust(pvals,"fdr")
       # pre-filtering by pval
-      filt_ids = (pvals <= pval_thresh)
-      y=y[filt_ids,]
-      norm_y=norm_y[filt_ids,]
-      true_disc=true_disc[filt_ids]
-      idx=filt_ids                # given no filtering done in the simulation step
+      #filt_ids = (pvals <= pval_thresh)
+      filt_ids = pvals <= quantile(pvals,filt_quant)
+    } else if(filt_method=="mad"){
+      mads = rep(0,g)
+      for(j in 1:g){
+        mads[j] = mad(log(norm_y[j,]+0.1))
+      }
+      filt_ids = mads >= quantile(mads,1-filt_quant)
     }
+    idx = filt_ids
     
     # # # rowVar filtering method
     # library(genefilter)
@@ -364,12 +369,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     # Grid search
     
-    # Use prefiltering just on the order selection step? This will reset all genes
-    y = all_data[[ii]]$y
-    true_clusters = all_data[[ii]]$true_clusters
-    norm_y = all_data[[ii]]$norm_y
-    true_disc = all_data[[ii]]$true_disc
-    idx = all_data[[ii]]$gene_id
+    # # Use prefiltering just on the order selection step? This will reset all genes
+    # y = all_data[[ii]]$y
+    # true_clusters = all_data[[ii]]$true_clusters
+    # norm_y = all_data[[ii]]$norm_y
+    # true_disc = all_data[[ii]]$true_disc
+    # idx = all_data[[ii]]$gene_id
     
     print(paste("Dataset",ii,"Grid Search:"))    # track iteration
     
