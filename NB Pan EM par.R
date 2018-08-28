@@ -553,7 +553,7 @@ EM<-function(y, k,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
              init_phi=matrix(0,nrow=nrow(y),ncol=k),
              disp=c("gene","cluster"),
-             method="CEM",
+             method=c("CEM","EM","SEM","CSEM"),
              prefix="", dir="NA"){
   
   if(method=="EM"){
@@ -691,6 +691,9 @@ predictions <- function(X,newdata,new_sizefactors){
   init_lambda2=X$lambda2
   init_tau=X$tau
   
+  
+  cl_phi=!is.null(dim(Xtrain$phi))  # dimension of phi is null when gene-wise
+  
   ##### EXPORT THIS?? #####
   # library(DESeq2)
   # row_names<-paste("gene",seq(nrow(newdata)))
@@ -722,7 +725,11 @@ predictions <- function(X,newdata,new_sizefactors){
   l<-matrix(0,nrow=k,ncol=n)
   for(i in 1:n){
     for(c in 1:k){
-      l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=exp(init_coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+      if(cl_phi){
+        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=exp(init_coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+      } else if(!cl_phi){
+        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi,mu=exp(init_coefs[,c] + offset[i]),log=TRUE))
+      }
     }    # subtract out 0.1 that was added earlier
   }
   
