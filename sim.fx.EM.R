@@ -6,7 +6,7 @@ run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.1,
       cmd = rep(0, 3)
       cmd[1] = "unlink('.RData') \n source('sim_EM.R') \n"
       cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d,
-                       distrib='%s', method='%s', filt_quant=%f, filt_method=%s,
+                       distrib='%s', method='%s', filt_quant=%f, filt_method='%s',
                        disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=%f,
                        ncores=%d)\n",
                        true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,filt_quant,filt_method,disp,fixed_parms,fixed_coef,fixed_phi,ncores)

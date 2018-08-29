@@ -89,7 +89,7 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
   for(j in 1:g){
     start = Sys.time()
     cat("gene",j,"/",g,"\n")
-    fit0 = glm.nb(as.numeric(y[j,]) ~ 1 + offset(log(size_factors)),trace=3)
+    fit0 = glm.nb(as.numeric(y[j,]) ~ 1 + offset(log(size_factors)),trace=0)
     #fit0 = glm.nb(y[j,] ~ 1)
     
     r0 = residuals(fit0,type="pearson")
@@ -306,6 +306,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     }
     idx = filt_ids
     
+    y=y[idx,]
+    norm_y=norm_y[idx,]
+    true_disc=true_disc[idx]
+    
     # # # rowVar filtering method
     # library(genefilter)
     # filt_ids2 = rowVars(y) > (rowMeans(y) + 0.5*rowMeans(y)^2)
@@ -369,12 +373,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     # Grid search
     
-    # # Use prefiltering just on the order selection step? This will reset all genes
-    # y = all_data[[ii]]$y
-    # true_clusters = all_data[[ii]]$true_clusters
-    # norm_y = all_data[[ii]]$norm_y
-    # true_disc = all_data[[ii]]$true_disc
-    # idx = all_data[[ii]]$gene_id
+    # Use prefiltering just on the order selection step? This will reset all genes
+    y = all_data[[ii]]$y
+    true_clusters = all_data[[ii]]$true_clusters
+    norm_y = all_data[[ii]]$norm_y
+    true_disc = all_data[[ii]]$true_disc
+    idx = rep(T,nrow(y))
     
     print(paste("Dataset",ii,"Grid Search:"))    # track iteration
     
