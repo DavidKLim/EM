@@ -1,14 +1,16 @@
 \documentclass[12pt]{article}
+
 \usepackage{amsmath}
 \usepackage{mathtools}
 \usepackage{graphicx,psfrag,epsf}
 \usepackage{enumerate}
-\usepackage{natbib}
+%\usepackage{natbib}
 \usepackage{url} % not crucial - just used below for the URL 
 \usepackage{float}
 \usepackage{hyperref}
 \usepackage[noabbrev,capitalize]{cleveref}
-
+%\usepackage{biblatex}
+%\addbibresource{C:/Users/limdd/Documents/Research/Sweave/Project1/sample.bib}
 
 
 %\pdfminorversion=4
@@ -25,9 +27,6 @@
 \begin{document}
 \SweaveOpts{concordance=TRUE}
 
-
-
-%\bibliographystyle{natbib}
 
 \def\spacingset#1{\renewcommand{\baselinestretch}%
 {#1}\small\normalsize} \spacingset{1}
@@ -137,7 +136,7 @@ Because $z_{ik}$ is unobservable, we estimate this quantity by the conditional e
 
 % 2.1.1 Penalty
 \subsubsection{Penalty}
-The penalty is the so-called grouped truncated lasso, which is discussed in Pan et al (2013).
+The penalty is the so-called grouped truncated lasso, which was introduced in Pan et al (2013).
 \begin{equation}
 p_{\lambda}(\beta)=\frac{\lambda_1}{2}\sum_{k<l} \norm{\beta_k-\beta_l-\theta_{kl}}_2^2 + \lambda_2 \sum_{k<l}TLP(\norm{\theta_{kl}}_2;\tau)
 \end{equation}
@@ -218,7 +217,7 @@ The optimal number of clusters K is found by searching over a range of values $K
 \begin{figure}
 \begin{center}
 <<echo=FALSE,fig=TRUE>>=
-load("Project1/list_BIC_n100_g865_K3.Rout")
+load("C:/Users/limdd/Documents/Research/Sweave/Project1/list_BIC_n100_g865_K3.Rout")
 plot(list_BIC,ylab="BIC",xlab="K",main="Plot of BIC vs. order")
 @
 \end{center}
@@ -238,27 +237,70 @@ Optimal tuning parameters for \(\lambda_2\) and \(\tau\) are also found by using
 
 %%% 3.1 Simulations %%%
 \subsection{Simulations}
-(WILL ADD: GENE-WISE vs CLUSTER-WISE DISPERSION PARAMETERS. Concern: ie. 10\% disc, LFC=1, n=100, g=1000, K=2 not choosing correct order. noise? at 20\%, correct order chosen. also at LFC=0.5, never finding correct order. More inaccurate as K increases. Cl-wise gave better results (previously))
 
-We simulated 100 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change (LFC), number of clusters (K), number of samples (n), number of genes (g), and proportion of discriminatory genes (pdisc). (ALSO INCLUDE VARYING NOISE?) In order to portray an accurate relationship between expression level and noise, we simulated genes based on the coefficient and dispersion estimates of the genes from the TCGA breast cancer dataset, then (for discriminatory genes) we imposed the LFC across the simulated clusters on the mean.
+It is well-known that a majority of the genes in a typical dataset is nondiscriminatory across subtypes. In order to cluster subtypes accurately, it is important to filter out genes that are obviously nondiscriminatory in nature. One common way to do this is by filtering out genes whose median absolute deviation is low (Chung et al 2008). We utilize this, along with a subsequent wrapper in our method to perform pre-filtering and variable selection on the data for analysis (Ritter et al book).
+
+(MAYBE ADD: NB GOF pvalue vs MAD)
+
+We simulated 100 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change ($LFC$), number of clusters ($K$), number of samples per cluster ($n_k$), number of genes ($g$), and proportion of discriminatory genes ($p_{disc}$). We searched over $LFC=(0.5, 1, 2)$, $K=(2, 3, ..., 7)$, $n_k=(25, 50)$, $g=(1000, 2000)$, and $p_{disc}=(0.05, 0.1)$
+
+To explore the behaviors in various realistic settings, we simulated low, medium, and high expression and noise values based on the 25th, 50th, and 75th quantiles of the estimates of expression and dispersion in the TCGA Breast Cancer dataset. These values were approximately $\beta=(3.75,6.5,7.85)$ and $\phi=(0.15,0.35,1.00)$, respectively.
+
+After simulating, we imposed pre-filtering and kept just the genes with the top 25\% of MAD. \cref{tab:1} shows the performance statistics with varying coefficients and noise, averaged across all of the other variables ($LFC$, $K$, $n_k$, $g$, and $p_{disc}$). One very promising added utility of our method is the ability to perform prediction based on the estimated parameters and the posterior weights from the E step. We analyze the performance of clustering, discovering discriminatory genes across clusters, as well as predicting on newly simulated samples (floor(0.1*n)) in \cref{tab:1}
 
 <<xtable1, results=tex, echo=FALSE>>==
 library(xtable)
-load("/Users/deelim/Documents/Research/Simulations/final_table_nb.out")
-colnames(tab) = c("n","g","lfc","true.K","true.pdisc","K","pdisc","lambda2","tau","ARI","sens","false.pos")
-tab1 = xtable(tab[,c(6,3,5,7,10:12)],
+load("C:/Users/limdd/Documents/Research/Sweave/Project1/simulation_res.RData")
+colnames(summary_tab_coefphi)[1:3] = c("$\\beta$","$\\phi$","Order Acc")
+tab1 = xtable(summary_tab_coefphi,
               digits=2,
               table.placement="!h",
-              caption="Varying log fold change (lfc) and proportion of discriminatory genes (true.pdisc) for K=3, n=50, g=1000",
+              caption="Effects of varying coefficients ($\\beta$) and noise ($\\phi$) in simulated datasets on performance",
               label = "tab:1")      # K=3, n=50, g=1000
-print(tab1,include.rownames=F)
+print(tab1,include.rownames=F, sanitize.text.function=identity)
 @
 
-(NOTE: table is inaccurate. For incorrectly selected order, ARI here is based on input correct order. Also, this table was based on cluster-specific dispersion parameters) We note from \cref{tab:1} that the order is incorrectly estimated in the case of a small proportion of discriminatory genes. Also, as the LFC is increased, we see a general increase in the ARI, indicating greater clustering accuracy when the differential between clusters is larger.
+As the average expression of the genes ($\beta$) goes up, we see that clustering performance (ARI) and order selection accuracy both increase. This is because as the mean expression for a gene increases, the distance two clusters in that particular gene increases. since the log fold change creates a greater separation at higher expressions. For example, the distance between $\beta=3$ and $\beta=4$ is much smaller than the distance between $\beta=6$ and $\beta=7$, since $\mu=e^{\beta}$, and $e^4-e^3 < e^7-e^6$.
 
-Another useful feature of our algorithm is the ability to uncover which genes are discriminatory across clusters. Our method seems to uncover the true proportion of discriminatory genes with perfect sensitivity, and very low false positive rates (FPR). We expect to see performance decrease with a smaller LFC, since the algorithm will have a harder time distinguishing the clusters. However, we see the FPR is quite low even in the relatively small LFC of $0.03$. 
+Conversely, as noise ($\phi$) increases, we see a decrease in clustering and order selection accuracy. The noisier the dataset, the harder it will be to distinguish whether the observed differential expression has biological significance, or is simply due to randomness in  the data. 
 
-(WILL INCLUDE MORE TABLES VARYING n, g, and K)
+Another useful feature of our algorithm is the ability to perform simultaneous variable selection while clustering. This helps us uncover which genes are discriminatory across clusters. We note that the sensitivity, or the proportion of discriminatory genes that are determined correctly to be discriminatory, is very good when the noise is small, but gets worse as noise is increased. We found that the false positive rate (FPR), or the rate at which nondiscriminatory genes are falsely determined to be discriminatory, does not follow this trend, but remains relatively constant through varying noise. 
+
+A common integrative clustering method that is able to handle count data is iClusterPlus (Mo et al 2012). It assumes a Poisson distribution on the data, and uses a L1 penalized likelihood model to estimate the parameters, while using a sampling scheme from the posterior distribution of the latent variables to discover clustering labels. We compared our method to just the count data portion of iClusterPlus's integrative method.
+
+Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering and K-medoids (Jaskowiak et al 2018). Jaskowiak suggested that these were among the most robust and efficient in clustering this type of data. (MAYBE INSERT THEORY OF HC AND K-MEDOIDS CLUSTERING).
+(((INSERT TABLE 2: comparison between EM, iCluster+, HC, K-Medoids)))
+
+% <<xtable2, results=tex,echo=FALSE>>==
+% @
+
+We analyzed some very natural variants of our method. For one, we have so far restricted the simulations to contain gene-specific dispersions. It is not currently known whether one dispersion parameter across all clusters for each gene adequately portrays real data. To introduce a more specific model, it may be more appropriate to introduce cluster-specific dispersion parameters. However, this may result in overfitting the data, causing worse performance.
+
+Secondly, research has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step (Biernacki et al 2003). This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. \cref{tab:3} \cref{tab:4} show the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
+
+<<xtable3,results=tex,echo=FALSE>>==
+load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
+colnames(tab) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
+tab3 = xtable(tab[,c(2,1,6,3,7,4,5,8)],
+              digits=2,
+              table.placement="!h",
+              caption="Clustering, discovery, and prediction performance of variants of EM. The simulated dispersions were gene-specific.",
+              label = "tab:3")      # K=3, n=50, g=1000
+print(tab3,include.rownames=F, sanitize.text.function=identity)
+
+@
+%<<xtable4,results=tex,echo=FALSE>>==
+%load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
+%colnames(tab) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
+%tab3 = xtable(tab[,c(2,1,6,3,7,4,5,8)],
+%              digits=2,
+%              table.placement="!h",
+%              caption="Clustering, discovery, and prediction performance of variants of EM. The simulated dispersions were gene-specific%%.",
+%              label = "tab:4")      # K=3, n=50, g=1000
+%print(tab4,include.rownames=F, sanitize.text.function=identity)
+%@
+
+((Insert analysis of tables 3 and 4))
 
 %%% 3.2 Real Data %%%
 \subsection{Real Data}
@@ -267,13 +309,13 @@ Another useful feature of our algorithm is the ability to uncover which genes ar
 
 We performed our clustering analysis on The Cancer Genome Atlas breast cancer dataset. This dataset contained 1215 subjects and 19682 genes. Of these subjects, we narrowed down to subjects who had prior annotated subtypes in the dataset based on the PAM50 genes. We also dropped the normal-like subtype, which occurred in just 8 cases out of 521 subjects. Then, we pre-filtered genes with low count, yielding 13970 total genes (based on genes with median count $\geq 40$). (ADD ARI and SILHOUETTE DERIVED for CEM, and rerun for current EM)
 
-We compared our method to a popular integrative clustering method called iCluster+ (Mo et al 2012). We used the same criterion (BIC) to search for the optimal order and tuning parameters. As shown in \cref{tab:2}, our method found the correct order of 4, while iCluster+ favored a higher number of clusters. Our method also yielded a greater agreement (ARI) to the annotated clusters, as well as a higher mean silhouette value. (SHOULD I INCLUDE EQUATIONS FOR ARI/silhouette here? Ge et al 2017 provides equation for silhouette)
+We compared our method to a popular integrative clustering method called iCluster+ (Mo et al 2012). We used the same criterion (BIC) to search for the optimal order and tuning parameters. As shown in \cref{tab:5}, our method found the correct order of 4, while iCluster+ favored a higher number of clusters. Our method also yielded a greater agreement (ARI) to the annotated clusters, as well as a higher mean silhouette value. (SHOULD I INCLUDE EQUATIONS FOR ARI/silhouette here? Ge et al 2017 provides equation for silhouette)
 
-<<xtable2,results=tex,echo=F>>=
+<<xtable5,results=tex,echo=F>>=
 library(mclust)
 library(cluster)
-load("/Users/deelim/Documents/Research/BRCA_env.Rdata")
-load("/Users/deelim/Documents/Research/X2.out")
+load("C:/Users/limdd/Documents/Research/BRCA_env.Rdata")
+load("C:/Users/limdd/Documents/Research/X2.out")
 true_K = length(levels(droplevels(as.factor(BRCA_subtypes))))
 EM_K = X2$EM_maxK
 EM_ARI=adjustedRandIndex(X2$EM_clusters,BRCA_subtypes)
@@ -281,7 +323,7 @@ i_K = X2$i_maxK
 i_ARI=adjustedRandIndex(X2$i_clusters,BRCA_subtypes)
 
 # Silhouette
-load("/Users/deelim/Documents/Research/Sweave/Project1/BRCA_dist.out")
+load("C:/Users/limdd/Documents/Research/Sweave/Project1/BRCA_dist.out")
 i_sil = silhouette(X2$i_clusters,d)
 EM_sil = silhouette(X2$EM_clusters,d)
 
@@ -289,12 +331,12 @@ EMclust = c(EM_K,EM_ARI,mean(EM_sil[,3]))
 iclust = c(i_K,i_ARI,mean(i_sil[,3]))
 
 
-tab2 = data.frame(rbind(round(EMclust,3),round(iclust,3)))
-colnames(tab2) = c("K","ARI","Silhouette")
-rownames(tab2) = c("EM","iCluster+")
+tab5 = data.frame(rbind(round(EMclust,3),round(iclust,3)))
+colnames(tab4) = c("K","ARI","Silhouette")
+rownames(tab4) = c("EM","iCluster+")
 
-tab2 = xtable(tab2,caption="Comparing iCluster+ with EM method. True (annotated) order is 4. Values of ARI closer to 1 indicate better clustering results with respect to the true (annotated) clusters. Silhouette values cluster to 1 indicate better clustering results based on dissimilarity matrix on normalized counts.",label="tab:2")
-print(tab2)
+tab5 = xtable(tab5,caption="Comparing iCluster+ with EM method. True (annotated) order is 4. Values of ARI closer to 1 indicate better clustering results with respect to the true (annotated) clusters. Silhouette values cluster to 1 indicate better clustering results based on dissimilarity matrix on normalized counts.",label="tab:5")
+print(tab5)
 
 #aggregate(EM_sil[,3], list(EM_sil[,1]), mean)   # See silhouette value means per cluster
 #aggregate(i_sil[,3], list(i_sil[,1]), mean)
@@ -305,7 +347,7 @@ It it known that the PAM50 genes are genes of significant interest for breast ca
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics{/Users/deelim/Documents/Research/Sweave/Project1/BRCA_pam50_CEM.png}
+\includegraphics{C:/Users/limdd/Documents/Research/Sweave/Project1/BRCA_pam50_CEM.png}
 \end{center}
 \caption{Heatmap of TCGA Breast Cancer PAM50 genes, comparing annotated clusters with CEM and EM algorithms.}
 \label{fig:2}
@@ -315,7 +357,6 @@ It it known that the PAM50 genes are genes of significant interest for breast ca
 Using just these genes, we found $ARI = 0.407$ using the cluster-specific dispersion parameters, and $ARI = 0.523$ using the gene-specific dispersion parameters.
 
 \subsubsection{TCGA Pancreatic Cancer Dataset}
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% 4. DISCUSSION %%%%%
@@ -341,14 +382,11 @@ Using just these genes, we found $ARI = 0.407$ using the cluster-specific disper
 
 \end{description}
 
-\section{BibTeX}
+\section{References}
 
-We hope you've chosen to use BibTeX!\ If you have, please feel free to use the package natbib with any bibliography style you're comfortable with. The .bst file agsm has been included here for your convenience. 
-
-\bibliographystyle{Chicago}
-
-\bibliography{Bibliography-MM-MC}
-
+%\bibliography{C:/Users/limdd/Documents/Research/Sweave/Project1/sample.bib}
+%\bibliographystyle{agsm}
+%\printbibliography
 
 
 \end{document}

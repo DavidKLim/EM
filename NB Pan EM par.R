@@ -35,6 +35,34 @@ soft_thresholding=function(alpha,lambda){
   }
 }
  
+# DESeq analysis
+normalizations <- function(dat){
+  n=ncol(dat)
+  g=nrow(dat)
+  row_names<-paste("gene",seq(g))
+  col_names<-paste("subj",seq(n))
+  cts<-round(as.matrix(dat),digits=0)
+  rownames(cts)<-row_names
+  colnames(cts)<-col_names
+  coldata<-data.frame(matrix(paste("cl"),nrow=n))
+  rownames(coldata)<-colnames(cts)
+  colnames(coldata)<-"cluster"
+  dds<-DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata,
+                              design = ~ 1)
+  dds<-DESeq(dds)
+  size_factors<-sizeFactors(dds)
+  norm_y<-counts(dds,normalized=TRUE)
+  idx <- rowSums( counts(dds, normalized=TRUE) >= 20) >= 5
+  
+  rownames(norm_y) = rownames(dat)
+  colnames(norm_y) = colnames(dat)
+  
+  res <- list(size_factors=size_factors,
+              norm_y=norm_y,
+              idx=idx)
+  return(res)
+}
  
 # phi.ml <-
 #   function(y, mu, n = sum(weights), weights, limit = 10,
@@ -527,7 +555,7 @@ EM_run <- function(y, k,
                Q=Q[1:a],
                BIC=BIC,
                nondiscriminatory=nondiscriminatory,
-               init_clusters=cls,
+               init_clusters=cls_init,
                final_clusters=final_clusters,
                phi=phi,
                logL=log_L,
@@ -609,7 +637,8 @@ EM<-function(y, k,
   init_cls_BIC <- rep(0,times=ncol(all_init_cls))
   
   # initial Tau search for CEM #
-  Tau_vals = c(2,20,200)
+  Tau_vals = 2
+  #Tau_vals = c(2,20,200)
   #Tau_vals = c(2,5,20,50,100,1000,5000,10000,50000,100000)
   init_cls_Tau = rep(0,ncol(all_init_cls))
   
@@ -692,7 +721,7 @@ predictions <- function(X,newdata,new_sizefactors){
   init_tau=X$tau
   
   
-  cl_phi=!is.null(dim(Xtrain$phi))  # dimension of phi is null when gene-wise
+  cl_phi=!is.null(dim(X$phi))  # dimension of phi is null when gene-wise
   
   ##### EXPORT THIS?? #####
   # library(DESeq2)
@@ -733,7 +762,7 @@ predictions <- function(X,newdata,new_sizefactors){
     }    # subtract out 0.1 that was added earlier
   }
   
-  pi=Xtrain$pi
+  pi=X$pi
   
   # E step
   # Estimate weights

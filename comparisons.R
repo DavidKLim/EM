@@ -25,6 +25,9 @@ normalizations <- function(dat){
   norm_y<-counts(dds,normalized=TRUE)
   idx <- rowSums( counts(dds, normalized=TRUE) >= 20) >= 5
   
+  rownames(norm_y) = rownames(dat)
+  colnames(norm_y) = colnames(dat)
+  
   res <- list(size_factors=size_factors,
               norm_y=norm_y,
               idx=idx)
@@ -37,11 +40,11 @@ normalizations <- function(dat){
 compare <- function(y){
   
   true_cls = as.numeric(NSCLC_anno$Adeno.Squamous)
-  true_k = 2
+  true_k = 4
   
   # Number of cores: 2 for laptop, 12 for Killdevil
   #no_cores <- 2   # for parallel computing
-  no_cores <- 12
+  no_cores <- 10
   
   # list of K to search over
   K_search = c(2:7)
@@ -88,7 +91,7 @@ compare <- function(y){
   
   # my method #
   source("NB Pan EM par.R")
-  dir_name = "NSCLC"
+  dir_name = "BRCA"
   
   EM_tune_start <- Sys.time()
   
@@ -232,47 +235,47 @@ compare <- function(y){
 #setwd("/Users/deelim/Documents/Research")
 setwd("/netscr/deelim/out")
 
-################################ NSCLC (Cell Line) Data #######################################
-
-# DATA PREP
-
-NSCLC_anno <- read.table("NSCLC_anno.txt",sep="\t",header=TRUE)
-NSCLC_dat <- read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
-rownames(NSCLC_dat)<-toupper(NSCLC_dat[,1])
-NSCLC_subtypes <- NSCLC_anno$Adeno.Squamous
-NSCLC_dat<-round(NSCLC_dat[,-1],digits=0)
-
-
-# pre-filtering DESEQ significant genes
-
-## DESeq2 to find top significant genes in clustering
-# colnames(NSCLC_dat)<-toupper(colnames(NSCLC_dat))
-# coldata<-NSCLC_anno[,-1]
-# rownames(coldata)<-toupper(NSCLC_anno[,1])
-# coldata<-coldata[,c("Adeno.Squamous","Tumor.location")]
-# dds<-DESeqDataSetFromMatrix(countData = NSCLC_dat,
-#                             colData = coldata,
-#                             design = ~ Adeno.Squamous)
-# DESeq_dds<-DESeq(dds)
-
-
-# RUN
-fit <- normalizations(NSCLC_dat)    # Normalizations done on full dataset
-size_factors <- fit$size_factors
-norm_y <- fit$norm_y
-
-filt_id = fit$idx & rowMedians(norm_y)>=15           # pre-filtering rowmedians >=100
-#rm(fit)
-
-y1 <- NSCLC_dat[filt_id,]
-norm_y = norm_y[filt_id,]
-rownames(y1) = rownames(NSCLC_dat)[filt_id]
-rownames(norm_y) = rownames(y1)
-colnames(y1) = colnames(NSCLC_dat)
-colnames(norm_y) = colnames(y1)
-
-X1<-compare(y1)
-
+# ################################ NSCLC (Cell Line) Data #######################################
+# 
+# # DATA PREP
+# 
+# NSCLC_anno <- read.table("NSCLC_anno.txt",sep="\t",header=TRUE)
+# NSCLC_dat <- read.table("NSCLC_rsem.genes.exp.count.unnormalized.txt",sep="\t",header=TRUE)
+# rownames(NSCLC_dat)<-toupper(NSCLC_dat[,1])
+# NSCLC_subtypes <- NSCLC_anno$Adeno.Squamous
+# NSCLC_dat<-round(NSCLC_dat[,-1],digits=0)
+# 
+# 
+# # pre-filtering DESEQ significant genes
+# 
+# ## DESeq2 to find top significant genes in clustering
+# # colnames(NSCLC_dat)<-toupper(colnames(NSCLC_dat))
+# # coldata<-NSCLC_anno[,-1]
+# # rownames(coldata)<-toupper(NSCLC_anno[,1])
+# # coldata<-coldata[,c("Adeno.Squamous","Tumor.location")]
+# # dds<-DESeqDataSetFromMatrix(countData = NSCLC_dat,
+# #                             colData = coldata,
+# #                             design = ~ Adeno.Squamous)
+# # DESeq_dds<-DESeq(dds)
+# 
+# 
+# # RUN
+# fit <- normalizations(NSCLC_dat)    # Normalizations done on full dataset
+# size_factors <- fit$size_factors
+# norm_y <- fit$norm_y
+# 
+# filt_id = fit$idx & rowMedians(norm_y)>=15           # pre-filtering rowmedians >=100
+# #rm(fit)
+# 
+# y1 <- NSCLC_dat[filt_id,]
+# norm_y = norm_y[filt_id,]
+# rownames(y1) = rownames(NSCLC_dat)[filt_id]
+# rownames(norm_y) = rownames(y1)
+# colnames(y1) = colnames(NSCLC_dat)
+# colnames(norm_y) = colnames(y1)
+# 
+# X1<-compare(y1)
+# 
 
 
 
@@ -283,55 +286,30 @@ X1<-compare(y1)
 
 # library(SummarizedExperiment)
 # library(genefilter)
-# 
+#
 # # DATA PREP
-# 
+#
 # load(file="TCGA_BRCA_exp.rda")
 # BRCA_cts <- round(assay(data),digits=0)             # default gives raw count
 # BRCA_anno <- colData(data)@listData
 # rm(data)
-# 
+#
 # BRCA_subtypes <- BRCA_anno$subtype_PAM50.mRNA
-# 
+#
 # idy <- (!is.na(BRCA_subtypes) & BRCA_subtypes != "Normal-like")
 # BRCA_cts <- BRCA_cts[!duplicated(BRCA_cts[,1:ncol(BRCA_cts)]),idy]
 # BRCA_subtypes = BRCA_subtypes[idy]
 
 
-# PRE-FILTERING
-
-## Row MAD
-#row_mad <- apply(BRCA_dat,1,mad)
-#BRCA_dat <- BRCA_dat[order(-row_mad),]
-
-## Row Variances
-#row_var <- rowVars(BRCA_cts)
-#BRCA_cts <- BRCA_cts[order(-row_var),]
 
 
 # RUN
 
-#subs_BRCA_dat <- BRCA_dat[1:10000,]
 
-# fit <- normalizations(BRCA_cts)
-# size_factors <- fit$size_factors
-# norm_y <- fit$norm_y
-# 
-# filterID = rowMedians(BRCA_cts)>=50
-# norm_y2 = norm_y[filterID,]
-# y2 <- BRCA_cts[filterID,]
-# rownames(y2) = rownames(BRCA_cts)[filterID]
-# rownames(norm_y2) = rownames(y2)
-# colnames(y2) = colnames(BRCA_cts)
-# colnames(norm_y2) = colnames(y2)
-# 
-# rm(list=c("BRCA_cts","fit"))
-# 
-# X2 <- compare(y2)
+X2 <- compare(y2)
 
 
-save(X1,file="NSCLC_compare.out")
-#save(X2,file="BRCA_compare.out")
+save(X2,file="BRCA_compare.out")
 
 
 
