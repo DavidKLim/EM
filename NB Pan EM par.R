@@ -612,7 +612,7 @@ EM<-function(y, k,
   # Initial Clusterings
   ## Hierarchical Clustering
   d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-  model<-hclust(d,method="complete")       # hierarchical clustering
+  model<-hclust(d,method="average")       # hierarchical clustering
   cls_hc <- cutree(model,k=k)
   
   ## K-means Clustering

@@ -98,18 +98,6 @@ Body of paper.  Margins in this document are roughly 0.75 inches all
 around, letter size paper.
 
 
-%\begin{itemize}
-%\item Note that figures and tables (such as Figure~\ref{fig:first} and
-%Table~\ref{tab:tabone}) should appear in the paper, not at the end or
-%in separate files.
-%\item In the latex source, near the top of the file the command
-%\verb+\newcommand{\blind}{1}+ can be used to hide the authors and acknowledgements, producing the required blinded version.
-%\item Remember that in the blind version, you should not identify authors indirectly in the text.  That is, don't say ``In Smith et. al.  (2009) we showed that ...''.  Instead, say ``Smith et. al. (2009) showed that ...''.
-%\item These points are only intended to remind you of some requirements. Please refer to the instructions for authors at \url{http://amstat.tandfonline.com/action/authorSubmission?journalCode=uasa20&page=instructions#.VFkk7fnF_0c}
-%\item For more about ASA\ style, please see \url{http://journals.taylorandfrancis.com/amstat/asa-style-guide/}
-%\item If you have supplementary material (e.g., software, data, technical proofs), identify them in the section below.  In early stages of the submission process, you may be unsure what to include as supplementary material.  Don't worry---this is something that can be worked out at later stages.
-%\end{itemize}
-
 %%%%%%%%%%%%%%%%%%%%%%
 %%%%% 2. METHODS %%%%%
 %%%%%%%%%%%%%%%%%%%%%%
@@ -156,7 +144,7 @@ We calculate the conditional expectation of the $z_{ik}$ given the current estim
 There are some variants of the E step that have been proposed by Biernacki et al (2003). Replacing the E step update with classification and/or stochastic E step updates has been shown to help the EM algorithm to not get stuck at a local maxima. In our numerical analyses, we will explore the effects of using these alternate E step updates on performance.
 
 
-%%% 2.2.2 M Step %%%
+% 2.2.2 M Step
 \subsubsection{M Step}
 In the M step of the EM algorithm, we update the current estimates of the parameters to maximize the penalized objective function. The maximization of $\pi_k$ and $\beta_{jk}$ are separable, thus they can be done independently.
 
@@ -168,7 +156,6 @@ $$\tilde{y}_{ik}=\hat{\eta_k}+(\frac{y_i-g(\hat{\eta}_k)}{g'(\hat{\eta}_k)})$$
 
 Here, $g()$ refers to the inverse link function for the Negative Binomial family with log link, thus $g(\eta)=\mu$, where $g^{-1}(\mu)=log(\mu)$ is the standard log link function.
 
-% The transformation is applied for each $k=1,...K$, so the response is multiplied by the number of clusters: $n*K$ transformed responses. $\hat{\mu_k}$ and $\hat{\eta_k}$ are iteratively updated within the IRLS algorithm until convergence.
 Using this transformation, the penalized objective function (Breheny 2011) becomes:
 
 \begin{equation}
@@ -268,48 +255,57 @@ Another useful feature of our algorithm is the ability to perform simultaneous v
 
 A common integrative clustering method that is able to handle count data is iClusterPlus (Mo et al 2012). It assumes a Poisson distribution on the data, and uses a L1 penalized likelihood model to estimate the parameters, while using a sampling scheme from the posterior distribution of the latent variables to discover clustering labels. We compared our method to just the count data portion of iClusterPlus's integrative method.
 
-Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering and K-medoids (Jaskowiak et al 2018). Jaskowiak suggested that these were among the most robust and efficient in clustering this type of data. (MAYBE INSERT THEORY OF HC AND K-MEDOIDS CLUSTERING).
-(((INSERT TABLE 2: comparison between EM, iCluster+, HC, K-Medoids)))
+Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering and K-medoids (Jaskowiak et al 2018). There has been a study that suggests that these were among the most robust and efficient in clustering this type of data. (MAYBE INSERT THEORY OF HC AND K-MEDOIDS CLUSTERING).
+
+(((INSERT TABLE 2: comparison between EM, iCluster+, HC, K-Medoids. running now)))
 
 % <<xtable2, results=tex,echo=FALSE>>==
 % @
 
-We analyzed some very natural variants of our method. For one, we have so far restricted the simulations to contain gene-specific dispersions. It is not currently known whether one dispersion parameter across all clusters for each gene adequately portrays real data. To introduce a more specific model, it may be more appropriate to introduce cluster-specific dispersion parameters. However, this may result in overfitting the data, causing worse performance.
+We analyzed some very natural variants of our method. For one, we have so far restricted the simulations to contain gene-specific dispersions. It is not currently known whether a scheme with one dispersion parameter across all clusters for each gene adequately portrays real data. It may sometimes be more appropriate to introduce cluster-specific dispersion parameters to better fit the data, yielding more accurate estimates. However, this may also result in overfitting the data, which would cause our model to get stuck at a local maxima. One potential drawback that may result is that the order may be underestimated, as the extra dispersion parameters may cause the algorithm to favor a smaller number of clusters in the data.
 
-Secondly, research has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step (Biernacki et al 2003). This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. \cref{tab:3} \cref{tab:4} show the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
+Secondly, research has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step (Biernacki et al 2003). This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. \cref{tab:3} \cref{tab:4} show the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. Results are based on 10 simulated datasets for each case. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
 
+%%%%% EXCLUDE ICLUSTER+ COMPARISON FOR TABLES 3 AND 4. JUST COMMENT ON IT IN PAPER %%%%%%%%%%%%%
 <<xtable3,results=tex,echo=FALSE>>==
 load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
-colnames(tab) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
-tab3 = xtable(tab[,c(2,1,6,3,7,4,5,8)],
+colnames(tab_g) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
+tab3 = xtable(tab_g[,c(2,1,6,3,7,4,5,8)],
               digits=2,
               table.placement="!h",
               caption="Clustering, discovery, and prediction performance of variants of EM. The simulated dispersions were gene-specific.",
-              label = "tab:3")      # K=3, n=50, g=1000
-print(tab3,include.rownames=F, sanitize.text.function=identity)
+              label = "tab:3")      # K=3, n=50, g=1000jo
+print(tab3,include.rownames=T, sanitize.text.function=identity)
 
 @
-%<<xtable4,results=tex,echo=FALSE>>==
-%load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
-%colnames(tab) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
-%tab3 = xtable(tab[,c(2,1,6,3,7,4,5,8)],
-%              digits=2,
-%              table.placement="!h",
-%              caption="Clustering, discovery, and prediction performance of variants of EM. The simulated dispersions were gene-specific%%.",
-%              label = "tab:4")      # K=3, n=50, g=1000
-%print(tab4,include.rownames=F, sanitize.text.function=identity)
-%@
 
-((Insert analysis of tables 3 and 4))
+<<xtable4,results=tex,echo=FALSE>>==
+#load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
+colnames(tab_cl) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
+tab4 = xtable(tab_cl[,c(2,1,6,3,7,4,5,8)],
+              digits=2,
+              table.placement="!h",
+              caption="Clustering, discovery, and prediction performance of variants of EM. The simulated dispersions were cluster-specific.",
+              label = "tab:4")      # K=3, n=50, g=1000
+print(tab4,include.rownames=T, sanitize.text.function=identity)
+@
+
+From \cref{tab:3} and \cref{tab:4}, we see that iCluster+ seems to overestimate the order in each case. Because it treats count data as distributed Poisson, it is likely that iCluster+ is not able to account for the extra-Poisson variation caused by the simulated noise. Also, in general, the order is underestimated for the EM runs with cluster-specific dispersion parameters than the runs with gene-specific dispersion parameters. This is due to the fact that allowing for cluster-specific dispersions overfits the data, so the cluster-specific dispersions is sufficient to explain the unaccounted clusters in the results. Because of this, the clustering accuracy suffers.
+
+We also notice the effect of the classification E step modification in our algorithm. We see that for a gene-specific dispersion scheme, the CEM seems to increase the ARI slightly. We notice that in \cref{tab:3}, the CEM caused the cluster-specific dispersion EM model to select the incorrect order. This portrays a risk of the CEM, as the variant E step adds randomness by drawing posterior probabilities closer together, and may lead to such instabilities.
+
+Although the clustering accuracy was dependent on the dispersion scheme, the sensitivity and false positive rate in discovering discriminatory genes seem to not be affected. In each case, the algorithm was able to correctly distinguish all of the simulated discriminatory genes, with very few false positive cases.
+
+The prediction accuracy was calculated by first inputting the correct order in cases that the order was incorrectly selected, simulating 20 samples ($n_{pred}=0.1*n$) with the same simulated parameters, and selecting the cluster with the highest posterior probability for each sample. In either intrinsic dispersion scheme, we see that the prediction accuracy is very high.
 
 %%% 3.2 Real Data %%%
 \subsection{Real Data}
 
 \subsubsection{TCGA Breast Cancer Dataset}
 
-We performed our clustering analysis on The Cancer Genome Atlas breast cancer dataset. This dataset contained 1215 subjects and 19682 genes. Of these subjects, we narrowed down to subjects who had prior annotated subtypes in the dataset based on the PAM50 genes. We also dropped the normal-like subtype, which occurred in just 8 cases out of 521 subjects. Then, we pre-filtered genes with low count, yielding 13970 total genes (based on genes with median count $\geq 40$). (ADD ARI and SILHOUETTE DERIVED for CEM, and rerun for current EM)
+We performed our clustering analysis on The Cancer Genome Atlas breast cancer dataset. This dataset contained 1215 subjects and 19682 genes. Of these subjects, we narrowed down to subjects who had prior annotated subtypes in the dataset based on the PAM50 genes. We also dropped the normal-like subtype, which occurred in just 8 cases out of 521 subjects. Thus, we analyzed 513 samples with 4 different subtypes: 231 luminal A, 127 luminal B, 97 basal-like, and 58 HER2-enriched. Then, we filtered out genes with low count by taking excluding from analysis the genes with MAD scores below the 75th quantile, yielding 4921 total genes. (ADD ARI and SILHOUETTE DERIVED for CEM, and rerun for current EM)
 
-We compared our method to a popular integrative clustering method called iCluster+ (Mo et al 2012). We used the same criterion (BIC) to search for the optimal order and tuning parameters. As shown in \cref{tab:5}, our method found the correct order of 4, while iCluster+ favored a higher number of clusters. Our method also yielded a greater agreement (ARI) to the annotated clusters, as well as a higher mean silhouette value. (SHOULD I INCLUDE EQUATIONS FOR ARI/silhouette here? Ge et al 2017 provides equation for silhouette)
+We compared our method to the count data method of iCluster+ (Mo et al 2012). We used the same criterion (BIC) to search for the optimal order and tuning parameters. As shown in \cref{tab:5}, our method found the correct order of 4, while iCluster+ favored a higher number of clusters. Our method also yielded a greater agreement (ARI) to the annotated clusters, as well as a higher mean silhouette value. (SHOULD I INCLUDE EQUATIONS FOR ARI/silhouette here? Ge et al 2017 provides equation for silhouette)
 
 <<xtable5,results=tex,echo=F>>=
 library(mclust)
@@ -332,8 +328,8 @@ iclust = c(i_K,i_ARI,mean(i_sil[,3]))
 
 
 tab5 = data.frame(rbind(round(EMclust,3),round(iclust,3)))
-colnames(tab4) = c("K","ARI","Silhouette")
-rownames(tab4) = c("EM","iCluster+")
+colnames(tab5) = c("K","ARI","Silhouette")
+rownames(tab5) = c("EM","iCluster+")
 
 tab5 = xtable(tab5,caption="Comparing iCluster+ with EM method. True (annotated) order is 4. Values of ARI closer to 1 indicate better clustering results with respect to the true (annotated) clusters. Silhouette values cluster to 1 indicate better clustering results based on dissimilarity matrix on normalized counts.",label="tab:5")
 print(tab5)
@@ -343,7 +339,7 @@ print(tab5)
 
 @
 
-It it known that the PAM50 genes are genes of significant interest for breast cancer. Thus, we performed further analysis on just the PAM50 genes. \cref{fig:2} is a heatmap of the known PAM50 genes, ordered by the clustering results of our CEM, and using cluster-specific dispersion parameters. (NOTE TO SELF: with initial Tau = 2. need to be re-run and made bigger to see gene labels)
+It it known that the PAM50 genes are genes of significant interest for breast cancer. We performed further analysis on just these PAM50 genes. \cref{fig:2} is a heatmap of the known PAM50 genes, ordered by the clustering results of our CEM, and using the scheme with gene-specific dispersion parameters. (NOTE TO SELF: with initial Tau = 2. need to be re-run and made bigger to see gene labels)
 
 \begin{figure}[H]
 \begin{center}
@@ -356,7 +352,11 @@ It it known that the PAM50 genes are genes of significant interest for breast ca
 
 Using just these genes, we found $ARI = 0.407$ using the cluster-specific dispersion parameters, and $ARI = 0.523$ using the gene-specific dispersion parameters.
 
-\subsubsection{TCGA Pancreatic Cancer Dataset}
+\subsubsection{TCGA Bladder Cancer Dataset}
+
+We also performed similar analyses on the TCGA Bladder Cancer dataset. This dataset contained 408 samples with annotated subtypes: 142 basal-squamous, 142 luminal-papillary, 78 luminal-infiltrated, 26 luminal, and 20 neuronal. As before, we filtered just the genes with the top 25 quantile MAD scores, leaving 4916 genes in the analysis.
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% 4. DISCUSSION %%%%%

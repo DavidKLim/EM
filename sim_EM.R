@@ -359,14 +359,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     idx = all_data[[ii]]$gene_id
     
     
-    
-    # # # rowVar filtering method
-    # library(genefilter)
-    # filt_ids2 = rowVars(y) > (rowMeans(y) + 0.5*rowMeans(y)^2)
-    # y=y[filt_ids2,]
-    # norm_y=norm_y[filt_ids2,]
-    # true_disc=true_disc[filt_ids2]
-    
     # Order selection
     K_search=c(1:7)
     list_BIC=matrix(0,nrow=length(K_search),ncol=2)
@@ -475,11 +467,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     cls_iClust=NA
     ARI_iClust=NA
+    sil_iClust=NA
     # iCluster+
     if(iCluster_compare){
       iCluster_res = sim.iCluster(y,true_clusters,ncores=1)
       if(iCluster_res$K != true.K){
-        cv.fit = tune.iClusterPlus(cpus=ncores,dt1=t(y),type="poisson",K=true.K,alpha=1,n.lambda=25,scale.lambda=1,maxiter=20)
+        cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K,alpha=1,n.lambda=25,scale.lambda=1,maxiter=20)
         BIC_mat = matrix(0,nrow=25,ncol=2)
         for(i in 1:25){
           BIC_mat[i,1] = cv.fit$lambda[i]
@@ -550,6 +543,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     cls_EM = X_pred$final_clusters              # in case wrong order is selected. This inputs correct order and outputs final clusters
     
     
+    d2 = dist(t(norm_y))
+    if(iCluster_compare){
+      sil_iClust = mean(silhouette(cls_iClust,d2)[,3])
+    }
+    sil_EM = mean(silhouette(cls_EM,d2)[,3])
+    sil_med = mean(silhouette(cls_med,d2)[,3])
+    sil_hc = mean(silhouette(cls_hc,d2)[,3])
+    
     print(paste("Time:",X$time_elap,"seconds"))
     print(paste("Dataset ",ii,"complete"))
     
@@ -568,7 +569,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                  cls_med=cls_med,
                  cls_EM=cls_EM,
                  cls_iClust=cls_iClust,
-                 ARI_iClust=ARI_iClust)
+                 ARI_iClust=ARI_iClust,
+                 sil_iClust=sil_iClust,
+                 sil_EM=sil_EM,
+                 sil_med=sil_med,
+                 sil_hc=sil_hc)
     return(results)
   }
   
@@ -600,6 +605,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     library(pheatmap)
     library(DESeq2)
     library(iClusterPlus)
+    library(cluster)
     sourceCpp("M_step.cpp")
     })
   
@@ -626,6 +632,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   temp_ARI_med = rep(0,sim)
   temp_ARI_EM = rep(0,sim)
   temp_ARI_iClust = rep(0,sim)
+  
+  temp_sil_hc = rep(0,sim)
+  temp_sil_med = rep(0,sim)
+  temp_sil_EM = rep(0,sim)
+  temp_sil_iClust = rep(0,sim)
   
   # Summarize results
   for(ii in 1:sim){
@@ -665,6 +676,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     temp_ARI_med[ii] = adjustedRandIndex(par_sim_res[[ii]]$cls_med,true_clusters)
     temp_ARI_EM[ii] = adjustedRandIndex(par_sim_res[[ii]]$cls_EM,true_clusters)
     
+    temp_sil_hc[ii] = par_sim_res[[ii]]$sil_hc
+    temp_sil_med[ii] = par_sim_res[[ii]]$sil_med
+    temp_sil_EM[ii] = par_sim_res[[ii]]$sil_EM
+    temp_sil_iClust[ii] = par_sim_res[[ii]]$sil_iClust
+    
   }
   
   #mean_pi<-colSums(temp_pi)/sim
@@ -697,6 +713,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   mean_ARI_EM = mean(temp_ARI_EM)
   mean_ARI_iClust = mean(temp_ARI_iClust)
   
+  # Silhouette values comparisons
+  mean_sil_hc = mean(temp_sil_hc)
+  mean_sil_med = mean(temp_sil_med)
+  mean_sil_EM = mean(temp_sil_EM)
+  mean_sil_iClust = mean(temp_sil_iClust)
+  
   
   # Store for tabulation:
   
@@ -720,7 +742,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                 ARI_HC=mean_ARI_hc,
                 ARI_med=mean_ARI_med,
                 ARI_EM=mean_ARI_EM,
-                ARI_iClust=mean_ARI_iClust)
+                ARI_iClust=mean_ARI_iClust,
+                sil_HC=mean_sil_hc,
+                sil_med=mean_sil_med,
+                sil_EM=mean_sil_EM,
+                sil_iClust=mean_sil_iClust)
   
   return(results)
 }
