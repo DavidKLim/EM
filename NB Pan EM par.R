@@ -631,6 +631,7 @@ EM<-function(y, k,
       rand_inits[,r] = sample(1:k,n,replace=TRUE)
     }
   }
+  colnames(rand_inits) = paste("rand",c(1:r_it),sep="")
   
   # Iterate through 2-it EM with each initialization
   all_init_cls <- cbind(cls_hc,cls_km,rand_inits)
