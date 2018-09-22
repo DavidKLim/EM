@@ -93,10 +93,23 @@ Clustering is a form of unsupervised learning that aims to uncover latent groups
 \section{Introduction}
 \label{sec:intro}
 
-Introduction
-Body of paper.  Margins in this document are roughly 0.75 inches all
-around, letter size paper.
+%MICROARRAY V RNASEQ%
+For many years, microarray data has been the gold standard in analysis involving mRNA gene expression data. RNA-seq is a relatively novel platform of gene expression data derived by using high-throughput technologies. It has been shown to have great potential, as it overcomes some of the biases and limitations that are inherent in working with microarray (Zhao et al 2014), and gives less background noise and provides a greater dynamic range for detection (Hrdlickova et al 2016). Furthermore, there have been studies to show a strong correlation of results based on RNA-seq and microarray data, suggesting the reproducibility of the utilities of microarray analyses in RNA-seq (Chen et al 2017).
 
+%CLUSTERING METHODS MICROARRAY%
+One such analysis of key interest in cancer genomics is that of clustering subjects based on similar gene expression profiles. This type of analysis can give valuable insight into possible subtypes of cancer samples by grouping similarly expressed samples together. While there are numerous methods that have been developed to cluster microarray gene expression data (Xie et al 2007, Monti et al 2003, Kluger et al 2003, Cho et al 2008), there are not many that are able to cluster RNA-seq data. Most of the methods that have been developed to handle RNA-seq data are specifically to cluster genes rather than samples (Si et al 2013). Since the number of genes is much greater than the number of samples for all genetic studies, it is far more difficult to cluster samples than genes. Due to the discrete nature of the data, the standard Gaussian model cannot be assumed of the underlying distribution. Thus, some of the current methods opt to approximate the data with the normal distribution using some type of transformation (Zwiener et al 2014, MacDonnell et al 2018). However, these analyses become highly dependent on the transformation used, leaving the reproducibility of said analyses in question.
+
+%POINTS TO ADDRESS IN RNASEQ (normalization,count data,variable selection/prefiltering)%
+There are also biases and artifacts inherent in RNA-seq data that need to be accounted for. This is typically done using one of an array of normalization steps (Li et al 2015), although there isn't one that is uniformly superior. Also, the high dimensionality of genetic dataset necessitates a dimension reduction scheme that can pinpoint genes that may be most likely to be significant in clustering, as a majority of the differential expression of genes across clusters may be redundant or simply due to noise (Ritter book 2015). Thus, many methods use some criterion to pre-filter genes that are clearly nondiscriminatory in nature. One prominent method of pre-filtering is by thresholding genes based on its median absolute deviation (MAD) value (Chung et al 2008).
+
+Additionally, dealing with discrete datasets requires a different assumption for the underlying distribution of the data for model-based methods. The most naive is the Poisson distribution, which is used alongside a penalized likelihood scheme by a very popular integrative method called iClusterPlus (Mo et al 2012). We believe, however, that such a model has its limitations, as it does not account for extra-Poisson variation.
+
+%OUR APPROACH%
+In this paper, we propose an Expectation-Maximization algorithm with an underlying finite mixture Negative Binomial model, incorporating a modified version of the group truncated lasso penalty. This penalty has been shown to be able to shrink cluster means closer to one another as well as select features by a thresholding parameter (Pan et al 2013). There are four primary steps to our method. First, we pre-filter out genes with low variability, as this low variability overall presents strong evidence of the gene being nondiscriminatory across clusters. Second, we select the optimal number of clusters in the Order Selection step using the Bayesian Information Criterion (BIC). We iterate over a range of possible realistic numbers of clusters, and select the one that yields the lowest BIC value. Third, we search over a grid of possible combinations of the penalty parameters, and select using the BIC. Fourth, we input the optimal order and parameters into a full run of our algorithm.
+
+The EM algorithm is known to be able to converge to the local maximum or saddle point rather than the global maximum (Yu et al 2018). To prevent this
+
+There are also some non-model-based methods that have been shown to be efficacious with RNA-seq data, such as the average-linkage hierarchical and K-medoids clustering methods (Jaskowiak et al 2018). Although these do not have a mode of variable selection, they may be useful in clustering nonetheless after some pre-filtering scheme. We will compare our method with the count data portion of iCluster+, average-linkage hierarchical clustering, and K-medoids clustering methods.
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%%%% 2. METHODS %%%%%
@@ -124,7 +137,7 @@ Because $z_{ik}$ is unobservable, we estimate this quantity by the conditional e
 
 % 2.1.1 Penalty
 \subsubsection{Penalty}
-The penalty is the so-called grouped truncated lasso, which was introduced in Pan et al (2013).
+The penalty is the so-called grouped truncated lasso (Pan et al 2013), which uses a elastic-net type penalty, that is a hybrid of the lasso (L1) and ridge (L2) penalties (Tibshirani 1996). This penalty performs shrinkage of cluster log means towards each other and selection of genes whose differences in cluster log means are small, while offsetting the drawbacks of each penalty, much like an elastic net penalty (Zou and Hastie 2005).
 \begin{equation}
 p_{\lambda}(\beta)=\frac{\lambda_1}{2}\sum_{k<l} \norm{\beta_k-\beta_l-\theta_{kl}}_2^2 + \lambda_2 \sum_{k<l}TLP(\norm{\theta_{kl}}_2;\tau)
 \end{equation}
@@ -269,23 +282,23 @@ Secondly, research has shown that the EM algorithm tends to converge to the loca
 %%%%% EXCLUDE ICLUSTER+ COMPARISON FOR TABLES 3 AND 4. JUST COMMENT ON IT IN PAPER %%%%%%%%%%%%%
 <<xtable3,results=tex,echo=FALSE>>==
 load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
-colnames(tab_g) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
-tab3 = xtable(tab_g[,c(2,1,6,3,7,4,5,8)],
+colnames(tab_g) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","Pred Acc")
+tab3 = xtable(tab_g,
               digits=2,
               table.placement="!h",
-              caption="Clustering, discovery, and prediction performance of variants of EM. The simulated dispersions were gene-specific.",
-              label = "tab:3")      # K=3, n=50, g=1000jo
+              caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: ARI values are based on runs with true number of clusters, for fair comparisons. Hierarchical clustering and K-medoids do not have a method for order selection. The simulated dispersions were gene-specific.",
+              label = "tab:3",na.print="")      # K=3, n=50, g=1000jo
 print(tab3,include.rownames=T, sanitize.text.function=identity)
 
 @
 
 <<xtable4,results=tex,echo=FALSE>>==
 #load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
-colnames(tab_cl) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","iClust $K$","iClust ARI","Pred Acc")
-tab4 = xtable(tab_cl[,c(2,1,6,3,7,4,5,8)],
+colnames(tab_cl) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","Pred Acc")
+tab4 = xtable(tab_cl,
               digits=2,
               table.placement="!h",
-              caption="Clustering, discovery, and prediction performance of variants of EM. The simulated dispersions were cluster-specific.",
+              caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: ARI values are based on runs with true number of clusters, for fair comparisons. The simulated dispersions were cluster-specific.",
               label = "tab:4")      # K=3, n=50, g=1000
 print(tab4,include.rownames=T, sanitize.text.function=identity)
 @
@@ -364,6 +377,8 @@ We also performed similar analyses on the TCGA Bladder Cancer dataset. This data
 
 \section{Discussion}
 \label{sec:disc}
+
+Extensions: gene-gene interaction/correlation, adjusting for confounders (batch effects),
 
 %\cite{Campbell02}, \cite{Schubert13}, \cite{Chi81}
 

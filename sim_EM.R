@@ -138,7 +138,7 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
 
 
 sim.iCluster = function(y,true_clusters,
-                        ncores=10){
+                        ncores=10,n.lambda=25){
   
   # list of K to search over
   K_search = c(2:7)
@@ -146,7 +146,7 @@ sim.iCluster = function(y,true_clusters,
   # iClusterPlus #
   iClust_OS <- list()
   for(k in (K_search-1)){
-    cv.fit = tune.iClusterPlus(cpus=ncores,dt1=t(y),type="poisson",K=k,alpha=1,n.lambda=25,scale.lambda=1,maxiter=20)
+    cv.fit = tune.iClusterPlus(cpus=ncores,dt1=t(y),type="poisson",K=k,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
     iClust_OS[[k]] = cv.fit
   }
   BIC_mat = getBIC(iClust_OS)
@@ -182,7 +182,7 @@ sim.predict <- function(X,new_dat,new_SF,true_clusters){
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
                  distrib,method="EM",filt_quant = 0.25,filt_method=c("pval","mad","none"),
                  disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
-                 ncores=10,iCluster_compare=F){
+                 ncores=10,nsims=ncores,iCluster_compare=F){
   
   # disp: "gene" or "cluster"
   # low: coef 3.75-3.84, phi 0.13-0.15
@@ -191,10 +191,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   
   # Fixed phi: scalar for gene-wise, vector of length K for cluster-wise
   
-  
-  # Number of cores: 2 for laptop, 12 for Killdevil
-  no_cores <- ncores   # number of cores
-  sim = no_cores       # number of sims (set eq to number of cores for now)
+  sim = nsims       # number of sims (set eq to number of cores for now)
   
   if(!fixed_parms){
     dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s",true.K,n,g,fold.change,num.disc,distrib)
@@ -470,11 +467,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     sil_iClust=NA
     # iCluster+
     if(iCluster_compare){
-      iCluster_res = sim.iCluster(y,true_clusters,ncores=1)
+      n.lambda=25
+      iCluster_res = sim.iCluster(y,true_clusters,ncores=1,n.lambda=n.lambda)
       if(iCluster_res$K != true.K){
-        cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K,alpha=1,n.lambda=25,scale.lambda=1,maxiter=20)
+        cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K-1,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
         BIC_mat = matrix(0,nrow=25,ncol=2)
-        for(i in 1:25){
+        for(i in 1:n.lambda){
           BIC_mat[i,1] = cv.fit$lambda[i]
           BIC_mat[i,2] = cv.fit$fit[[i]]$BIC
         }
@@ -592,7 +590,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   temp_pred_acc<-rep(0,times=sim)
 
   ## ADD PARALLELIZATION HERE ##
-  cl<-makeCluster(no_cores)
+  cl<-makeCluster(ncores)
   clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding","NB.GOF","simulate_data","simulate_data_g","sim.iCluster","sim.predict","predictions"),envir=environment())
   clusterEvalQ(cl,{
     library(stats)
