@@ -440,7 +440,7 @@ EM_run <- function(y, k,
       for(c in 1:k){
         wts[c,]<-exp((1/Tau)*(log(pi[c])+l[c,])-logdenom)
       }
-      if(a<=2){
+      if(a<=5){
         Tau = 0.9*Tau
       } else{ Tau=1 }     # after 2 iteration, CEM --> EM     
     }
@@ -668,21 +668,23 @@ EM<-function(y, k,
     ########################## SIMULATION ONLY #############################
     
     cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
+    # if(CEM){
+    #   for(t in 1:length(Tau_vals)){
+    #     fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
+    #                  init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
+    #                  cls_init=all_init_cls[,i], CEM=CEM,init_Tau=Tau_vals[t] ,SEM=SEM, maxit_EM=10)
+    #     if(all(fit$wts < 0.999 & fit$wts > 0.001)){
+    #       break
+    #     }
+    #   }
+    #   
+    #   cat(paste("Init Tau:",Tau_vals[t],"\n"))
+    #   init_cls_Tau[i] <- Tau_vals[t]
+    # }
+    init_cls_Tau[i] <- Tau_vals    # just setting tau val to 2 for all (for now)
+    
     if(CEM){
-      for(t in 1:length(Tau_vals)){
-        fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
-                     init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                     cls_init=all_init_cls[,i], CEM=CEM,init_Tau=Tau_vals[t] ,SEM=SEM, maxit_EM=3)
-        if(all(fit$wts < 0.999 & fit$wts > 0.001)){
-          break
-        }
-      }
-      
-      cat(paste("Init Tau:",Tau_vals[t],"\n"))
-      init_cls_Tau[i] <- Tau_vals[t]
-    }
-    if(CEM){
-      maxit_search = 5
+      maxit_search = 10
     } else { maxit_search = 2 }
     fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
                               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
