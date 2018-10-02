@@ -44,7 +44,7 @@ run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.05
 collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.05,.1),g=c(1000,2000),n_per=c(25,50),
                        distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,filt_quant=0.25,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n_per)
-  tab<-matrix(0,nrow=nsims,ncol=24)      # 3 conditions, 7 things to tabulate
+  tab<-matrix(0,nrow=nsims,ncol=26)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI","sens","false.pos","i_K","i_ARI","i_lambda","pred_acc",
                   "ARI_hc","ARI_med","ARI_EM","ARI_iClust","sil_HC","sil_med","sil_EM","sil_iClust")
   ii=1
@@ -87,6 +87,8 @@ collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c
       tab[ii,22]<-X$sil_med
       tab[ii,23]<-X$sil_EM
       tab[ii,24]<-X$sil_iClust
+      tab[ii,25]<-X$final_K_hc
+      tab[ii,26]<-X$final_K_med
       ii=ii+1
   }}}}}
   if(fixed_parms=="F"){

@@ -164,6 +164,7 @@ sim.iCluster = function(y,true_clusters,
   results<-list(K=max_k+1,
                 lambda=max_lambda,
                 ARI=ARI,
+                cls=iClust_fit$clusters,
                 iClust_fit = iClust_fit)
   
   return(results)
@@ -364,13 +365,15 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     for(aa in 1:nrow(list_BIC)){
       pref = sprintf("order%d",ii)
+      start=as.numeric(Sys.time())
       X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # no penalty
+      end=as.numeric(Sys.time())
       list_BIC[aa,2]<-X$BIC
       if(list_BIC[aa,1]==true.K){
         compare_X = X
       }
       print(list_BIC[aa,])
-      print(paste("Time:",X$time_elap,"seconds"))
+      print(paste("Time:",end-start,"seconds"))
     }
     
   
@@ -469,19 +472,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     if(iCluster_compare){
       n.lambda=25
       iCluster_res = sim.iCluster(y,true_clusters,ncores=1,n.lambda=n.lambda)
-      if(iCluster_res$K != true.K){
-        cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K-1,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
-        BIC_mat = matrix(0,nrow=25,ncol=2)
-        for(i in 1:n.lambda){
-          BIC_mat[i,1] = cv.fit$lambda[i]
-          BIC_mat[i,2] = cv.fit$fit[[i]]$BIC
-        }
-        max_lambda = BIC_mat[which.min(BIC_mat[,2]),1]
-        
-        iClust_fit <- iClusterPlus(dt1=t(y),type="poisson",lambda=max_lambda,alpha=1,K=true.K-1,maxiter=10)
-        cls_iClust = iClust_fit$clusters
-        ARI_iClust = adjustedRandIndex(cls_iClust,true_clusters)
-      }
+      # if(iCluster_res$K != true.K){
+      #   cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K-1,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
+      #   BIC_mat = matrix(0,nrow=25,ncol=2)
+      #   for(i in 1:n.lambda){
+      #     BIC_mat[i,1] = cv.fit$lambda[i]
+      #     BIC_mat[i,2] = cv.fit$fit[[i]]$BIC
+      #   }
+      #   max_lambda = BIC_mat[which.min(BIC_mat[,2]),1]
+      #   
+      #   iClust_fit <- iClusterPlus(dt1=t(y),type="poisson",lambda=max_lambda,alpha=1,K=true.K-1,maxiter=10)
+      # }
+      cls_iClust = iCluster_res$cls
+      ARI_iClust = iCluster_res$ARI
     } else{iCluster_res=NA}
     
     
@@ -533,21 +536,37 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     # Comparisons with Average linkage HC and K-Medoid clustering
     d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
     model<-hclust(d,method="average")       # hierarchical clustering
-    cls_hc <- cutree(model,k=max_k)
     
-    fit = pam(t(norm_y),max_k)
-    cls_med = fit$clustering
+    temp_silhc=rep(0,times=6)
+    temp_silmed=rep(0,times=6)
+    temp_clshc=matrix(0,nrow=n,ncol=6)
+    temp_clsmed=matrix(0,nrow=n,ncol=6)
+    for(c in 2:7){
+      cls_hc <- cutree(model,k=c)
+      fit = pam(t(norm_y),c)
+      cls_med = fit$clustering
+      temp_clshc[,c-1] = cls_hc
+      temp_clsmed[,c-1] = cls_med
+      temp_silhc[c-1] = mean(silhouette(cls_hc,d)[,3])
+      temp_silmed[c-1] = mean(silhouette(cls_med,d)[,3])
+    }
+    hc_id=which.max(temp_silhc)
+    med_id=which.max(temp_silmed)
+    
+    cls_hc=temp_clshc[,hc_id]
+    cls_med=temp_clsmed[,hc_id]
+    sil_hc=temp_silhc[hc_id]
+    sil_med=temp_silmed[hc_id]
+    K_hc=hc_id+1
+    K_med=med_id+1
     
     cls_EM = X_pred$final_clusters              # in case wrong order is selected. This inputs correct order and outputs final clusters
-    
     
     d2 = dist(t(norm_y))
     if(iCluster_compare){
       sil_iClust = mean(silhouette(cls_iClust,d2)[,3])
     }
     sil_EM = mean(silhouette(cls_EM,d2)[,3])
-    sil_med = mean(silhouette(cls_med,d2)[,3])
-    sil_hc = mean(silhouette(cls_hc,d2)[,3])
     
     print(paste("Time:",X$time_elap,"seconds"))
     print(paste("Dataset ",ii,"complete"))
@@ -571,7 +590,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                  sil_iClust=sil_iClust,
                  sil_EM=sil_EM,
                  sil_med=sil_med,
-                 sil_hc=sil_hc)
+                 sil_hc=sil_hc,
+                 K_hc=K_hc,
+                 K_med=K_med)
     return(results)
   }
   
@@ -636,6 +657,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   temp_sil_EM = rep(0,sim)
   temp_sil_iClust = rep(0,sim)
   
+  temp_K_hc = rep(0,sim)
+  temp_K_med = rep(0,sim)
+  
   # Summarize results
   for(ii in 1:sim){
     X=par_sim_res[[ii]]$X
@@ -679,6 +703,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     temp_sil_EM[ii] = par_sim_res[[ii]]$sil_EM
     temp_sil_iClust[ii] = par_sim_res[[ii]]$sil_iClust
     
+    temp_K_hc[ii] = par_sim_res[[ii]]$K_hc
+    temp_K_med[ii] = par_sim_res[[ii]]$K_med
   }
   
   #mean_pi<-colSums(temp_pi)/sim
@@ -717,6 +743,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   mean_sil_EM = mean(temp_sil_EM)
   mean_sil_iClust = mean(temp_sil_iClust)
   
+  final_K_hc = as.numeric(names(which.max(table(temp_K_hc))))
+  final_K_med = as.numeric(names(which.max(table(temp_K_med))))
   
   # Store for tabulation:
   
@@ -744,7 +772,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                 sil_HC=mean_sil_hc,
                 sil_med=mean_sil_med,
                 sil_EM=mean_sil_EM,
-                sil_iClust=mean_sil_iClust)
+                sil_iClust=mean_sil_iClust,
+                final_K_hc=final_K_hc,
+                final_K_med=final_K_med)
   
   return(results)
 }
