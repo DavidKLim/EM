@@ -252,7 +252,7 @@ EM_run <- function(y, k,
   # Stopping Criteria
   IRLS_tol = 1E-6
   maxit_IRLS = 50
-  EM_tol = 1E-6
+  EM_tol = 1E-4
   
   # Initialize parameters
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
@@ -296,10 +296,11 @@ EM_run <- function(y, k,
   #     phi_g[j]=1/(glm.nb(as.integer(y[j,])~1+offset(offset))$theta)
   #   }
   # }
+  DNC=0
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
-    
+    EMstart= as.numeric(Sys.time())
     
     if(a==1){         # Initializations for 1st EM iteration
       if(init_parms){
@@ -313,7 +314,7 @@ EM_run <- function(y, k,
               coefs[j,c]=log(0.1)
               next
               }
-            coefs[j,c]<-log(glm(as.numeric(y[j,cls==c])~1)$coef)               # Initialize beta
+            coefs[j,c]<-glm(as.numeric(y[j,cls==c])~1,family=poisson())$coef               # Initialize beta
           } # include if statement case for no subjects in cluster --> 0
         }
         beta <- coefs[j,]
@@ -329,7 +330,7 @@ EM_run <- function(y, k,
     
     par_X=rep(list(list()),g)
     
-    
+    Mstart=as.numeric(Sys.time())
     for(j in 1:g){
       # print(paste("j=",j,"a=",a,"k=",k,"lambda1=",lambda1,"lambda2=",lambda2,"tau=",tau,"IRLS_tol=",IRLS_tol,"maxit_IRLS=",maxit_IRLS))
       # print(paste("offset:",offset))
@@ -351,6 +352,8 @@ EM_run <- function(y, k,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
                            )
     }
+    Mend=as.numeric(Sys.time())
+    cat(paste("M step time:",Mend-Mstart,"seconds\n"))
     
     
     for(j in 1:g){
@@ -411,11 +414,15 @@ EM_run <- function(y, k,
     Q[a]<-pt1+pt2
     
     # break condition for EM
-    if(a>5){if(abs(Q[a]-Q[a-5])<EM_tol) {
+    if(a>5){if(abs((Q[a]-Q[a-5])/Q[a])<EM_tol) {
       finalwts<-wts
       break
     }}
-    if(a==maxit_EM){finalwts<-wts}
+    if(a==maxit_EM){
+      finalwts<-wts
+      warning("Reached max iterations.")
+      DNC=1
+      }
   
     
     # E step
@@ -508,6 +515,8 @@ EM_run <- function(y, k,
       }
     }
     cat(paste("Samp1: PP:",wts[,1],"\n"))
+    EMend = as.numeric(Sys.time())
+    cat(paste("Time elapsed:",EMend-EMstart,"seconds\n"))
     cat("-------------------------------------\n")
     
   }
@@ -565,7 +574,7 @@ EM_run <- function(y, k,
                lambda2=lambda2,
                tau=tau,
                size_factors=size_factors,
-               norm_y=norm_y)
+               norm_y=norm_y,DNC=DNC)
   return(result)
   
 }
@@ -616,7 +625,7 @@ EM<-function(y, k,
   cls_hc <- cutree(model,k=k)
   
   ## K-means Clustering
-  cls_km <- kmeans(t(norm_y),k)$cluster
+  cls_km <- kmeans(t(log(norm_y+0.1)),k)$cluster
   
   #TESTING RANDOM CLUSTERING
   
