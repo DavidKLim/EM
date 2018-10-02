@@ -1,38 +1,415 @@
-\documentclass[12pt]{article}
+%  template.tex for Biometrics papers
+%
+%  This file provides a template for Biometrics authors.  Use this
+%  template as the starting point for creating your manuscript document.
+%  See the file biomsample.tex for an example of a full-blown manuscript.
 
+%  ALWAYS USE THE referee OPTION WITH PAPERS SUBMITTED TO BIOMETRICS!!!
+%  You can see what your paper would look like typeset by removing
+%  the referee option.  Because the typeset version will be in two
+%  columns, however, some of your equations may be too long. DO NOT
+%  use the \longequation option discussed in the user guide!!!  This option
+%  is reserved ONLY for equations that are impossible to split across 
+%  multiple lines; e.g., a very wide matrix.  Instead, type your equations 
+%  so that they stay in one column and are split across several lines, 
+%  as are almost all equations in the journal.  Use a recent version of the
+%  journal as a guide. 
+%  
+%\documentclass[12pt]{article}
+\documentclass[useAMS,usenatbib,referee]{biom}
+%documentclass[useAMS]{biom}
+%
+%  If your system does not have the AMS fonts version 2.0 installed, then
+%  remove the useAMS option.
+%
+%  useAMS allows you to obtain upright Greek characters.
+%  e.g. \umu, \upi etc.  See the section on "Upright Greek characters" in
+%  this guide for further information.
+%
+%  If you are using AMS 2.0 fonts, bold math letters/symbols are available
+%  at a larger range of sizes for NFSS release 1 and 2 (using \boldmath or
+%  preferably \bmath).
+% 
+%  Other options are described in the user guide. Here are a few:
+% 
+%  -  If you use Patrick Daly's natbib  to cross-reference your 
+%     bibliography entries, use the usenatbib option
+%
+%  -  If you use \includegraphics (graphicx package) for importing graphics
+%     into your figures, use the usegraphicx option
+% 
+%  If you wish to typeset the paper in Times font (if you do not have the
+%  PostScript Type 1 Computer Modern fonts you will need to do this to get
+%  smoother fonts in a PDF file) then uncomment the next line
+%  \usepackage{Times}
 \usepackage{amsmath}
 \usepackage{mathtools}
 \usepackage{graphicx,psfrag,epsf}
 \usepackage{enumerate}
-%\usepackage{natbib}
-\usepackage{url} % not crucial - just used below for the URL 
+\usepackage{url} % not crucial - just used below for the URL
 \usepackage{float}
-\usepackage{hyperref}
-\usepackage[noabbrev,capitalize]{cleveref}
+\usepackage[T1]{fontenc}
+\usepackage{colortbl}
 %\usepackage{biblatex}
-%\addbibresource{C:/Users/limdd/Documents/Research/Sweave/Project1/sample.bib}
+%\usepackage{harvard}
+% \usepackage{filecontents}
+% 
+% \begin{filecontents}{proj1bib.bib}
+% % Encoding: UTF-8
+% 
+% @Article{Zhao2014,
+%   author    = {Shanrong Zhao and Wai-Ping Fung-Leung and Anton Bittner and Karen Ngo and Xuejun Liu},
+%   title     = {Comparison of {RNA}-Seq and Microarray in Transcriptome Profiling of Activated T Cells},
+%   journal   = {{PLoS} {ONE}},
+%   year      = {2014},
+%   editor    = {Shu-Dong Zhang},
+%   volume    = {9},
+%   number    = {1},
+%   month     = {jan},
+%   pages     = {e78644},
+%   doi       = {10.1371/journal.pone.0078644},
+%   publisher = {Public Library of Science ({PLoS})},
+% }
+% 
+% @Article{Hrdlickova2016,
+%   author    = {Radmila Hrdlickova and Masoud Toloue and Bin Tian},
+%   title     = {{RNA}-Seq methods for transcriptome analysis},
+%   journal   = {Wiley Interdisciplinary Reviews: {RNA}},
+%   year      = {2016},
+%   volume    = {8},
+%   number    = {1},
+%   month     = {may},
+%   pages     = {e1364},
+%   doi       = {10.1002/wrna.1364},
+%   publisher = {Wiley},
+% }
+% 
+% @Article{Chen2017,
+%   author    = {Li Chen and Fenghao Sun and Xiaodong Yang and Yulin Jin and Mengkun Shi and Lin Wang and Yu Shi and Cheng Zhan and Qun Wang},
+%   title     = {Correlation between {RNA}-Seq and microarrays results using {TCGA} data},
+%   journal   = {Gene},
+%   year      = {2017},
+%   volume    = {628},
+%   month     = {sep},
+%   pages     = {200--204},
+%   doi       = {10.1016/j.gene.2017.07.056},
+%   publisher = {Elsevier {BV}},
+% }
+% 
+% @Article{Xie2007,
+%   author    = {Benhuai Xie and Wei Pan and Xiaotong Shen},
+%   title     = {Variable Selection in Penalized Model-Based Clustering Via Regularization on Grouped Parameters},
+%   journal   = {Biometrics},
+%   year      = {2007},
+%   volume    = {64},
+%   number    = {3},
+%   month     = {dec},
+%   pages     = {921--930},
+%   doi       = {10.1111/j.1541-0420.2007.00955.x},
+%   publisher = {Wiley},
+% }
+% 
+% @Article{Monti2003,
+%   author    = {Stefano Monti},
+%   title     = {Consensus Clustering: A Resampling-Based Method for Class Discovery and Visualization of Gene Expression Microarray Data},
+%   journal   = {Machine Learning},
+%   year      = {2003},
+%   volume    = {52},
+%   number    = {1/2},
+%   pages     = {91--118},
+%   doi       = {10.1023/a:1023949509487},
+%   publisher = {Springer Nature},
+% }
+% 
+% @Article{Kluger2003,
+%   author    = {Y. Kluger},
+%   title     = {Spectral Biclustering of Microarray Data: Coclustering Genes and Conditions},
+%   journal   = {Genome Research},
+%   year      = {2003},
+%   volume    = {13},
+%   number    = {4},
+%   month     = {apr},
+%   pages     = {703--716},
+%   doi       = {10.1101/gr.648603},
+%   publisher = {Cold Spring Harbor Laboratory},
+% }
+% 
+% @Article{Cho2008,
+%   author    = {Hyuk Cho and I.S. Dhillon},
+%   title     = {Coclustering of Human Cancer Microarrays Using Minimum Sum-Squared Residue Coclustering},
+%   journal   = {{IEEE}/{ACM} Transactions on Computational Biology and Bioinformatics},
+%   year      = {2008},
+%   volume    = {5},
+%   number    = {3},
+%   month     = {jul},
+%   pages     = {385--400},
+%   doi       = {10.1109/tcbb.2007.70268},
+%   publisher = {Institute of Electrical and Electronics Engineers ({IEEE})},
+% }
+% 
+% @Article{Si2013,
+%   author    = {Yaqing Si and Peng Liu and Pinghua Li and Thomas P. Brutnell},
+%   title     = {Model-based clustering for {RNA}-seq data},
+%   journal   = {Bioinformatics},
+%   year      = {2013},
+%   volume    = {30},
+%   number    = {2},
+%   month     = {nov},
+%   pages     = {197--205},
+%   doi       = {10.1093/bioinformatics/btt632},
+%   publisher = {Oxford University Press ({OUP})},
+% }
+% 
+% @Article{Zwiener2014,
+%   author    = {Isabella Zwiener and Barbara Frisch and Harald Binder},
+%   title     = {Transforming {RNA}-Seq Data to Improve the Performance of Prognostic Gene Signatures},
+%   journal   = {{PLoS} {ONE}},
+%   year      = {2014},
+%   editor    = {Frank Emmert-Streib},
+%   volume    = {9},
+%   number    = {1},
+%   month     = {jan},
+%   pages     = {e85150},
+%   doi       = {10.1371/journal.pone.0085150},
+%   publisher = {Public Library of Science ({PLoS})},
+% }
+% 
+% @Article{Noel-MacDonnell2018,
+%   author    = {Janelle R. Noel-MacDonnell and Joseph Usset and Ellen L. Goode and Brooke L. Fridley},
+%   title     = {Assessment of data transformations for model-based clustering of {RNA}-Seq data},
+%   journal   = {{PLOS} {ONE}},
+%   year      = {2018},
+%   editor    = {Surinder K. Batra},
+%   volume    = {13},
+%   number    = {2},
+%   month     = {feb},
+%   pages     = {e0191758},
+%   doi       = {10.1371/journal.pone.0191758},
+%   publisher = {Public Library of Science ({PLoS})},
+% }
+% 
+% @Article{Li2015,
+%   author    = {Peipei Li and Yongjun Piao and Ho Sun Shon and Keun Ho Ryu},
+%   title     = {Comparing the normalization methods for the differential analysis of Illumina high-throughput {RNA}-Seq data},
+%   journal   = {{BMC} Bioinformatics},
+%   year      = {2015},
+%   volume    = {16},
+%   number    = {1},
+%   month     = {oct},
+%   doi       = {10.1186/s12859-015-0778-7},
+%   publisher = {Springer Nature},
+% }
+% 
+% @Book{Ritter2015,
+%   author    = {Gunter Ritter},
+%   title     = {Robust Cluster Analysis and Variable Selection},
+%   year      = {2015},
+%   publisher = {CRC Press, Taylor \& Francis},
+% }
+% 
+% @Article{Chung2008,
+%   author    = {N. Chung and X. D. Zhang and A. Kreamer and L. Locco and P.-F. Kuan and S. Bartz and P. S. Linsley and M. Ferrer and B. Strulovici},
+%   title     = {Median Absolute Deviation to Improve Hit Selection for Genome-Scale {RNAi} Screens},
+%   journal   = {Journal of Biomolecular Screening},
+%   year      = {2008},
+%   volume    = {13},
+%   number    = {2},
+%   month     = {jan},
+%   pages     = {149--158},
+%   doi       = {10.1177/1087057107312035},
+%   publisher = {{SAGE} Publications},
+% }
+% 
+% @Article{Mo2013,
+%   author    = {Qianxing Mo and Sijian Wang and Venkatraman E. Seshan and Adam B. Olshen and Nikolaus Schultz and Chris Sander and R. Scott Powers and Marc Ladanyi and Ronglai Shen},
+%   title     = {Pattern discovery and cancer gene identification in integrated cancer genomic data},
+%   journal   = {Proceedings of the National Academy of Sciences},
+%   year      = {2013},
+%   volume    = {110},
+%   number    = {11},
+%   month     = {feb},
+%   pages     = {4245--4250},
+%   doi       = {10.1073/pnas.1208949110},
+%   publisher = {Proceedings of the National Academy of Sciences},
+% }
+% 
+% @Article{Pan2013,
+%   author  = {Wei Pan and Xiaotong Shen and Binghui Liu},
+%   title   = {Cluster Analysis: Unsupervised Learning via Supervised Learning with a Non-convex Penalty},
+%   journal = {Journal of Machine Learning Research},
+%   year    = {2013},
+%   volume  = {14},
+%   url     = {http://jmlr.org/papers/v14/pan13a.html},
+% }
+% 
+% @Article{Yu2018,
+%   author    = {Jian Yu and Chaomu Chaomurilige and Miin-Shen Yang},
+%   title     = {On convergence and parameter selection of the {EM} and {DA}-{EM} algorithms for Gaussian mixtures},
+%   journal   = {Pattern Recognition},
+%   year      = {2018},
+%   volume    = {77},
+%   month     = {may},
+%   pages     = {188--203},
+%   doi       = {10.1016/j.patcog.2017.12.014},
+%   publisher = {Elsevier {BV}},
+% }
+% 
+% @Article{Celeux1992,
+%   author    = {Gilles Celeux and G{\'{e}}rard Govaert},
+%   title     = {A classification {EM} algorithm for clustering and two stochastic versions},
+%   journal   = {Computational Statistics {\&} Data Analysis},
+%   year      = {1992},
+%   volume    = {14},
+%   number    = {3},
+%   month     = {oct},
+%   pages     = {315--332},
+%   doi       = {10.1016/0167-9473(92)90042-e},
+%   publisher = {Elsevier {BV}},
+% }
+% 
+% @Article{Love2014,
+%   author    = {Michael I Love and Wolfgang Huber and Simon Anders},
+%   title     = {Moderated estimation of fold change and dispersion for {RNA}-seq data with {DESeq}2},
+%   journal   = {Genome Biology},
+%   year      = {2014},
+%   volume    = {15},
+%   number    = {12},
+%   month     = {dec},
+%   doi       = {10.1186/s13059-014-0550-8},
+%   publisher = {Springer Nature},
+% }
+% 
+% @Article{Jaskowiak2018,
+%   author    = {Pablo Andretta Jaskowiak and Ivan G. Costa and Ricardo J.G.B. Campello},
+%   title     = {Clustering of {RNA}-Seq samples: Comparison study on cancer data},
+%   journal   = {Methods},
+%   year      = {2018},
+%   volume    = {132},
+%   month     = {jan},
+%   pages     = {42--49},
+%   doi       = {10.1016/j.ymeth.2017.07.023},
+%   publisher = {Elsevier {BV}},
+% }
+% 
+% @Article{Biernacki2003,
+%   author    = {Christophe Biernacki and Gilles Celeux and G{\'{e}}rard Govaert},
+%   title     = {Choosing starting values for the {EM} algorithm for getting the highest likelihood in multivariate Gaussian mixture models},
+%   journal   = {Computational Statistics {\&} Data Analysis},
+%   year      = {2003},
+%   volume    = {41},
+%   number    = {3-4},
+%   month     = {jan},
+%   pages     = {561--575},
+%   doi       = {10.1016/s0167-9473(02)00163-9},
+%   publisher = {Elsevier {BV}},
+% }
+% 
+% @Article{Breheny2011,
+%   author    = {Patrick Breheny and Jian Huang},
+%   title     = {Coordinate descent algorithms for nonconvex penalized regression, with applications to biological feature selection},
+%   journal   = {The Annals of Applied Statistics},
+%   year      = {2011},
+%   volume    = {5},
+%   number    = {1},
+%   month     = {mar},
+%   pages     = {232--253},
+%   doi       = {10.1214/10-aoas388},
+%   publisher = {Institute of Mathematical Statistics},
+% }
+% 
+% @Article{Rose1998,
+%   author    = {K. Rose},
+%   title     = {Deterministic annealing for clustering, compression, classification, regression, and related optimization problems},
+%   journal   = {Proceedings of the {IEEE}},
+%   year      = {1998},
+%   volume    = {86},
+%   number    = {11},
+%   pages     = {2210--2239},
+%   doi       = {10.1109/5.726788},
+%   publisher = {Institute of Electrical and Electronics Engineers ({IEEE})},
+% }
+% 
+% @Article{Koboldt2012,
+%   author    = {Daniel C. Koboldt and Robert S. Fulton and Michael D. McLellan and Heather Schmidt and Joelle Kalicki-Veizer and Joshua F. McMichael and Lucinda L. Fulton and David J. Dooling and Li Ding and Elaine R. Mardis and Richard K. Wilson and Adrian Ally and Miruna Balasundaram and Yaron S. N. Butterfield and Rebecca Carlsen and Candace Carter and Andy Chu and Eric Chuah and Hye-Jung E. Chun and Robin J. N. Coope and Noreen Dhalla and Ranabir Guin and Carrie Hirst and Martin Hirst and Robert A. Holt and Darlene Lee and Haiyan I. Li and Michael Mayo and Richard A. Moore and Andrew J. Mungall and Erin Pleasance and A. Gordon Robertson and Jacqueline E. Schein and Arash Shafiei and Payal Sipahimalani and Jared R. Slobodan and Dominik Stoll and Angela Tam and Nina Thiessen and Richard J. Varhol and Natasja Wye and Thomas Zeng and Yongjun Zhao and Inanc Birol and Steven J. M. Jones and Marco A. Marra and Andrew D. Cherniack and Gordon Saksena and Robert C. Onofrio and Nam H. Pho and Scott L. Carter and Steven E. Schumacher and Barbara Tabak and Bryan Hernandez and Jeff Gentry and Huy Nguyen and Andrew Crenshaw and Kristin Ardlie and Rameen Beroukhim and Wendy Winckler and Gad Getz and Stacey B. Gabriel and Matthew Meyerson and Lynda Chin and Peter J. Park and Raju Kucherlapati and Katherine A. Hoadley and J. Todd Auman and Cheng Fan and Yidi J. Turman and Yan Shi and Ling Li and Michael D. Topal and Xiaping He and Hann-Hsiang Chao and Aleix Prat and Grace O. Silva and Michael D. Iglesia and Wei Zhao and Jerry Usary and Jonathan S. Berg and Michael Adams and Jessica Booker and Junyuan Wu and Anisha Gulabani and Tom Bodenheimer and Alan P. Hoyle and Janae V. Simons and Matthew G. Soloway and Lisle E. Mose and Stuart R. Jefferys and Saianand Balu and Joel S. Parker and D. Neil Hayes and Charles M. Perou and Simeen Malik and Swapna Mahurkar and Hui Shen and Daniel J. Weisenberger and Timothy Triche Jr and Phillip H. Lai and Moiz S. Bootwalla and Dennis T. Maglinte and Benjamin P. Berman and David J. Van Den Berg and Stephen B. Baylin and Peter W. Laird and Chad J. Creighton and Lawrence A. Donehower and Gad Getz and Michael Noble and Doug Voet and Gordon Saksena and Nils Gehlenborg and Daniel DiCara and Juinhua Zhang and Hailei Zhang and Chang-Jiun Wu and Spring Yingchun Liu and Michael S. Lawrence and Lihua Zou and Andrey Sivachenko and Pei Lin and Petar Stojanov and Rui Jing and Juok Cho and Raktim Sinha and Richard W. Park and Marc-Danie Nazaire and Jim Robinson and Helga Thorvaldsdottir and Jill Mesirov and Peter J. Park and Lynda Chin and Sheila Reynolds and Richard B. Kreisberg and Brady Bernard and Ryan Bressler and Timo Erkkila and Jake Lin and Vesteinn Thorsson and Wei Zhang and Ilya Shmulevich and Giovanni Ciriello and Nils Weinhold and Nikolaus Schultz and Jianjiong Gao and Ethan Cerami and Benjamin Gross and Anders Jacobsen and Rileen Sinha and B. Arman Aksoy and Yevgeniy Antipin and Boris Reva and Ronglai Shen and Barry S. Taylor and Marc Ladanyi and Chris Sander and Pavana Anur and Paul T. Spellman and Yiling Lu and Wenbin Liu and Roel R. G. Verhaak and Gordon B. Mills and Rehan Akbani and Nianxiang Zhang and Bradley M. Broom and Tod D. Casasent and Chris Wakefield and Anna K. Unruh and Keith Baggerly and Kevin Coombes and John N. Weinstein and David Haussler and Christopher C. Benz and Joshua M. Stuart and Stephen C. Benz and Jingchun Zhu and Christopher C. Szeto and Gary K. Scott and Christina Yau and Evan O. Paull and Daniel Carlin and Christopher Wong and Artem Sokolov and Janita Thusberg and Sean Mooney and Sam Ng and Theodore C. Goldstein and Kyle Ellrott and Mia Grifford and Christopher Wilks and Singer Ma and Brian Craft and Chunhua Yan and Ying Hu and Daoud Meerzaman and Julie M. Gastier-Foster and Jay Bowen and Nilsa C. Ramirez and Aaron D. Black and Robert E. XPATH ERROR: unknown variable "tname". and Peter White and Erik J. Zmuda and Jessica Frick and Tara M. Lichtenberg and Robin Brookens and Myra M. George and Mark A. Gerken and Hollie A. Harper and Kristen M. Leraas and Lisa J. Wise and Teresa R. Tabler and Cynthia McAllister and Thomas Barr and Melissa Hart-Kothari and Katie Tarvin and Charles Saller and George Sandusky and Colleen Mitchell and Mary V. Iacocca and Jennifer Brown and Brenda Rabeno and Christine Czerwinski and Nicholas Petrelli and Oleg Dolzhansky and Mikhail Abramov and Olga Voronina and Olga Potapova and Jeffrey R. Marks and Wiktoria M. Suchorska and Dawid Murawa and Witold Kycler and Matthew Ibbs and Konstanty Korski and Arkadiusz Spycha{\l}a and Pawe{\l} Murawa and Jacek J. Brzezi{\'{n}}ski and Hanna Perz and Rados{\l}aw {\L}a{\'{z}}niak and Marek Teresiak and Honorata Tatka and Ewa Leporowska and Marta Bogusz-Czerniewicz and Julian Malicki and Andrzej Mackiewicz and Maciej Wiznerowicz and Xuan Van Le and Bernard Kohl and Nguyen Viet Tien and Richard Thorp and Nguyen Van Bang and Howard Sussman and Bui Duc Phu and Richard Hajek and Nguyen Phi Hung and Tran Viet The Phuong and Huynh Quyet Thang and Khurram Zaki Khan and Robert Penny and David Mallery and Erin Curley and Candace Shelton and Peggy Yena and James N. Ingle and Fergus J. Couch and Wilma L. Lingle and Tari A. King and Ana Maria Gonzalez-Angulo and Gordon B. Mills and Mary D. Dyer and Shuying Liu and Xiaolong Meng and Modesto Patangan and Frederic Waldman and Hubert Stöppler and W. Kimryn Rathmell and Leigh Thorne and Mei Huang and Lori Boice and Ashley Hill and Carl Morrison and Carmelo Gaudioso and Wiam Bshara and Kelly Daily and Sophie C. Egea and Mark D. Pegram and Carmen Gomez-Fernandez and Rajiv Dhir and Rohit Bhargava and Adam Brufsky and Craig D. Shriver and Jeffrey A. Hooke and Jamie Leigh Campbell and Richard J. Mural and Hai Hu and Stella Somiari and Caroline Larson and Brenda Deyarmin and Leonid Kvecher and Albert J. Kovatich and Matthew J. Ellis and Tari A. King and Hai Hu and Fergus J. Couch and Richard J. Mural and Thomas Stricker and Kevin White and Olufunmilayo Olopade and James N. Ingle and Chunqing Luo and Yaqin Chen and Jeffrey R. Marks and Frederic Waldman and Maciej Wiznerowicz and Ron Bose and Li-Wei Chang and Andrew H. Beck and Ana Maria Gonzalez-Angulo and Todd Pihl and Mark Jensen and Robert Sfeir and Ari Kahn and Anna Chu and Prachi Kothiyal and Zhining Wang and Eric Snyder and Joan Pontius and Brenda Ayala and Mark Backus and Jessica Walton and Julien Baboud and Dominique Berton and Matthew Nicholls and Deepak Srinivasan and Rohini Raman and Stanley Girshik and Peter Kigonya and Shelley Alonso and Rashmi Sanbhadti and Sean Barletta and David Pot and Margi Sheth and John A. Demchok and Kenna R. Mills Shaw and Liming Yang and Greg Eley and Martin L. Ferguson and Roy W. Tarnuzzer and Jiashan Zhang and Laura A. L. Dillon and Kenneth Buetow and Peter Fielding and Bradley A. Ozenberger and Mark S. Guyer and Heidi J. Sofia and Jacqueline D. Palchik},
+%   title     = {Comprehensive molecular portraits of human breast tumours},
+%   journal   = {Nature},
+%   year      = {2012},
+%   volume    = {490},
+%   number    = {7418},
+%   month     = {sep},
+%   pages     = {61--70},
+%   doi       = {10.1038/nature11412},
+%   publisher = {Springer Nature},
+% }
+% 
+% @Article{Tibshirani1994,
+%   author  = {Robert Tibshirani},
+%   title   = {Regression Shrinkage and Selection Via the Lasso},
+%   journal = {Journal of the Royal Statistical Society, Series B},
+%   year    = {1994},
+%   volume  = {58},
+%   pages   = {267-288},
+% }
+% 
+% @Article{Zou2005,
+%   author    = {Hui Zou and Trevor Hastie},
+%   title     = {Regularization and variable selection via the elastic net},
+%   journal   = {Journal of the Royal Statistical Society: Series B (Statistical Methodology)},
+%   year      = {2005},
+%   volume    = {67},
+%   number    = {2},
+%   month     = {apr},
+%   pages     = {301--320},
+%   doi       = {10.1111/j.1467-9868.2005.00503.x},
+%   publisher = {Wiley},
+% }
+% 
+% @Article{Robertson2017,
+%   author    = {A. Gordon Robertson and Jaegil Kim and Hikmat Al-Ahmadie and Joaquim Bellmunt and Guangwu Guo and Andrew D. Cherniack and Toshinori Hinoue and Peter W. Laird and Katherine A. Hoadley and Rehan Akbani and Mauro A.A. Castro and Ewan A. Gibb and Rupa S. Kanchi and Dmitry A. Gordenin and Sachet A. Shukla and Francisco Sanchez-Vega and Donna E. Hansel and Bogdan A. Czerniak and Victor E. Reuter and Xiaoping Su and Benilton de Sa Carvalho and Vinicius S. Chagas and Karen L. Mungall and Sara Sadeghi and Chandra Sekhar Pedamallu and Yiling Lu and Leszek J. Klimczak and Jiexin Zhang and Caleb Choo and Akinyemi I. Ojesina and Susan Bullman and Kristen M. Leraas and Tara M. Lichtenberg and Catherine J. Wu and Nicholaus Schultz and Gad Getz and Matthew Meyerson and Gordon B. Mills and David J. McConkey and John N. Weinstein and David J. Kwiatkowski and Seth P. Lerner and Rehan Akbani and Hikmat Al-Ahmadie and Monique Albert and Iakovina Alexopoulou and Adrian Ally and Tatjana Antic and Manju Aron and Miruna Balasundaram and John Bartlett and Stephen B. Baylin and Allison Beaver and Joaquim Bellmunt and Inanc Birol and Lori Boice and Moiz S. Bootwalla and Jay Bowen and Reanne Bowlby and Denise Brooks and Bradley M. Broom and Wiam Bshara and Susan Bullman and Eric Burks and Flavio M. C{\'{a}}rcano and Rebecca Carlsen and Benilton S. Carvalho and Andre L. Carvalho and Eric P. Castle and Mauro A.A. Castro and Patricia Castro and James W. Catto and Vinicius S. Chagas and Andrew D. Cherniack and David W. Chesla and Caleb Choo and Eric Chuah and Sudha Chudamani and Victoria K. Cortessis and Sandra L. Cottingham and Daniel Crain and Erin Curley and Bogdan A. Czerniak and Siamak Daneshmand and John A. Demchok and Noreen Dhalla and Hooman Djaladat and John Eckman and Sophie C. Egea and Jay Engel and Ina Felau and Martin L. Ferguson and Johanna Gardner and Julie M. Gastier-Foster and Mark Gerken and Gad Getz and Ewan A. Gibb and Carmen R. Gomez-Fernandez and Dmitry A. Gordenin and Guangwu Guo and Donna E. Hansel and Jodi Harr and Arndt Hartmann and Lynn M. Herbert and Toshinori Hinoue and Thai H. Ho and Katherine A. Hoadley and Robert A. Holt and Carolyn M. Hutter and Steven J.M. Jones and Merce Jorda and Richard J. Kahnoski and Rupa S. Kanchi and Katayoon Kasaian and Jaegil Kim and Leszek J. Klimczak and David J. Kwiatkowski and Phillip H. Lai and Peter W. Laird and Brian R. Lane and Kristen M. Leraas and Seth P. Lerner and Tara M. Lichtenberg and Jia Liu and Laxmi Lolla and Yair Lotan and Yiling Lu and Fabiano R. Lucchesi and Yussanne Ma and Roberto D. Machado and Dennis T. Maglinte and David Mallery and Marco A. Marra and Sue E. Martin and Michael Mayo and David J. McConkey and Anoop Meraney and Matthew Meyerson and Gordon B. Mills and Alireza Moinzadeh and Richard A. Moore and Edna M. Mora Pinero and Scott Morris and Carl Morrison and Karen L. Mungall and Andrew J. Mungall and Jerome B. Myers and Rashi Naresh and Peter H. O{\textquotesingle}Donnell and Akinyemi I. Ojesina and Dipen J. Parekh and Jeremy Parfitt and Joseph D. Paulauskis and Chandra Sekhar Pedamallu and Robert J. Penny and Todd Pihl and Sima Porten and Mario E. Quintero-Aguilo and Nilsa C. Ramirez and W. Kimryn Rathmell and Victor E. Reuter and Kimberly Rieger-Christ and A. Gordon Robertson and Sara Sadeghi and Charles Saller and Andrew Salner and Francisco Sanchez-Vega and George Sandusky and Cristovam Scapulatempo-Neto and Jacqueline E. Schein and Anne K. Schuckman and Nikolaus Schultz and Candace Shelton and Troy Shelton and Sachet A. Shukla and Jeff Simko and Parminder Singh and Payal Sipahimalani and Norm D. Smith and Heidi J. Sofia and Andrea Sorcini and Melissa L. Stanton and Gary D. Steinberg and Robert Stoehr and Xiaoping Su and Travis Sullivan and Qiang Sun and Angela Tam and Roy Tarnuzzer and Katherine Tarvin and Helge Taubert and Nina Thiessen and Leigh Thorne and Kane Tse and Kelinda Tucker and David J. Van Den Berg and Kim E. van Kessel and Sven Wach and Yunhu Wan and Zhining Wang and John N. Weinstein and Daniel J. Weisenberger and Lisa Wise and Tina Wong and Ye Wu and Catherine J. Wu and Liming Yang and Leigh Anne Zach and Jean C. Zenklusen and Jiashan (Julia) Zhang and Jiexin Zhang and Erik Zmuda and Ellen C. Zwarthoff},
+%   title     = {Comprehensive Molecular Characterization of Muscle-Invasive Bladder Cancer},
+%   journal   = {Cell},
+%   year      = {2017},
+%   volume    = {171},
+%   number    = {3},
+%   month     = {oct},
+%   pages     = {540--556.e25},
+%   doi       = {10.1016/j.cell.2017.09.007},
+%   publisher = {Elsevier {BV}},
+% }
+% 
+% @Article{Ge2017,
+%   author    = {Shu-Guang Ge and Junfeng Xia and Wen Sha and Chun-Hou Zheng},
+%   title     = {Cancer Subtype Discovery Based on Integrative Model of Multigenomic Data},
+%   journal   = {{IEEE}/{ACM} Transactions on Computational Biology and Bioinformatics},
+%   year      = {2017},
+%   volume    = {14},
+%   number    = {5},
+%   month     = {sep},
+%   pages     = {1115--1121},
+%   doi       = {10.1109/tcbb.2016.2621769},
+%   publisher = {Institute of Electrical and Electronics Engineers ({IEEE})},
+% }
+% 
+% @Article{Zhao2018,
+%   author    = {Shitao Zhao and Jianqiang Sun and Kentaro Shimizu and Koji Kadota},
+%   title     = {Silhouette Scores for Arbitrary Defined Groups in Gene Expression Data and Insights into Differential Expression Results},
+%   journal   = {Biological Procedures Online},
+%   year      = {2018},
+%   volume    = {20},
+%   number    = {1},
+%   month     = {mar},
+%   doi       = {10.1186/s12575-018-0067-8},
+%   publisher = {Springer Nature},
+% }
+% 
+% @Comment{jabref-meta: databaseType:biblatex;}
+% \end{filecontents}
 
+%%%%%%%%%%%%%%%%%%%% MACROS %%%%%%%%%%%%%%%%%
+\def\bSig\mathbf{\Sigma}
+\newcommand{\VS}{V\&S}
+\newcommand{\tr}{\mbox{tr}}
 
-%\pdfminorversion=4
-% NOTE: To produce blinded version, replace "0" with "1" below.
-\newcommand{\blind}{1}
-
-% DON'T change margins - should be 1 inch all around.
-\addtolength{\oddsidemargin}{-.5in}%
-\addtolength{\evensidemargin}{-.5in}%
-\addtolength{\textwidth}{1in}%
-\addtolength{\textheight}{-.3in}%
-\addtolength{\topmargin}{-.8in}%
-
-\begin{document}
-\SweaveOpts{concordance=TRUE}
-
-
-\def\spacingset#1{\renewcommand{\baselinestretch}%
-{#1}\small\normalsize} \spacingset{1}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \DeclarePairedDelimiter\abs{\lvert}{\rvert}%
 \DeclarePairedDelimiter\norm{\lVert}{\rVert}%
 
@@ -44,72 +421,204 @@
 \def\norm{\@ifstar{\oldnorm}{\oldnorm*}}
 \makeatother
 
-\if1\blind
-{
-  \title{\bf Mixture Negative Binomial Expectation Maximization (NB-EM) Algorithm for Unsupervised Clustering}
-  \author{David Lim\thanks{
-    The authors gratefully acknowledge \textit{please remember to list all relevant funding sources in the unblinded version}}\hspace{.2cm}\\
-    Department of Biostatistics, UNC, Chapel Hill\\
-    Naim Rashid \\
-    Department of Biostatistics, UNC, Chapel Hill \\
-    Joseph Ibrahim \\
-    Department of Biostatistics, UNC, Chapel Hill}
+%  The rotating package allows you to have tables displayed in landscape
+%  mode.  The rotating package is NOT included in this distribution, but
+%  can be obtained from the CTAN archive.  USE OF LANDSCAPE TABLES IS
+%  STRONGLY DISCOURAGED -- create landscape tables only as a last resort if
+%  you see no other way to display the information.  If you do do this,
+%  then you need the following command.
 
-  \maketitle
-} \fi
+%\usepackage[figuresright]{rotating}
 
-\if0\blind
-{
-  \bigskip
-  \bigskip
-  \bigskip
-  \begin{center}
-    {\LARGE\bf Mixture Negative Binomial Expectation Maximization (NB-EM) Algorithm for Unsupervised Clustering}
-\end{center}
-  \medskip
-} \fi
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\bigskip
+%  Here, place your title and author information.  Note that in
+%  use of the \author command, you create your own footnotes.  Follow
+%  the examples below in creating your author and affiliation information.
+%  Also consult a recent issue of the journal for examples of formatting.
+
+\title[NTS:NEED TO ADD TCGA BRCA AND BLCA IN BIBLIO]{Model-based Unsupervised Clustering Method for Subtype Discovery of Raw RNA-seq Data}
+
+%  Here are examples of different configurations of author/affiliation
+%  displays.  According to the Biometrics style, in some instances,
+%  the convention is to have superscript *, **, etc footnotes to indicate
+%  which of multiple email addresses belong to which author.  In this case,
+%  use the \email{ } command to produce the emails in the display.
+
+%  In other cases, such as a single author or two authors from
+%  different institutions, there should be no footnoting.  Here, use
+%  the \emailx{ } command instead.
+
+%  The examples below corrspond to almost every possible configuration
+%  of authors and may be used as a guide.  For other configurations, consult
+%  a recent issue of the the journal.
+
+%  Single author -- USE \emailx{ } here so that no asterisk footnoting
+%  for the email address will be produced.
+
+%\author{John Author\emailx{email@address.edu} \\
+%Department of Statistics, University of Warwick, Coventry CV4 7AL, U.K.}
+
+%  Two authors from the same institution, with both emails -- use
+%  \email{ } here to produce the asterisk footnoting for each email address
+
+%\author{John Author$^{*}$\email{author@address.edu} and
+%Kathy Authoress$^{**}$\email{email2@address.edu} \\
+%Department of Statistics, University of Warwick, Coventry CV4 7AL, U.K.}
+
+%  Exactly two authors from different institutions, with both emails
+%  USE \emailx{ } here so that no asterisk footnoting for the email address
+%  is produced.
+
+% \author
+% {John Author\emailx{author@address.edu} \\
+% Department of Statistics, University of Warwick, Coventry CV4 7AL, U.K.
+% \and
+% Kathy Author\emailx{anotherauthor@address.edu} \\
+% Department of Biostatistics, University of North Carolina at Chapel Hill,
+% Chapel Hill, North Carolina, U.S.A.}
+
+%  Three or more authors from same institution with all emails displayed
+%  and footnoted using asterisks -- use \email{ }
+
+\author{David Lim$^*$\email{deelim@ad.unc.edu},
+Naim Rashid$^{**}$\email{naim@unc.edu}, and
+Joseph Ibrahim$^{***}$\email{ibrahim@bios.unc.edu} \\
+Department of Biostatistics, University of North Carolina, Chapel Hill, NC, USA}
+
+%  Three or more authors from same institution with one corresponding email
+%  displayed
+
+%\author{John Author$^*$\email{author@address.edu}, 
+%Jane Author, and Dick Author \\
+%Department of Statistics, University of Warwick, Coventry CV4 7AL, U.K}
+
+%  Three or more authors, with at least two different institutions,
+%  more than one email displayed 
+
+%\author{John Author$^{1,*}$\email{author@address.edu}, 
+%Kathy Author$^{2,**}$\email{anotherauthor@address.edu}, and 
+%Wilma Flinstone$^{3,***}$\email{wilma@bedrock.edu} \\
+%$^{1}$Department of Statistics, University of Warwick, Coventry CV4 7AL, U.K \\
+%$^{2}$Department of Biostatistics, University of North Carolina at 
+%Chapel Hill, Chapel Hill, North Carolina, U.S.A. \\
+%$^{3}$Department of Geology, University of Bedrock, Bedrock, Kansas, U.S.A.}
+
+%  Three or more authors with at least two different institutions and only
+%  one email displayed
+
+%\author{John Author$^{1,*}$\email{author@address.edu}, 
+%Wilma Flinstone$^{2}$, and Barney Rubble$^{2}$ \\
+%$^{1}$Department of Statistics, University of Warwick, Coventry CV4 7AL, U.K \\
+%$^{2}$Department of Geology, University of Bedrock, Bedrock, Kansas, U.S.A.}
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+
+% \setlength{\paperheight}{11in}
+% \setlength{\paperwidth}{8.5in}
+
+
+\date{{\it Received October} 2007. {\it Revised February} 2008.  {\it
+Accepted March} 2008.}
+
+%  These options will count the number of pages and provide volume
+%  and date information in the upper left hand corner of the top of the 
+%  first page as in published papers.  The \pagerange command will only
+%  work if you place the command \label{firstpage} near the beginning
+%  of the document and \label{lastpage} at the end of the document, as we
+%  have done in this template.
+
+%  Again, putting a volume number and date is for your own amusement and
+%  has no bearing on what actually happens to your paper!  
+
+\pagerange{\pageref{firstpage}--\pageref{lastpage}} 
+\volume{64}
+\pubyear{2008}
+\artmonth{December}
+
+%  The \doi command is where the DOI for your paper would be placed should it
+%  be published.  Again, if you make one up and stick it here, it means 
+%  nothing!
+
+\doi{10.1111/j.1541-0420.2005.00454.x}
+
+%  This label and the label ``lastpage'' are used by the \pagerange
+%  command above to give the page range for the article.  You may have 
+%  to process the document twice to get this to match up with what you 
+%  expect.  When using the referee option, this will not count the pages
+%  with tables and figures.  
+
+\label{firstpage}
+
+%  put the summary for your paper here
+
+%% BLINDING %%
+% \if1\blind
+% {
+%   \title{\bf Mixture Negative Binomial Expectation Maximization (NB-EM) Algorithm for Unsupervised Clustering}
+%   \author{David Lim\thanks{
+%     The authors gratefully acknowledge \textit{please remember to list all relevant funding sources in the unblinded version}}\hspace{.2cm}\\
+%     Department of Biostatistics, UNC, Chapel Hill\\
+%     Naim Rashid \\
+%     Department of Biostatistics, UNC, Chapel Hill \\
+%     Joseph Ibrahim \\
+%     Department of Biostatistics, UNC, Chapel Hill}
+% 
+%   \maketitle
+% } \fi
+% 
+% \if0\blind
+% {
+%   \bigskip
+%   \bigskip
+%   \bigskip
+%   \begin{center}
+%     {\LARGE\bf Mixture Negative Binomial Expectation Maximization (NB-EM) Algorithm for Unsupervised Clustering}
+% \end{center}
+%   \medskip
+% } \fi
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%%%% 0. ABSTRACT %%%%%
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{abstract}
-Clustering is a form of unsupervised learning that aims to uncover latent groups within data based on similarity across a set of features. A common application of this in biomedical research is in deriving novel cancer subtypes from patient gene expression data, given a set of informative genes. However, it is typically unknown a priori what genes may be informative in discriminating between clusters, and what the optimal number of clusters is. Few methods exist for unsupervised clustering of RNA-seq data that can simultaneously adjust for between-sample normalization factors, account for effects of potential confounding variables, and cluster patients while selecting cluster-discriminatory genes. To address this issue, we propose a mixture model EM algorithm with a group truncated lasso penalty. The maximization is done by coordinate-wise descent using the IRLS algorithm, allowing us to include normalization factors and predictors into our modeling framework. The EM framework allows for subtype prediction in new patients via posterior probabilities of cluster membership given the fitted model. Based on simulations and real data, we show the utility of our method.
+Clustering is a form of unsupervised learning that aims to uncover latent groups within data based on similarity across a set of features. A common application of this in biomedical research is in deriving novel cancer subtypes from patient gene expression data, given a set of informative genes. However, it is typically unknown a priori what genes may be informative in discriminating between clusters, and what the optimal number of clusters is. Few methods exist for unsupervised clustering of RNA-seq data that can simultaneously adjust for between-sample normalization factors, account for effects of potential confounding variables, and cluster patients while selecting cluster-discriminatory genes. To address this issue, we propose a model-based clustering algorithm that utilizes a multivariate finite mixture of regression (FMR) model with a group truncated lasso penalty. The maximization is done by coordinate-wise descent using the IRLS algorithm, allowing us to include normalization factors and predictors into our modeling framework. Given the fitted model, our framework allows for subtype prediction in new patients via posterior probabilities of cluster membership. Based on simulations and real data, we show the utility of our method relative to competing approaches.
 \end{abstract}
 
-\noindent%
-{\it Keywords:}  unsupervised clustering, genomics, EM
-\vfill
+\begin{keywords}
+unsupervised clustering, genomics, EM
+\end{keywords}
 
-\newpage
-\spacingset{1.45} % DON'T change the spacing!
+\maketitle
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% 1. INTRODUCTION %%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
+<<setup, include=FALSE, cache=FALSE, echo=FALSE>>=
+setwd("C:/Users/limdd/Documents/Research/Sweave")
+Sys.setenv(TEXINPUTS=getwd(),
+           BIBINPUTS=getwd(),
+           BSTINPUTS=getwd())
+@
 
 \section{Introduction}
 \label{sec:intro}
 
 %MICROARRAY V RNASEQ%
-For many years, microarray data has been the gold standard in analysis involving mRNA gene expression data. RNA-seq is a relatively novel platform of gene expression data derived by using high-throughput technologies. It has been shown to have great potential, as it overcomes some of the biases and limitations that are inherent in working with microarray (Zhao et al 2014), and gives less background noise and provides a greater dynamic range for detection (Hrdlickova et al 2016). Furthermore, there have been studies to show a strong correlation of results based on RNA-seq and microarray data, suggesting the reproducibility of the utilities of microarray analyses in RNA-seq (Chen et al 2017).
+RNA-seq is a recent platform for gene expression data based upon high-throughput sequencing. It has been shown to overcome some of the biases and limitations that are inherent in working with microarray \citep{Zhao2014}, and gives less background noise and provides a greater dynamic range for detection \citep{Hrdlickova2016}. Furthermore, there have been studies to show a strong correlation of results based on RNA-seq and microarray data, suggesting the reproducibility of the utilities of microarray analyses in RNA-seq \citep{Chen2017}.
 
 %CLUSTERING METHODS MICROARRAY%
-One such analysis of key interest in cancer genomics is that of clustering subjects based on similar gene expression profiles. This type of analysis can give valuable insight into possible subtypes of cancer samples by grouping similarly expressed samples together. While there are numerous methods that have been developed to cluster microarray gene expression data (Xie et al 2007, Monti et al 2003, Kluger et al 2003, Cho et al 2008), there are not many that are able to cluster RNA-seq data. Most of the methods that have been developed to handle RNA-seq data are specifically to cluster genes rather than samples (Si et al 2013). Since the number of genes is much greater than the number of samples for all genetic studies, it is far more difficult to cluster samples than genes. Due to the discrete nature of the data, the standard Gaussian model cannot be assumed of the underlying distribution. Thus, some of the current methods opt to approximate the data with the normal distribution using some type of transformation (Zwiener et al 2014, MacDonnell et al 2018). However, these analyses become highly dependent on the transformation used, leaving the reproducibility of said analyses in question.
+One such analysis of key interest in cancer genomics is that of clustering subjects based on subject-specific gene expression profiles, which can provide valuable insight into possible relatedness of cancer samples by grouping similarly expressed samples together. Subtype discovery has become a field of significant interest because studies have shown that the subtype of a patient's tumor not only affects the prognosis of the disease (Blows et al., 2010), but also the effectiveness of commonly-used treatments like chemotherapy \citep{Carey2011,Mao2017}. Clustering similar patients based on their gene expression profiles can help identify subjects' subtypes, and thus potentially lead to a much more efficient and effective targeted therapy regime. While there are numerous methods that have been developed to cluster microarray gene expression data \citep{Xie2007,Monti2003,Kluger2003,Cho2008}, few are able to cluster RNA-seq. Due to the discrete nature of the data, the standard Gaussian model cannot be assumed of the underlying distribution, as is done by methods like mclust \citep{Yeung2001}. Thus, some of the current methods opt to approximate the data with the normal distribution using some type of transformation \citep{Zwiener2014}. These transformations typically make the data 'more normal' to utilize existing methods for microarray, but there is not one transformation that is superior \citep{Noel-MacDonnell2018}. Thus, analyses using transformed count data would likely be dependent on the type of transformation used, which raises the question of reproducibility when working with them. Also, methods that have been developed for clustering with raw RNA-seq data have been designed specifically to cluster genes rather than samples \citep{Si2013}.
 
 %POINTS TO ADDRESS IN RNASEQ (normalization,count data,variable selection/prefiltering)%
-There are also biases and artifacts inherent in RNA-seq data that need to be accounted for. This is typically done using one of an array of normalization steps (Li et al 2015), although there isn't one that is uniformly superior. Also, the high dimensionality of genetic dataset necessitates a dimension reduction scheme that can pinpoint genes that may be most likely to be significant in clustering, as a majority of the differential expression of genes across clusters may be redundant or simply due to noise (Ritter book 2015). Thus, many methods use some criterion to pre-filter genes that are clearly nondiscriminatory in nature. One prominent method of pre-filtering is by thresholding genes based on its median absolute deviation (MAD) value (Chung et al 2008).
-
-Additionally, dealing with discrete datasets requires a different assumption for the underlying distribution of the data for model-based methods. The most naive is the Poisson distribution, which is used alongside a penalized likelihood scheme by a very popular integrative method called iClusterPlus (Mo et al 2012). We believe, however, that such a model has its limitations, as it does not account for extra-Poisson variation.
+Biases and artifacts inherent in RNA-seq data also need to be accounted for during clustering. This is typically done using one of an array of normalization steps \citep{Li2015}, although none have been shown to be uniformly superior. Also, the high dimensionality of genetic dataset necessitates a dimension reduction scheme that can pinpoint genes that may be most likely to be informative in clustering, as a majority of genes may be uninformative and vary due to noise. (\textbf{ADD SENTENCE ON IMPACT OF NOISE/UNINFORMATIVE GENES CITING PRIOR WORK}). Thus, many methods use some criterion to pre-filter genes that are nondiscriminatory in nature \citep{Ritter2015}. A widely-used method of pre-filtering is done by ranking and thresholding genes based on its median absolute deviation (MAD) \citep{Chung2008} (\textbf{Alternatives to discuss?}). Additionally, dealing with count data requires different distributional assumptions for model-based methods. The most naive model-based assumption with untransformed count data is the Poisson distribution, which is used alongside a penalized likelihood scheme by a very popular integrative method called iCluster+ \citep{Mo2013}. We believe, however, that such a model also has its limitations, as it does not account for extra-Poisson variation. There are also some non-model-based methods that have been shown to be efficacious with RNA-seq data, such as the average-linkage hierarchical clustering (HC) and K-medoids clustering (K-med) methods \citep{Jaskowiak2018}. HC works by iteratively fusing the two closest clusters together, starting with $n$ clusters and going down. The closeness is determined by a distance matrix and a linkage scheme. Typically, a 1-spearman or 1-pearson correlation is most commonly used, and Jaskowiak proposes that the average-linkage scheme provides the best results with RNA-seq. K-med is very similar in procedure to the widely-known K-means algorithm, but rather than assigning the means as the centroids, K-med assigns datapoints as centroids (medoids). K-med works similarly to K-means by minimizing the distance between cluster members and their corresponding centroid, but is more robust and can better handle count data. Although these do not have a mode of variable selection, they may be useful in clustering nonetheless after some pre-filtering scheme.
 
 %OUR APPROACH%
-In this paper, we propose an Expectation-Maximization algorithm with an underlying finite mixture Negative Binomial model, incorporating a modified version of the group truncated lasso penalty. This penalty has been shown to be able to shrink cluster means closer to one another as well as select features by a thresholding parameter (Pan et al 2013). There are four primary steps to our method. First, we pre-filter out genes with low variability, as this low variability overall presents strong evidence of the gene being nondiscriminatory across clusters. Second, we select the optimal number of clusters in the Order Selection step using the Bayesian Information Criterion (BIC). We iterate over a range of possible realistic numbers of clusters, and select the one that yields the lowest BIC value. Third, we search over a grid of possible combinations of the penalty parameters, and select using the BIC. Fourth, we input the optimal order and parameters into a full run of our algorithm.
+In this paper, we propose a finite mixture Negative Binomial model (\textbf{NEED BETTER NAME FOR METHOD}), incorporating a modified version of the group truncated lasso penalty. This penalty has been shown to be able to shrink cluster means closer to one another as well as select features by a thresholding parameter \citep{Pan2013}. There are four primary steps to our method. First, we pre-filter out genes with low variability using the MAD criterion to remove likely uninformative genes. Second, we select the optimal number of clusters in the Order Selection step using the Bayesian Information Criterion (BIC). Third, we search over a grid of possible combinations of the penalty parameters, and select the optimal tuning parameters using the BIC. Fourth, we input the optimal order and parameters into a full run of our algorithm.
 
-The EM algorithm is known to be able to converge to the local maximum or saddle point rather than the global maximum (Yu et al 2018). To prevent this
-
-There are also some non-model-based methods that have been shown to be efficacious with RNA-seq data, such as the average-linkage hierarchical and K-medoids clustering methods (Jaskowiak et al 2018). Although these do not have a mode of variable selection, they may be useful in clustering nonetheless after some pre-filtering scheme. We will compare our method with the count data portion of iCluster+, average-linkage hierarchical clustering, and K-medoids clustering methods.
+We also explore an alternative E step update to potentially overcome the limitation of the classic EM of converging to a local maximum. Also, we assess the degrees of freedom in the fitted dispersion parameters per gene. Our framework allows for a separate fitted dispersion per cluster, but a single parameter per gene may suffice and perhaps be more appropriate.
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%%%% 2. METHODS %%%%%
@@ -118,31 +627,35 @@ There are also some non-model-based methods that have been shown to be efficacio
 \section{Methods}
 \label{sec:meth}
 
-Our novel method utilizes the widely known Expectation-Maximization algorithm. Most model-based methods dealing with this type of data typically proceed with the assumption of an underlying Poisson distribution on the dataset. However, there is much evidence to suggest that the Poisson assumption is too conservative for this type of genomic data. Thus, we proceed with the more liberal assumption of a negative binomial distribution, with a gene-wise(?) overdispersion parameter that accounts for the extra-Poisson variation.
-
-Our main goal is two-fold: 1. to determine discriminatory genes based on differential expression of RNA-seq data, and 2. to cluster subjects based on similar expression profiles of genes. Also, we believe that our method is special in that it may be used to derive posterior probabilities of a sample's subtype based on the model that is fit on the dataset, which may be especially useful in prediction.
+The main goal of our method is two-fold: 1. to determine discriminatory genes based on differential expression of RNA-seq data, and 2. to cluster subjects based on similar expression profiles of genes. Also, we believe that our method is novel in that it may be used to derive posterior probabilities of a sample's subtype based on the model that is fit on the dataset, which may be especially useful in prediction. We utilize an EM algorithm to maximize our likelihood model.
 
 %%% 2.1 Obj fx %%%
 \subsection{Likelihood Model}
-The objective function is the well-known Q function, which is the conditional expectation of the complete data log-likelihood function, which is given by 
+Let $y_{ij}$ be the count of the $i$'th subject for the $j$'th gene, where $i=1,...,n$ and $j=1,...,g$, and assume it follows a Negative Binomial distribution with mean $\mu_{ijk}$ and dispersion $\phi_{j}$, where the mean and dispersions are parametrized:
+
+\begin{align}
+log(\mu_{ijk}) = & \beta_{jk} + s_i \\
+V(y_{jk}) = & \mu_{jk} + \phi_j\mu_{jk}^2
+\end{align}
+
+where $\beta_{jk}$ represents the cluster log mean for gene j and cluster k, where $k=1,...,K$, and $s_i$ is the log of the subject-specific normalization factors calculated by DESeq2 \citep{Love2014}. We pass these normalization factors as offsets into our regression model to correct for sequencing depth. Note that the equation calls for one common dispersion parameter per gene. The analog that we will assess is the use of separate cluster-specific dispersions, which replaces $\phi_j$ with $\phi_{jk}$ above. It is not known which scheme for these dispersions is more appropriate. Many prominent methods with RNA-seq use gene-specific dispersion parameters to account for extra-Poisson variation within each gene. However, it can be argued that in cases where the differences in dispersion between clusters is very large, estimating additional cluster-specific dispersion parameters may be required to better fit the model. But, it is also possible that this may lead to overfitting and skew the clustering results. In this paper, we find that one common dispersion per gene tends to be more accurate in terms of performance, but we will include the option to use separate cluster-specific dispersions as well.
+
+Estimation of $\beta_{jk}$ and $\phi_j$ is done by maximizing the conditional expectation of the complete data log-likelihood function, which is given by 
 
 \begin{equation}
-log[L(\Psi)]=\sum_{i=1}^{n} \sum_{k=1}^{K} z_{ik} \{log(\pi_k)+log[f_k(\boldsymbol{y_i}; \boldsymbol{\beta_k},\boldsymbol{\phi_k})]\}+p_\lambda(\beta)
+log[L(\Psi)]=\sum_{i=1}^{n} \sum_{k=1}^{K} z_{ik} \{log(\pi_k)+log[f_k(\boldsymbol{y_i}; \boldsymbol{\beta_k},\boldsymbol{\phi})]\}+p_\lambda(\beta)
 \end{equation}
 
-where $z_{ik}=I(z_i=k)$ denotes the indicator of subject $i$ being in cluster $k$ and $f_k(y_i; \beta_k)=\prod_{j=1}^{g} f_{jk}(y_{ij}; \beta_{jk},\phi_{jk})$. Given $y_{ij}$ is the count of the i'th subject for the j'th gene, where $i=1,...,n$ and $j=1,...,g$. The cluster means are given by $\beta_{jk}$ where $k=1,...,K$. The cluster proportions are given by $\pi_k$. The underlying assumption here is that the expression of each gene is uncorrelated to that of any other gene.
-
-Because $z_{ik}$ is unobservable, we estimate this quantity by the conditional expectation of $z_{ik}$ and the parameters estimated from the $m$th step. In this algorithm, we implement gene-by-gene iteratively reweighted least squares method, using coordinate-wise descent along the clusters. We include an elastic net penalty, which shrinks the means of each cluster closer together and selects genes by thresholding the differences to 0.
-
+where $z_{ik}=I(z_i=k)$ denotes the indicator of subject $i$ being in cluster $k$ and $f_k(\boldsymbol{y_i}; \boldsymbol{\beta_k})=\prod_{j=1}^{g} f_{jk}(y_{ij}; \beta_{jk},\phi_j)$. The cluster proportions are given by $\pi_k$. Because $z_{ik}$ is unobservable, we estimate this quantity by the conditional expectation of $z_{ik}$ given the parameters estimated from the $m$th step. For simplicity of the model, we assume that the expression of each gene is uncorrelated to that of any other gene, which makes the maximization of $\beta_{jk}$ and $\phi_j$ separable. We can then implement a gene-by-gene maximization procedure, which we outline in the M step section.
 
 % 2.1.1 Penalty
 \subsubsection{Penalty}
-The penalty is the so-called grouped truncated lasso (Pan et al 2013), which uses a elastic-net type penalty, that is a hybrid of the lasso (L1) and ridge (L2) penalties (Tibshirani 1996). This penalty performs shrinkage of cluster log means towards each other and selection of genes whose differences in cluster log means are small, while offsetting the drawbacks of each penalty, much like an elastic net penalty (Zou and Hastie 2005).
+The penalty we incorporate is the so-called grouped truncated lasso penalty, which uses a hybrid of the lasso (L1) and ridge (L2) penalties \citep{Tibshirani1994}. This penalty performs shrinkage of cluster log means towards each other, as well as selection of genes whose differences in cluster log means are small. The incorporations of both types of penalties offset the drawbacks of each penalty, much like the elastic net penalty \citep{Zou2005}.
 \begin{equation}
 p_{\lambda}(\beta)=\frac{\lambda_1}{2}\sum_{k<l} \norm{\beta_k-\beta_l-\theta_{kl}}_2^2 + \lambda_2 \sum_{k<l}TLP(\norm{\theta_{kl}}_2;\tau)
 \end{equation}
 
-where $\theta_{kl}=\beta_k-\beta_l$ is a reparametrization to store the difference between cluster means in the previous iteration, and $TLP(\alpha;\tau)=min(\abs{\alpha},\tau)$. In this penalization scheme, $\lambda_1$ is the parameter that controls shrinkage of the cluster means towards one another, and $\lambda_2$ is the parameter that controls selection by thresholding two cluster means to be equal if they are close enough together. The $\tau$ parameter is a threshold that introduces no further penalty when the difference between cluster means is sufficiently large.
+where $\theta_{kl}=\beta_k-\beta_l$ is a reparametrization to store the difference between cluster means in the previous iteration, and $TLP(\alpha;\tau)=min(\abs{\alpha},\tau)$. In this penalization scheme, $\lambda_1$ is the parameter that controls shrinkage of the cluster means towards one another, and $\lambda_2$ is the parameter that controls selection by thresholding two cluster means to be equal if they are close enough together. The $\tau$ parameter is a threshold that introduces no further penalty when the difference between cluster means is sufficiently large. When the difference in estimated log means is sufficiently small, i.e. $\abs{\beta_{jk} - \beta_{jl}}<\lambda_2$ the coefficients are set equal by setting them equal to the mean of the two parameters.
 
 %%% 2.2 Computation %%%
 \subsection{Computation}
@@ -154,22 +667,22 @@ We calculate the conditional expectation of the $z_{ik}$ given the current estim
 \hat{z}_{ik}^{(m)}=\dfrac{\hat{\pi}_k^{(m)}f_k(\boldsymbol{y_i};\boldsymbol{\hat{\beta}_k^{(m)},\hat{\phi}_k^{(m)}})}{\sum_{l=1}^{K}\hat{\pi}_l^{(m)}f_l(\boldsymbol{y_i};\boldsymbol{\hat{\beta}_l^{(m)},\hat{\phi}_l^{(m)}})}
 \end{equation}
 
-There are some variants of the E step that have been proposed by Biernacki et al (2003). Replacing the E step update with classification and/or stochastic E step updates has been shown to help the EM algorithm to not get stuck at a local maxima. In our numerical analyses, we will explore the effects of using these alternate E step updates on performance.
+At convergence, we are able to assign patients according to these posterior probabilities. These probabilities will also allow for partial cluster membership, as their values will be between 0 and 1, but the final cluster label is assigned to the cluster that corresponds to the maximum value of the posterior probabilities for that subject.
 
+The EM algorithm is known to be able to converge to the local maximum or saddle point rather than the global maximum \citep{Yu2018}. To prevent this, we compare multiple initializations with a shorter EM run. Then, we choose the optimal initialization based on the BIC. We also introduce a variant of the E step that has been known to address this issue. Replacing the E step update with classification E step update has been shown to help the EM algorithm to not get stuck at a local maxima \citep{Biernacki2003}. In our numerical analyses, we will explore the effects of using this alternate E step update on performance, and we will incorporate the classification E step as an optional substitute for the classic E step in our method.
 
 % 2.2.2 M Step
 \subsubsection{M Step}
 In the M step of the EM algorithm, we update the current estimates of the parameters to maximize the penalized objective function. The maximization of $\pi_k$ and $\beta_{jk}$ are separable, thus they can be done independently.
 
-
 %Est of beta
-The maximization of the cluster means and dispersion parameter(s) is performed by iteratively reweighted least squares using a coordinate-wise descent algorithm. We first maximize the penalized objective function to estimate the cluster means. This is accomplished by using a transformed response, as implemented in Breheny et al (2011) (ncvreg paper). We fix a gene j, and transform the responses by the following:
+The maximization of the cluster means and dispersion parameter(s) is performed by iteratively reweighted least squares using a coordinate descent algorithm. We first maximize the penalized objective function to estimate the cluster means. This is accomplished by using a transformed response \citep{Breheny2011}. We fix a gene $j$, and transform the responses by the following:
 
 $$\tilde{y}_{ik}=\hat{\eta_k}+(\frac{y_i-g(\hat{\eta}_k)}{g'(\hat{\eta}_k)})$$
 
 Here, $g()$ refers to the inverse link function for the Negative Binomial family with log link, thus $g(\eta)=\mu$, where $g^{-1}(\mu)=log(\mu)$ is the standard log link function.
 
-Using this transformation, the penalized objective function (Breheny 2011) becomes:
+Using this transformation, the penalized objective function becomes:
 
 \begin{equation}
 Q_j(\boldsymbol{\beta}) \approx \frac{1}{2n}(\mathbf{\tilde{y}}-\mathbf{X}\boldsymbol{\beta})'\mathbf{W}(\mathbf{\tilde{y}}-\mathbf{X}\boldsymbol{\beta})+\sum_{k=1}^{K}p_{\boldsymbol{\lambda}}(\beta_{jk})
@@ -189,33 +702,23 @@ Therefore, we have $w_{ik}=\sqrt{\dfrac{\hat{z}^{(m)}_{ik} g'(\eta)^2}{V(\mu)}}$
 \end{split}
 \end{equation}
 
-with $ST(\alpha,\lambda)=sign(\alpha)(\lvert \alpha \rvert-\lambda)_+$ denoting the usual soft-thresholding rule. The gene $j$ is fixed, and the above procedure is repeated for every gene $j=1, ..., g$. 
+with $ST(\alpha,\lambda)=sign(\alpha)(\lvert \alpha \rvert-\lambda)_+$ denoting the usual soft-thresholding rule. The gene $j$ is fixed, and the above procedure is repeated for every gene $j=1, ..., g$. In this framework, $\hat{\theta}$ represents shrinkage on the cluster means, with the cluster means set as equal when they are within $\lambda_2$ from each other. After sequentially updating the cluster means, we estimate the overdispersion parameter $\phi$ using a maximum likelihood (ML) approach. However, this approach is limited due to instability when sample size is small. To mitigate this, we include a very small penalty (order of $10^{-50}$) on the ML estimation of $\phi$ to stabilize the estimate in the low sample setting. We also compared the effects of fitting a common dispersion per gene, and cluster-specific dispersions per gene. It is not known which would be more appropriate for this type of data. Cluster-specific dispersion parameters may provide a better fitting model to the data, but gene-specific dispersion parameters will allow for more sparsity and avoid the issue of overfitting. The function in the R package will include the option to use either scheme.
 
-In this framework, $\hat{\theta}$ represents shrinkage on the cluster means, with the cluster means set as equal when they are within $\lambda_2$ from each other.
-
-
-
-%Est of phi
-After sequentially updating the cluster means, we estimate the overdispersion parameter $\phi$ using a maximum likelihood (ML) approach. However, this approach is limited due to instability when sample size is small. To mitigate this, we include a very small penalty (order of $10^{-50}$) on the ML estimation of $\phi$ to stabilize the estimate in the low sample setting.
-
-We also compared the effects of using gene-specific and cluster-specific dispersion parameters. It is not known which would be more appropriate for this type of data. Cluster-specific dispersion parameters may provide a better fitting model to the data, but gene-specific dispersion parameters will allow for more sparsity and avoid the issue of overfitting. The function in the R package will include the option to use either scheme.
-
-
-% 2.2.3 Convergence
-\subsubsection{Stopping Criteria}
+% Convergence
 The stopping criterion for the EM algorithm is based on a threshold on the Q function. The algorithm is considered to have "converged" if $\lvert Q^{(m+1)}-Q^{(m)} \rvert< \epsilon_1$
 
 The stopping criterion for the IRLS in the M step is based on a threshold on the sum of squares of the parameters. The algorithm is considered to have converged if $\lvert \boldsymbol{\beta}^{(l+1)}-\boldsymbol{\beta}^{(l)} \rvert + \lvert \boldsymbol{\phi}^{(l+1)}-\boldsymbol{\phi}^{(l)} \rvert < \epsilon_2$
 
 We set both $\epsilon_1 = 10^{-6}$ and $\epsilon_2 = 10^{-6}$.
 
-% 2.2.4 Tuning Parameters
+% 2.2.3 Tuning Parameters
 \subsubsection{Tuning Parameters}
 
-The optimal number of clusters K is found by searching over a range of values $K=(1, ...,7)$ and comparing the fit using the yielded BIC values. \cref{fig:1} gives a graphical representation of the procedure on an example simulated dataset
+The optimal number of clusters K is found by searching over a range of values $K=(1, ...,7)$ and comparing the fit using the yielded BIC values. \ref{fig:1} gives a graphical representation of the procedure on an example simulated dataset
 
 \begin{figure}
 \begin{center}
+%\includegraphics{C:/Users/limdd/Documents/Research/Sweave/Project1/BICvOrder.png}
 <<echo=FALSE,fig=TRUE>>=
 load("C:/Users/limdd/Documents/Research/Sweave/Project1/list_BIC_n100_g865_K3.Rout")
 plot(list_BIC,ylab="BIC",xlab="K",main="Plot of BIC vs. order")
@@ -227,7 +730,6 @@ plot(list_BIC,ylab="BIC",xlab="K",main="Plot of BIC vs. order")
 
 Optimal tuning parameters for \(\lambda_2\) and \(\tau\) are also found by using the BIC criterion. The algorithm searches over a grid of values, and selects the combination that yields the lowest BIC. Pan proposed fixing the shrinkage parameter $\lambda_1=1$, varying the thresholding parameters $\lambda_2$ and $\tau$. We set $\lambda_1=1$ and search over $\lambda_2=(0.01, 0.05, 0.1, 0.15, 0.2)$ and $\tau=(0.1, 0.3, 0.5, 0.7, 0.9)$. Pan further proposed re-running the algorithm after doubling the value of $\lambda_1$ upon convergence in order to prevent the algorithm from being stuck at local maxima. For the sake of computation time, we instead implemented the classification and stochastic E step weights as an alternative solution to this issue.
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% 3. Numerical Examples %%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -238,7 +740,7 @@ Optimal tuning parameters for \(\lambda_2\) and \(\tau\) are also found by using
 %%% 3.1 Simulations %%%
 \subsection{Simulations}
 
-It is well-known that a majority of the genes in a typical dataset is nondiscriminatory across subtypes. In order to cluster subtypes accurately, it is important to filter out genes that are obviously nondiscriminatory in nature. One common way to do this is by filtering out genes whose median absolute deviation is low (Chung et al 2008). We utilize this, along with a subsequent wrapper in our method to perform pre-filtering and variable selection on the data for analysis (Ritter et al book).
+It is well-known that a majority of the genes in a typical dataset is nondiscriminatory across subtypes. In order to cluster subtypes accurately, it is important to filter out genes that are obviously nondiscriminatory in nature. One common way to do this is by filtering out genes whose median absolute deviation is low \citep{Chung2008}. We utilize this, along with a subsequent wrapper in our method to perform pre-filtering and variable selection on the data for analysis \citep{Ritter2015}.
 
 (MAYBE ADD: NB GOF pvalue vs MAD)
 
@@ -246,18 +748,20 @@ We simulated 100 datasets per condition, and spanned an extensive set of conditi
 
 To explore the behaviors in various realistic settings, we simulated low, medium, and high expression and noise values based on the 25th, 50th, and 75th quantiles of the estimates of expression and dispersion in the TCGA Breast Cancer dataset. These values were approximately $\beta=(3.75,6.5,7.85)$ and $\phi=(0.15,0.35,1.00)$, respectively.
 
-After simulating, we imposed pre-filtering and kept just the genes with the top 25\% of MAD. \cref{tab:1} shows the performance statistics with varying coefficients and noise, averaged across all of the other variables ($LFC$, $K$, $n_k$, $g$, and $p_{disc}$). One very promising added utility of our method is the ability to perform prediction based on the estimated parameters and the posterior weights from the E step. We analyze the performance of clustering, discovering discriminatory genes across clusters, as well as predicting on newly simulated samples (floor(0.1*n)) in \cref{tab:1}
+After simulating, we imposed pre-filtering and kept just the genes with the top 25\% of MAD. \ref{tab:1} shows the performance statistics with varying coefficients and noise, averaged across all of the other variables ($LFC$, $K$, $n_k$, $g$, and $p_{disc}$). One very promising added utility of our method is the ability to perform prediction based on the estimated parameters and the posterior weights from the E step. We analyze the performance of clustering, discovering discriminatory genes across clusters, as well as predicting on newly simulated samples (floor(0.1*n)) in \ref{tab:1}
 
 <<xtable1, results=tex, echo=FALSE>>==
 library(xtable)
-load("C:/Users/limdd/Documents/Research/Sweave/Project1/simulation_res.RData")
+load("C:/Users/limdd/Documents/Research/Simulations/gene_fixed_mad25_icluster_and_pred/second/simulation_res.RData")
 colnames(summary_tab_coefphi)[1:3] = c("$\\beta$","$\\phi$","Order Acc")
 tab1 = xtable(summary_tab_coefphi,
               digits=2,
               table.placement="!h",
-              caption="Effects of varying coefficients ($\\beta$) and noise ($\\phi$) in simulated datasets on performance",
-              label = "tab:1")      # K=3, n=50, g=1000
-print(tab1,include.rownames=F, sanitize.text.function=identity)
+              caption="Effects of varying coefficients ($\\beta$) and noise ($\\phi$) in simulated datasets on performance. The highlighted row represents the median $\\beta$ and $\\phi$ based on TCGA Breast Cancer Dataset.",
+              label = "tab:1",
+              floating.environment = "table*")      # K=3, n=50, g=1000
+print(tab1,include.rownames=F, sanitize.text.function=identity,
+      add.to.row=list(pos=as.list(4),command="\\rowcolor[gray]{.9}"))
 @
 
 As the average expression of the genes ($\beta$) goes up, we see that clustering performance (ARI) and order selection accuracy both increase. This is because as the mean expression for a gene increases, the distance two clusters in that particular gene increases. since the log fold change creates a greater separation at higher expressions. For example, the distance between $\beta=3$ and $\beta=4$ is much smaller than the distance between $\beta=6$ and $\beta=7$, since $\mu=e^{\beta}$, and $e^4-e^3 < e^7-e^6$.
@@ -266,110 +770,132 @@ Conversely, as noise ($\phi$) increases, we see a decrease in clustering and ord
 
 Another useful feature of our algorithm is the ability to perform simultaneous variable selection while clustering. This helps us uncover which genes are discriminatory across clusters. We note that the sensitivity, or the proportion of discriminatory genes that are determined correctly to be discriminatory, is very good when the noise is small, but gets worse as noise is increased. We found that the false positive rate (FPR), or the rate at which nondiscriminatory genes are falsely determined to be discriminatory, does not follow this trend, but remains relatively constant through varying noise. 
 
-A common integrative clustering method that is able to handle count data is iClusterPlus (Mo et al 2012). It assumes a Poisson distribution on the data, and uses a L1 penalized likelihood model to estimate the parameters, while using a sampling scheme from the posterior distribution of the latent variables to discover clustering labels. We compared our method to just the count data portion of iClusterPlus's integrative method.
+A common integrative clustering method that is able to handle count data is iCluster+. It assumes a Poisson distribution on the data, and uses a L1 penalized likelihood model to estimate the parameters, while using a sampling scheme from the posterior distribution of the latent variables to discover clustering labels. We compared our method to just the count data portion of iCluster+'s integrative method.
 
-Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering and K-medoids (Jaskowiak et al 2018). There has been a study that suggests that these were among the most robust and efficient in clustering this type of data. (MAYBE INSERT THEORY OF HC AND K-MEDOIDS CLUSTERING).
+Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering and K-medoids. There has been a study that suggests that these were among the most robust and efficient in clustering this type of data.
 
-(((INSERT TABLE 2: comparison between EM, iCluster+, HC, K-Medoids. running now)))
+<<xtable2, results=tex,echo=FALSE>>==
+tab=all_summary_tabs[[2]][[2]][,-7]
+colnames(tab) = c("Parameter", "Order Acc", "ARI", "Sensitivity", "FPR","Pred Acc","iARI")
 
-% <<xtable2, results=tex,echo=FALSE>>==
-% @
+tab2=xtable(tab,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of varying simulation parameters on performance. Values of performance are averaged across all other conditions, keeping row condition fixed",
+              label = "tab:2",
+            floating.environment = "table*")      # K=3, n=50, g=1000
+print(tab2,include.rownames=F,sanitize.text.function=identity,table.placement="H")
+@
 
-We analyzed some very natural variants of our method. For one, we have so far restricted the simulations to contain gene-specific dispersions. It is not currently known whether a scheme with one dispersion parameter across all clusters for each gene adequately portrays real data. It may sometimes be more appropriate to introduce cluster-specific dispersion parameters to better fit the data, yielding more accurate estimates. However, this may also result in overfitting the data, which would cause our model to get stuck at a local maxima. One potential drawback that may result is that the order may be underestimated, as the extra dispersion parameters may cause the algorithm to favor a smaller number of clusters in the data.
+Here, we introduce some variants of our method. For one, we have so far restricted the simulations to contain gene-specific dispersions. It is not currently known whether a scheme with one dispersion parameter across all clusters for each gene adequately portrays real data. It may sometimes be more appropriate to introduce cluster-specific dispersion parameters to better fit the data, yielding more accurate estimates. However, this may also result in overfitting the data, which would cause our model to get stuck at a local maxima. One potential drawback that may result is that the order may be underestimated, as the extra dispersion parameters may cause the algorithm to favor a smaller number of clusters in the data.
 
-Secondly, research has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step (Biernacki et al 2003). This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. \cref{tab:3} \cref{tab:4} show the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. Results are based on 10 simulated datasets for each case. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
+Secondly, prior work has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step. This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. We use a simulated annealing method \citep{Rose1998,Si2013} to slowly wean off the noise-adding effects of the CEM, and revert to the original EM. \ref{tab:3} \ref{tab:4} show the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. Results are based on 10 simulated datasets for each case. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
 
 %%%%% EXCLUDE ICLUSTER+ COMPARISON FOR TABLES 3 AND 4. JUST COMMENT ON IT IN PAPER %%%%%%%%%%%%%
 <<xtable3,results=tex,echo=FALSE>>==
 load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
-colnames(tab_g) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","Pred Acc")
+colnames(tab_g) = c("$K$","ARI","$p_{disc}$","Sensitivity","FPR","Pred Acc")
 tab3 = xtable(tab_g,
               digits=2,
               table.placement="!h",
-              caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: ARI values are based on runs with true number of clusters, for fair comparisons. Hierarchical clustering and K-medoids do not have a method for order selection. The simulated dispersions were gene-specific.",
-              label = "tab:3",na.print="")      # K=3, n=50, g=1000jo
-print(tab3,include.rownames=T, sanitize.text.function=identity)
+              caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: For fair comparisons, ARI values are based on runs with true number of clusters. The simulated dispersions were gene-specific.",
+              label = "tab:3",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
+print(tab3,include.rownames=T, sanitize.text.function=identity,table.placement="H")
 
 @
 
 <<xtable4,results=tex,echo=FALSE>>==
 #load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
-colnames(tab_cl) = c("$K$","$p_{disc}$","EM ARI","Sensitivity","FPR","Pred Acc")
+colnames(tab_cl) = c("$K$","ARI","$p_{disc}$","Sensitivity","FPR","Pred Acc")
 tab4 = xtable(tab_cl,
               digits=2,
               table.placement="!h",
-              caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: ARI values are based on runs with true number of clusters, for fair comparisons. The simulated dispersions were cluster-specific.",
-              label = "tab:4")      # K=3, n=50, g=1000
-print(tab4,include.rownames=T, sanitize.text.function=identity)
+              caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. The simulated dispersions were cluster-specific.",
+              label = "tab:4",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000
+print(tab4,include.rownames=T, sanitize.text.function=identity,table.placement="H")
 @
 
-From \cref{tab:3} and \cref{tab:4}, we see that iCluster+ seems to overestimate the order in each case. Because it treats count data as distributed Poisson, it is likely that iCluster+ is not able to account for the extra-Poisson variation caused by the simulated noise. Also, in general, the order is underestimated for the EM runs with cluster-specific dispersion parameters than the runs with gene-specific dispersion parameters. This is due to the fact that allowing for cluster-specific dispersions overfits the data, so the cluster-specific dispersions is sufficient to explain the unaccounted clusters in the results. Because of this, the clustering accuracy suffers.
+From \ref{tab:3} and \ref{tab:4}, we see that iCluster+ seems to overestimate the order in each case. Because it treats count data as distributed Poisson, it is likely that iCluster+ is not able to account for the extra-Poisson variation caused by the simulated noise. Also, in general, the order is underestimated for the EM runs with cluster-specific dispersion parameters than the runs with gene-specific dispersion parameters. This is due to the fact that allowing for cluster-specific dispersions overfits the data, so the cluster-specific dispersions is sufficient to explain the unaccounted clusters in the results. Because of this, the clustering accuracy suffers.
 
-We also notice the effect of the classification E step modification in our algorithm. We see that for a gene-specific dispersion scheme, the CEM seems to increase the ARI slightly. We notice that in \cref{tab:3}, the CEM caused the cluster-specific dispersion EM model to select the incorrect order. This portrays a risk of the CEM, as the variant E step adds randomness by drawing posterior probabilities closer together, and may lead to such instabilities.
+We also notice the effect of the classification E step modification in our algorithm. We see that for a gene-specific dispersion scheme, the CEM seems to increase the ARI slightly. We notice that in \ref{tab:3}, the CEM caused the cluster-specific dispersion EM model to select the incorrect order. This portrays a risk of the CEM, as the variant E step adds randomness by drawing posterior probabilities closer together, and may lead to such instabilities.
 
 Although the clustering accuracy was dependent on the dispersion scheme, the sensitivity and false positive rate in discovering discriminatory genes seem to not be affected. In each case, the algorithm was able to correctly distinguish all of the simulated discriminatory genes, with very few false positive cases.
 
-The prediction accuracy was calculated by first inputting the correct order in cases that the order was incorrectly selected, simulating 20 samples ($n_{pred}=0.1*n$) with the same simulated parameters, and selecting the cluster with the highest posterior probability for each sample. In either intrinsic dispersion scheme, we see that the prediction accuracy is very high.
+The prediction accuracy was calculated by first inputting the correct order in cases that the order was incorrectly selected, simulating 20 samples ($n_{pred}=0.1n$) with the same simulated parameters, and selecting the cluster with the highest posterior probability for each sample. In either intrinsic dispersion scheme, we see that the prediction accuracy is very high (> 0.94).
 
 %%% 3.2 Real Data %%%
 \subsection{Real Data}
 
 \subsubsection{TCGA Breast Cancer Dataset}
 
-We performed our clustering analysis on The Cancer Genome Atlas breast cancer dataset. This dataset contained 1215 subjects and 19682 genes. Of these subjects, we narrowed down to subjects who had prior annotated subtypes in the dataset based on the PAM50 genes. We also dropped the normal-like subtype, which occurred in just 8 cases out of 521 subjects. Thus, we analyzed 513 samples with 4 different subtypes: 231 luminal A, 127 luminal B, 97 basal-like, and 58 HER2-enriched. Then, we filtered out genes with low count by taking excluding from analysis the genes with MAD scores below the 75th quantile, yielding 4921 total genes. (ADD ARI and SILHOUETTE DERIVED for CEM, and rerun for current EM)
+We performed our clustering analysis on The Cancer Genome Atlas (TCGA) breast cancer dataset. This dataset contained 1215 subjects and 19682 genes. Of these subjects, we narrowed down our analysis to subjects whose subtypes were previously determined and annotated by a study done by TCGA based on the PAM50 genes (Koboldt et al, 2012). We also dropped the normal-like subtype, which occurred in just 8 cases out of 521 subjects. Thus, we analyzed 513 samples with 4 different subtypes: 231 luminal A, 127 luminal B, 97 basal-like, and 58 HER2-enriched. Then, we filtered out genes with low count by excluding the genes with MAD scores below the 75th quantile from our analysis, yielding 4921 total genes.
 
-We compared our method to the count data method of iCluster+ (Mo et al 2012). We used the same criterion (BIC) to search for the optimal order and tuning parameters. As shown in \cref{tab:5}, our method found the correct order of 4, while iCluster+ favored a higher number of clusters. Our method also yielded a greater agreement (ARI) to the annotated clusters, as well as a higher mean silhouette value. (SHOULD I INCLUDE EQUATIONS FOR ARI/silhouette here? Ge et al 2017 provides equation for silhouette)
+We compared our method to the count data method of iCluster+, as well as the average-linkage hierarchical clustering (HC) model and K-medoids (K-med) model. We used the same criterion (BIC) to search for the optimal order and tuning parameters. The order selection steps for the EM and for iCluster+ were compared to see if the annotated number of clusters can be recovered. The EM correctly recovered the annotated order of $K=4$, but iCluster+ continued to select the maximum number of clusters in the range ($K=7$). In \ref{tab:5}, we compared all the methods with the correct number of clusters input. First, we notice the drastically lower agreement (ARI) of the HC and K-med clusters compared to the EM. The results also show that the EM and iCluster+ yielded clusters with the same ARI values compared to the annotated clusters, although the EM yielded a slightly higher mean silhouette value. Mean silhouette value measures clustering accuracy by a combination of proximity within clusters, and distance away from other clusters \citep{Ge2017}. A recent study showed that higher average silhouette value is robust to small sample size, and can be very indicative of degree of cluster separation in RNA-seq data \citep{Zhao2018}. K-med works by minimizing the distance between each cluster point and the center of the cluster. This seems to most closely reflect how the silhouette value is computed, so K-med naturally yields the highest mean silhouette value ($0.136$). After K-med, EM yielded the highest mean silhouette value ($0.100$) Silhouette values were based on the 1-pearson correlation distance.
+
+We also performed survival analysis with each respective clustering labels. Although the results seem to slightly favor the annotated clusters ($p=0.125$) over the EM ($p=0.200$), survival data was very limited in this study (only 79 out of 513 samples), so we were hesitant to draw any conclusions. We then conducted the Fisher's Exact test on the overall survival (OS) of the patients. There were 62 OS events, and no missing data points in the 513 total samples.
+
+HC clusters seemed to yield the lowest p-value in this case, but upon closer examination, we found that 509 out of the 513 samples had been clustered together. This is clearly not optimal, and showed that the hierarchical model was unable to distinguish the clusters very well. The annotated clusters surprisingly yielded the highest p-value of $0.579$, while iCluster+ yielded a smaller p-value of $0.291$. We found a significantly smaller p-value of $0.088$ via the EM.
 
 <<xtable5,results=tex,echo=F>>=
-library(mclust)
-library(cluster)
-load("C:/Users/limdd/Documents/Research/BRCA_env.Rdata")
-load("C:/Users/limdd/Documents/Research/X2.out")
-true_K = length(levels(droplevels(as.factor(BRCA_subtypes))))
-EM_K = X2$EM_maxK
-EM_ARI=adjustedRandIndex(X2$EM_clusters,BRCA_subtypes)
-i_K = X2$i_maxK
-i_ARI=adjustedRandIndex(X2$i_clusters,BRCA_subtypes)
+load("C:/Users/limdd/Documents/Research/Real Data/TCGA BRCA/BRCA_compare_res.RData")
+colnames(tab) = c("K","ARI","Silhouette","L-R p-value","Fisher's p-value")
 
-# Silhouette
-load("C:/Users/limdd/Documents/Research/Sweave/Project1/BRCA_dist.out")
-i_sil = silhouette(X2$i_clusters,d)
-EM_sil = silhouette(X2$EM_clusters,d)
-
-EMclust = c(EM_K,EM_ARI,mean(EM_sil[,3]))
-iclust = c(i_K,i_ARI,mean(i_sil[,3]))
-
-
-tab5 = data.frame(rbind(round(EMclust,3),round(iclust,3)))
-colnames(tab5) = c("K","ARI","Silhouette")
-rownames(tab5) = c("EM","iCluster+")
-
-tab5 = xtable(tab5,caption="Comparing iCluster+ with EM method. True (annotated) order is 4. Values of ARI closer to 1 indicate better clustering results with respect to the true (annotated) clusters. Silhouette values cluster to 1 indicate better clustering results based on dissimilarity matrix on normalized counts.",label="tab:5")
-print(tab5)
-
-#aggregate(EM_sil[,3], list(EM_sil[,1]), mean)   # See silhouette value means per cluster
-#aggregate(i_sil[,3], list(i_sil[,1]), mean)
+tab5 = xtable(tab,digits=3,caption="Cluster Analyses and p-values from Log-Rank survival test (L-R) and Fisher's Exact test of TCGA Breast Cancer dataset on NB-EM, iCluster+, Average-linkage hierarchical clustering (HC), and K-medoids (K-Med). *Note: Due to lack of an order selection step, annotated number of clusters $K=4$ was plugged in.",
+              label="tab:5",table.placement="H",na.print="",
+              floating.environment = "table*")
+print(tab5,sanitize.text.function=identity,table.placement="H")
 
 @
 
-It it known that the PAM50 genes are genes of significant interest for breast cancer. We performed further analysis on just these PAM50 genes. \cref{fig:2} is a heatmap of the known PAM50 genes, ordered by the clustering results of our CEM, and using the scheme with gene-specific dispersion parameters. (NOTE TO SELF: with initial Tau = 2. need to be re-run and made bigger to see gene labels)
+Our method produced a total of 2988 discriminatory genes. \ref{fig:2} shows a heatmap of these genes, ordered by the derived clusters. Given the very small false positive rate in our simulations, we predict that many of these genes provide valuable information in differential expression across these clusters.
 
-\begin{figure}[H]
+\begin{figure}
 \begin{center}
-\includegraphics{C:/Users/limdd/Documents/Research/Sweave/Project1/BRCA_pam50_CEM.png}
+\includegraphics[width=170mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/BRCA_HM_disc.eps}
 \end{center}
-\caption{Heatmap of TCGA Breast Cancer PAM50 genes, comparing annotated clusters with CEM and EM algorithms.}
+\caption{Heatmap of derived discriminatory genes. Cluster labels are annotated above, with derived clusters ("EM") and annotated clusters.}
 \label{fig:2}
 \end{figure}
 
+It has been widely known and accepted that the PAM50 genes are genes of significant interest in determining subtypes of cancer. We thus performed further analyses on just these PAM50 genes. Interestingly, 22 of the 50 genes were pre-filtered out due to a low MAD value. Also, out of the 28 that made it past the pre-filtering step, our algorithm found only 20 genes to be discriminatory across clusters. \ref{fig:3} shows the distribution of MAD scores of the PAM50 genes that were pre-filtered out, as well as the estimated log fold change across clusters for those PAM50 genes that were selected by our algorithm to be nondiscriminatory. Because these genes yielded a smaller estimated LFC (< 0.5), the penalty scheme selects them out as nondiscriminatory.
 
-Using just these genes, we found $ARI = 0.407$ using the cluster-specific dispersion parameters, and $ARI = 0.523$ using the gene-specific dispersion parameters.
+\begin{figure}
+\begin{center}
+\includegraphics[width=170mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/BRCA_MAD_LFC_PAM50.png}
+\end{center}
+\caption{(left) MAD scores of PAM50 genes, stratified by inclusion via MAD pre-filtering scheme; (right) Estimated LFC's of normalized counts across derived clusters}
+\label{fig:3}
+\end{figure}
+
+The low variation in the pre-filtered out PAM50 genes may suggest that these genes are not as valuable in clustering RNA-seq data. Even still, our algorithm selected about $15.2\%$ of the initial genes to be discriminatory, and selected $40\%$ of the PAM50 genes as discriminatory. \ref{fig:4} displays the heatmaps of these PAM50 genes, ordered by the derived and annotated cluster labels.
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=170mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/BRCA_HMs_PAM50.jpg}
+\end{center}
+\caption{Heatmap of PAM50 genes ordered by derived (top) clusters, and by annotated (bottom) clusters.}
+\label{fig:4}
+\end{figure}
+
+We found that the the derived clusters tended to fuse together the Luminal A and Luminal B subtypes. Also, the algorithm was not able to cluster out the HER2-enriched subtype distinctly from the other subtypes, but samples of that subtypes seems to be interspersed throughout. The Basal-like and Luminal A subtypes seem to, at least for the most part, be distinguishably clustered together, but the Luminal B and HER2 clusters were not clustered as well apart.
 
 \subsubsection{TCGA Bladder Cancer Dataset}
 
-We also performed similar analyses on the TCGA Bladder Cancer dataset. This dataset contained 408 samples with annotated subtypes: 142 basal-squamous, 142 luminal-papillary, 78 luminal-infiltrated, 26 luminal, and 20 neuronal. As before, we filtered just the genes with the top 25 quantile MAD scores, leaving 4916 genes in the analysis.
+We also performed similar analyses on the TCGA Bladder Cancer dataset. This dataset contained 408 samples with annotated subtypes based on a study (Robertson et al, 2017): 142 basal-squamous, 142 luminal-papillary, 78 luminal-infiltrated, 26 luminal, and 20 neuronal. As before, we filtered just the genes with the top 25 quantile MAD scores, leaving 4916 genes in the analysis. The luminal and neuronal subtypes accounted for just 6.4\% and 4.9\% of the subjects, respectively.
 
+The EM order selection step yielded $K=4$, while the iCluster+ order selection step yielded $K=7$. We see that iCluster+ constantly overestimates the order because of its inability to deal with extra-Poisson variation. Our order selection was closer to the truth ($K=5$), but it slightly underestimated the order because of the small sample size in the luminal and neuronal subtypes. For comparisons, we input the correct number of clusters to each method.
 
+<<xtable6,results=tex,echo=F>>=
+load("C:/Users/limdd/Documents/Research/Real Data/TCGA BLCA/BLCA_compare_res.RData")
+colnames(tab) = c("K","ARI","Silhouette","L-R p-value","Fisher's p-value")
+
+tab6 = xtable(tab,digits=3,caption="Cluster Analyses and p-values of TCGA Bladder Cancer data from Log-Rank survival test (L-R) and Fisher's Exact test on NB-EM, iCluster+, Average-linkage hierarchical clustering (HC), and K-medoids (K-Med).",
+              label="tab:6",table.placement="H",na.print="",floating.environment = "table*")
+print(tab6,sanitize.text.function=identity,table.placement="H")
+
+@
+
+Survival analysis was done on 178 non-missing survival times. Surprisingly, the EM produced a lower ARI value ($0.335$) with the correct order than with the optimal order from the order selection step ($0.407$), although the average silhouette value with the correct order ($0.077$) was slightly higher than with the selected order ($0.067$). 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% 4. DISCUSSION %%%%%
@@ -378,30 +904,63 @@ We also performed similar analyses on the TCGA Bladder Cancer dataset. This data
 \section{Discussion}
 \label{sec:disc}
 
+Our findings from the simultions and real data applications give evidence to the usefulness of our method.
+
+One way that 
 Extensions: gene-gene interaction/correlation, adjusting for confounders (batch effects),
 
-%\cite{Campbell02}, \cite{Schubert13}, \cite{Chi81}
+\backmatter
+%  This section is optional.  Here is where you will want to cite
+%  grants, people who helped with the paper, etc.  But keep it short!
 
-\bigskip
-\begin{center}
-{\large\bf SUPPLEMENTARY MATERIAL}
-\end{center}
+\section*{Acknowledgements}
 
-\begin{description}
+The authors thank Professor A. Sen for some helpful suggestions,
+Dr C. R. Rangarajan for a critical reading of the original version of the
+paper, and an anonymous referee for very useful comments that improved
+the presentation of the paper.\vspace*{-8pt}
 
-\item[Title:] Brief description. (file type)
+%  If your paper refers to supplementary web material, then you MUST
+%  include this section!!  See Instructions for Authors at the journal
+%  website http://www.biometrics.tibs.org
 
-\item[R-package for  MYNEW routine:] R-package ÒMYNEWÓ containing code to perform the diagnostic methods described in the article. The package also contains all datasets used as examples in the article. (GNU zipped tar file)
+\section*{Supplementary Materials}
 
-\item[HIV data set:] Data set used in the illustration of MYNEW method in Section~ 3.2. (.txt file)
-
-\end{description}
+Web Appendix A, referenced in Section~\ref{s:model}, is available with
+this paper at the Biometrics website on Wiley Online
+Library.\vspace*{-8pt}
 
 \section{References}
+%  Here, we create the bibliographic entries manually, following the
+%  journal style.  If you use this method or use natbib, PLEASE PAY
+%  CAREFUL ATTENTION TO THE BIBLIOGRAPHIC STYLE IN A RECENT ISSUE OF
+%  THE JOURNAL AND FOLLOW IT!  Failure to follow stylistic conventions
+%  just lengthens the time spend copyediting your paper and hence its
+%  position in the publication queue should it be accepted.
 
-%\bibliography{C:/Users/limdd/Documents/Research/Sweave/Project1/sample.bib}
-%\bibliographystyle{agsm}
-%\printbibliography
+%  We greatly prefer that you incorporate the references for your
+%  article into the body of the article as we have done here 
+%  (you can use natbib or not as you choose) than use BiBTeX,
+%  so that your article is self-contained in one file.
+%  If you do use BiBTeX, please use the .bst file that comes with 
+%  the distribution.  In this case, replace the thebibliography
+%  environment below by 
 
+\bibliographystyle{biom}
+\bibliography{Proj1}
+%\bibliography{proj1bib}
+
+\appendix
+%  To get the journal style of heading for an appendix, mimic the following.
+
+\section{}
+\subsection{Title of appendix}
+
+Put your short appendix here.  Remember, longer appendices are
+possible when presented as Supplementary Web Material.  Please 
+review and follow the journal policy for this material, available
+under Instructions for Authors at \texttt{http://www.biometrics.tibs.org}.
+
+\label{lastpage}
 
 \end{document}
