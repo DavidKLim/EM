@@ -1,6 +1,6 @@
-run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.05,.1),g=c(1000,2000),n_per=c(25,50),
+run.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=c(2000),n_per=c(25,50),
                    distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,
-                   ncores=10,nsims=ncores,filt_quant=0.25,filt_method=c("mad","pval","none")){
+                   ncores=10,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none")){
   setwd("/netscr/deelim/out")
 
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n_per)){
@@ -41,12 +41,12 @@ run.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.05
   }}}}}
 }
 
-collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c(.05,.1),g=c(1000,2000),n_per=c(25,50),
-                       distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,filt_quant=0.25,filt_method=c("mad","pval","none")){
+collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=c(2000),n_per=c(25,50),
+                       distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n_per)
   tab<-matrix(0,nrow=nsims,ncol=26)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI","sens","false.pos","i_K","i_ARI","i_lambda","pred_acc",
-                  "ARI_hc","ARI_med","ARI_EM","ARI_iClust","sil_HC","sil_med","sil_EM","sil_iClust")
+                  "ARI_hc","ARI_med","ARI_EM","ARI_iClust","sil_HC","sil_med","sil_EM","sil_iClust","K_HC","K_med","Order_Acc")
   ii=1
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n_per)){
       n = n_per[m]*true_k[i]
@@ -89,6 +89,7 @@ collect.sim = function(prefix="",true_k=c(2:7),fold_change=c(0.5,1,2),num_disc=c
       tab[ii,24]<-X$sil_iClust
       tab[ii,25]<-X$final_K_hc
       tab[ii,26]<-X$final_K_med
+      tab[ii,27]<-mean(X$all_k == true_k[i])
       ii=ii+1
   }}}}}
   if(fixed_parms=="F"){

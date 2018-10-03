@@ -181,7 +181,7 @@ sim.predict <- function(X,new_dat,new_SF,true_clusters){
 
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
-                 distrib,method="EM",filt_quant = 0.25,filt_method=c("pval","mad","none"),
+                 distrib,method="EM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
                  disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
                  ncores=10,nsims=ncores,iCluster_compare=F){
   
@@ -438,11 +438,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     #search for optimal penalty parameters
     for(aa in 1:nrow(list_BIC)){
       pref = sprintf("grid%d",ii)
+      start = as.numeric(Sys.time())
       X<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method)
+      end = as.numeric(Sys.time())
       list_BIC[aa,4]<-X$BIC
       print(list_BIC[aa,])
-      print(paste("Time:",X$time_elap,"seconds"))
-      print(paste("Cluster agreement:",mean(X$init_clusters==X$final_clusters)))
+      print(paste("Time:",end-start,"seconds"))
     }
     
     #store optimal penalty parameters
@@ -463,7 +464,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     # Final run with optimal parameters
     pref = sprintf("final%d",ii)
+    start = as.numeric(Sys.time())
     X<-EM(y=y,k=max_k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
+    end = as.numeric(Sys.time())
+    X$time_elap = end-start
     
     cls_iClust=NA
     ARI_iClust=NA
@@ -491,46 +495,49 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     
     # Predictions:
-    if(max_k != true.K){
-      X_pred=EM(y=y,k=true.K,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
-    } else{X_pred = X}
+    y_pred=NA
+    pred_acc=NA
+    true_clusters_pred=NA
+    if(max_k == true.K){
+      X_pred = X
     
-    n_pred = floor(0.1*n)           # simulate data for 10% of original n
-    SF_pred = size_factors[1:n_pred]
-    
-    if(disp=="cluster"){    # check for whether init_phi is of dimension 1
-      sim.dat<-simulate_data(n=n_pred,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=SF_pred,distrib=distrib,phi=init_phi) # cluster-wise disp param
-    } else{
-      sim.dat<-simulate_data_g(n=n_pred,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=SF_pred,distrib=distrib,phi=init_phi) # gene-specific disp param
-    }
-    y_pred<-sim.dat$y
-    z_pred<-sim.dat$z
-    true_clusters_pred<-rep(0,times=n_pred)
-    
-    # same pre-filtering for prediction dataset:
-    y_pred = y_pred[idx,]
-    
-    for(i in 1:n_pred){
-      true_clusters_pred[i]<-which(z_pred[,i]==1)
-    }
-    
-    # match cluster ID'sbased on SSE's of true vs estimated coefficients
-    SSEs=matrix(0,nrow=true.K,ncol=true.K)
-    subs_sim_coefs=sim_coefs[idx,]
-    for(c in 1:true.K){
-      for(cc in 1:true.K){
-        SSEs[c,cc] = sum(abs(subs_sim_coefs[,c]-X_pred$coefs[,cc]))
+      n_pred = floor(0.1*n)           # simulate data for 10% of original n
+      SF_pred = size_factors[1:n_pred]
+      
+      if(disp=="cluster"){    # check for whether init_phi is of dimension 1
+        sim.dat<-simulate_data(n=n_pred,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=SF_pred,distrib=distrib,phi=init_phi) # cluster-wise disp param
+      } else{
+        sim.dat<-simulate_data_g(n=n_pred,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=SF_pred,distrib=distrib,phi=init_phi) # gene-specific disp param
       }
+      y_pred<-sim.dat$y
+      z_pred<-sim.dat$z
+      true_clusters_pred<-rep(0,times=n_pred)
+      
+      # same pre-filtering for prediction dataset:
+      y_pred = y_pred[idx,]
+      
+      for(i in 1:n_pred){
+        true_clusters_pred[i]<-which(z_pred[,i]==1)
+      }
+      
+      # match cluster ID'sbased on SSE's of true vs estimated coefficients
+      SSEs=matrix(0,nrow=true.K,ncol=true.K)
+      subs_sim_coefs=sim_coefs[idx,]
+      for(c in 1:true.K){
+        for(cc in 1:true.K){
+          SSEs[c,cc] = sum(abs(subs_sim_coefs[,c]-X_pred$coefs[,cc]))
+        }
+      }
+      new_cl_ids = rep(0,true.K)
+      for(c in 1:true.K){
+        new_cl_ids[c]=which.min(SSEs[c,])
+      }
+      true_clusters_pred=new_cl_ids[true_clusters_pred]
+      
+      
+      fit= sim.predict(X_pred,y_pred,SF_pred,true_clusters=true_clusters_pred)
+      pred_acc=fit$pred_acc
     }
-    new_cl_ids = rep(0,true.K)
-    for(c in 1:true.K){
-      new_cl_ids[c]=which.min(SSEs[c,])
-    }
-    true_clusters_pred=new_cl_ids[true_clusters_pred]
-    
-    
-    fit= sim.predict(X_pred,y_pred,SF_pred,true_clusters=true_clusters_pred)
-    pred_acc=fit$pred_acc
     
     
     # Comparisons with Average linkage HC and K-Medoid clustering
@@ -718,33 +725,38 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   tab_lambda2 = table(temp_lambda2s)
   tab_tau = table(temp_taus)
   
-  # Final_K, lambda2, tau represent most frequently found K, lambda2, and tau
-  final_k = as.numeric(names(which.max(tab_k)))
+  #### Final_K, lambda2, tau represent most frequently found K, lambda2, and tau
+  # final_k = as.numeric(names(which.max(tab_k)))
+  final_k=mean(temp_ks)
   final_lambda2 = as.numeric(names(which.max(tab_lambda2)))
   final_tau = as.numeric(names(which.max(tab_tau)))
   
-  # iCluster+ results
+  #### iCluster+ results
   imean_ARI = mean(itemp_ARI)
-  ifinal_k = as.numeric(names(which.max(table(itemp_K))))
+  # ifinal_k = as.numeric(names(which.max(table(itemp_K))))
+  ifinal_k = mean(itemp_K)
   ifinal_lambda = as.numeric(names(which.max(table(itemp_lambda))))
   
-  # mean prediction accuracy
-  mean_pred_acc = mean(temp_pred_acc)
+  #### mean prediction accuracy
+  mean_pred_acc = mean(temp_pred_acc,na.rm=T)
   
-  # ARI from Average-linkage HC and K-medoid
+  #### ARI from Average-linkage HC and K-medoid
   mean_ARI_hc = mean(temp_ARI_hc)
   mean_ARI_med = mean(temp_ARI_med)
   mean_ARI_EM = mean(temp_ARI_EM)
   mean_ARI_iClust = mean(temp_ARI_iClust)
   
-  # Silhouette values comparisons
+  #### Silhouette values comparisons
   mean_sil_hc = mean(temp_sil_hc)
   mean_sil_med = mean(temp_sil_med)
   mean_sil_EM = mean(temp_sil_EM)
   mean_sil_iClust = mean(temp_sil_iClust)
   
-  final_K_hc = as.numeric(names(which.max(table(temp_K_hc))))
-  final_K_med = as.numeric(names(which.max(table(temp_K_med))))
+  # final_K_hc = as.numeric(names(which.max(table(temp_K_hc))))
+  # final_K_med = as.numeric(names(which.max(table(temp_K_med))))
+  
+  final_K_hc = mean(temp_K_hc)
+  final_K_med = mean(temp_K_med)
   
   # Store for tabulation:
   

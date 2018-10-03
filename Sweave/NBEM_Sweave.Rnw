@@ -752,16 +752,16 @@ After simulating, we imposed pre-filtering and kept just the genes with the top 
 
 <<xtable1, results=tex, echo=FALSE>>==
 library(xtable)
-load("C:/Users/limdd/Documents/Research/Simulations/gene_fixed_mad25_icluster_and_pred/second/simulation_res.RData")
-colnames(summary_tab_coefphi)[1:3] = c("$\\beta$","$\\phi$","Order Acc")
-tab1 = xtable(summary_tab_coefphi,
+load("C:/Users/limdd/Documents/Research/Simulations/gene_fixed_mad25_icluster_and_pred/second/sim_res_tab1.RData")
+colnames(newtab) = c("$\\beta$","$\\phi$","true K","LFC","$n_{k}$","K","$p_{disc}$","ARI","Sensitivity","FPR","Pred Acc","iK","iARI")
+tab1 = xtable(newtab,
               digits=2,
               table.placement="!h",
               caption="Effects of varying coefficients ($\\beta$) and noise ($\\phi$) in simulated datasets on performance. The highlighted row represents the median $\\beta$ and $\\phi$ based on TCGA Breast Cancer Dataset.",
               label = "tab:1",
               floating.environment = "table*")      # K=3, n=50, g=1000
-print(tab1,include.rownames=F, sanitize.text.function=identity,
-      add.to.row=list(pos=as.list(4),command="\\rowcolor[gray]{.9}"))
+print(tab1,include.rownames=F, sanitize.text.function=identity)
+      #,add.to.row=list(pos=as.list(4),command="\\rowcolor[gray]{.9}"))
 @
 
 As the average expression of the genes ($\beta$) goes up, we see that clustering performance (ARI) and order selection accuracy both increase. This is because as the mean expression for a gene increases, the distance two clusters in that particular gene increases. since the log fold change creates a greater separation at higher expressions. For example, the distance between $\beta=3$ and $\beta=4$ is much smaller than the distance between $\beta=6$ and $\beta=7$, since $\mu=e^{\beta}$, and $e^4-e^3 < e^7-e^6$.
@@ -774,48 +774,35 @@ A common integrative clustering method that is able to handle count data is iClu
 
 Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering and K-medoids. There has been a study that suggests that these were among the most robust and efficient in clustering this type of data.
 
-<<xtable2, results=tex,echo=FALSE>>==
-tab=all_summary_tabs[[2]][[2]][,-7]
-colnames(tab) = c("Parameter", "Order Acc", "ARI", "Sensitivity", "FPR","Pred Acc","iARI")
-
-tab2=xtable(tab,
-              digits=2,
-              table.placement="!h",
-              caption="Effects of varying simulation parameters on performance. Values of performance are averaged across all other conditions, keeping row condition fixed",
-              label = "tab:2",
-            floating.environment = "table*")      # K=3, n=50, g=1000
-print(tab2,include.rownames=F,sanitize.text.function=identity,table.placement="H")
-@
-
 Here, we introduce some variants of our method. For one, we have so far restricted the simulations to contain gene-specific dispersions. It is not currently known whether a scheme with one dispersion parameter across all clusters for each gene adequately portrays real data. It may sometimes be more appropriate to introduce cluster-specific dispersion parameters to better fit the data, yielding more accurate estimates. However, this may also result in overfitting the data, which would cause our model to get stuck at a local maxima. One potential drawback that may result is that the order may be underestimated, as the extra dispersion parameters may cause the algorithm to favor a smaller number of clusters in the data.
 
-Secondly, prior work has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step. This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. We use a simulated annealing method \citep{Rose1998,Si2013} to slowly wean off the noise-adding effects of the CEM, and revert to the original EM. \ref{tab:3} \ref{tab:4} show the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. Results are based on 10 simulated datasets for each case. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
+Secondly, prior work has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step. This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. We use a simulated annealing method \citep{Rose1998,Si2013} to slowly wean off the noise-adding effects of the CEM, and revert to the original EM. \ref{tab:2} \ref{tab:3} show the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. Results are based on 10 simulated datasets for each case. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
 
 %%%%% EXCLUDE ICLUSTER+ COMPARISON FOR TABLES 3 AND 4. JUST COMMENT ON IT IN PAPER %%%%%%%%%%%%%
-<<xtable3,results=tex,echo=FALSE>>==
+<<xtable2,results=tex,echo=FALSE>>==
 load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
 colnames(tab_g) = c("$K$","ARI","$p_{disc}$","Sensitivity","FPR","Pred Acc")
-tab3 = xtable(tab_g,
+tab2 = xtable(tab_g,
               digits=2,
               table.placement="!h",
               caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: For fair comparisons, ARI values are based on runs with true number of clusters. The simulated dispersions were gene-specific.",
-              label = "tab:3",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
-print(tab3,include.rownames=T, sanitize.text.function=identity,table.placement="H")
+              label = "tab:2",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
+print(tab2,include.rownames=T, sanitize.text.function=identity,table.placement="H")
 
 @
 
-<<xtable4,results=tex,echo=FALSE>>==
+<<xtable3,results=tex,echo=FALSE>>==
 #load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
 colnames(tab_cl) = c("$K$","ARI","$p_{disc}$","Sensitivity","FPR","Pred Acc")
-tab4 = xtable(tab_cl,
+tab3 = xtable(tab_cl,
               digits=2,
               table.placement="!h",
               caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. The simulated dispersions were cluster-specific.",
-              label = "tab:4",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000
-print(tab4,include.rownames=T, sanitize.text.function=identity,table.placement="H")
+              label = "tab:3",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000
+print(tab3,include.rownames=T, sanitize.text.function=identity,table.placement="H")
 @
 
-From \ref{tab:3} and \ref{tab:4}, we see that iCluster+ seems to overestimate the order in each case. Because it treats count data as distributed Poisson, it is likely that iCluster+ is not able to account for the extra-Poisson variation caused by the simulated noise. Also, in general, the order is underestimated for the EM runs with cluster-specific dispersion parameters than the runs with gene-specific dispersion parameters. This is due to the fact that allowing for cluster-specific dispersions overfits the data, so the cluster-specific dispersions is sufficient to explain the unaccounted clusters in the results. Because of this, the clustering accuracy suffers.
+From \ref{tab:2} and \ref{tab:3}, we see that iCluster+ seems to overestimate the order in each case. Because it treats count data as distributed Poisson, it is likely that iCluster+ is not able to account for the extra-Poisson variation caused by the simulated noise. Also, in general, the order is underestimated for the EM runs with cluster-specific dispersion parameters than the runs with gene-specific dispersion parameters. This is due to the fact that allowing for cluster-specific dispersions overfits the data, so the cluster-specific dispersions is sufficient to explain the unaccounted clusters in the results. Because of this, the clustering accuracy suffers.
 
 We also notice the effect of the classification E step modification in our algorithm. We see that for a gene-specific dispersion scheme, the CEM seems to increase the ARI slightly. We notice that in \ref{tab:3}, the CEM caused the cluster-specific dispersion EM model to select the incorrect order. This portrays a risk of the CEM, as the variant E step adds randomness by drawing posterior probabilities closer together, and may lead to such instabilities.
 
