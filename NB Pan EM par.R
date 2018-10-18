@@ -230,7 +230,7 @@ EM_run <- function(y, k,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
                    init_phi=matrix(0,nrow=nrow(y),ncol=k),
                    disp,cls_init,
-                   CEM=F,init_Tau=1,SEM=F,
+                   CEM=F,init_Tau=2,SEM=F,
                    maxit_EM=100){
   
   start_time <- Sys.time()

@@ -387,7 +387,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             arma::vec prod_w_trans_y = all_prod_w_trans_y.rows(good_ids);
     
             /* Update beta */
-            if(lambda1 != 0){
+            if(lambda1 != 0){                    /* Wei Pan grouped lasso penaltized MLE update */
                 beta(c) = (lambda1*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n )  / (lambda1*(k-1) + accu(w)/n );
             } else {
                 beta(c) = accu(prod_w_trans_y)/accu(w);

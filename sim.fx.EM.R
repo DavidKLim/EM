@@ -1,6 +1,6 @@
 run.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=c(2000),n_per=c(25,50),
                    distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,
-                   ncores=10,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none")){
+                   ncores=10,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none"),more_options=""){
   setwd("/netscr/deelim/out")
 
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n_per)){
@@ -11,14 +11,14 @@ run.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=
         cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d,
                        distrib='%s', method='%s', filt_quant=%f, filt_method='%s',
                        disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=%f,
-                       ncores=%d,nsims=%d,iCluster_compare=T)\n",
-                       true_k[i],fold_change[j],num_disc[k],g[l],n,distrib,method,filt_quant,filt_method,disp,fixed_parms,fixed_coef,fixed_phi,ncores,nsims)
+                       ncores=%d,nsims=%d,iCluster_compare=T%s)\n",
+                       true_k[i],fold_change[j],num_disc[k],g[l],n,distrib,method,filt_quant,filt_method,disp,fixed_parms,fixed_coef,fixed_phi,ncores,nsims,more_options)
       } else{
         cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d,
                        distrib='%s', method='%s', filt_quant=%f, filt_method='%s',
                        disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=c(%s),
-                       ncores=%d,nsims=%d,iCluster_compare=T)\n",
-                         true_k[i],fold_change[j],num_disc[k],g[l],n,distrib,method,filt_quant,filt_method,disp,fixed_parms,fixed_coef,paste(fixed_phi,collapse=","),ncores,nsims)
+                       ncores=%d,nsims=%d,iCluster_compare=T%s)\n",
+                         true_k[i],fold_change[j],num_disc[k],g[l],n,distrib,method,filt_quant,filt_method,disp,fixed_parms,fixed_coef,paste(fixed_phi,collapse=","),ncores,nsims,more_options)
       }
       if(fixed_parms=="F"){
         out = sprintf("/netscr/deelim/run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d_filt_%s_%f",
@@ -44,9 +44,10 @@ run.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=
 collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=c(2000),n_per=c(25,50),
                        distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n_per)
-  tab<-matrix(0,nrow=nsims,ncol=26)      # 3 conditions, 7 things to tabulate
-  colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI","sens","false.pos","i_K","i_ARI","i_lambda","pred_acc",
-                  "ARI_hc","ARI_med","ARI_EM","ARI_iClust","sil_HC","sil_med","sil_EM","sil_iClust","K_HC","K_med","Order_Acc")
+  tab<-matrix(0,nrow=nsims,ncol=27)      # 3 conditions, 7 things to tabulate
+  colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI",
+                   "sens","false.pos","i_K","i_ARI","i_lambda","pred_acc","ARI_hc","ARI_med","ARI_EM","ARI_iClust",
+                   "sil_HC","sil_med","sil_EM","sil_iClust","K_HC","K_med","Order_Acc")
   ii=1
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n_per)){
       n = n_per[m]*true_k[i]
@@ -93,12 +94,12 @@ collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05
       ii=ii+1
   }}}}}
   if(fixed_parms=="F"){
-    final_results = sprintf("final_table_%s_%s_%s_filt_%s_%f",distrib,method,disp,filt_method,filt_quant)
+    final_results = sprintf("final_table_%s_%s_%s_%s_filt_%s_%f",prefix,distrib,method,disp,filt_method,filt_quant)
   } else{
     if(length(fixed_phi)==1){
-      final_results = sprintf("final_table_%s_%s_%s_fixed_%f_%f_filt_%s_%f",distrib,method,disp,fixed_coef,fixed_phi,filt_method,filt_quant)
+      final_results = sprintf("final_table_%s_%s_%s_%s_fixed_%f_%f_filt_%s_%f",prefix,distrib,method,disp,fixed_coef,fixed_phi,filt_method,filt_quant)
     } else{
-      final_results = sprintf("final_table_%s_%s_%s_fixed_%f_%s_filt_%s_%f",distrib,method,disp,fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
+      final_results = sprintf("final_table_%s_%s_%s_%s_fixed_%f_%s_filt_%s_%f",prefix,distrib,method,disp,fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
     }
   }
   final_results2 = sprintf("%s.out",final_results)

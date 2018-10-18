@@ -145,19 +145,32 @@ sim.iCluster = function(y,true_clusters,
   
   # iClusterPlus #
   iClust_OS <- list()
-  for(k in (K_search-1)){
-    cv.fit = tune.iClusterPlus(cpus=ncores,dt1=t(y),type="poisson",K=k,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
-    iClust_OS[[k]] = cv.fit
+  for(c in (K_search-1)){
+    cv.fit = tune.iClusterPlus(cpus=ncores,dt1=t(y),type="poisson",K=c,n.lambda=n.lambda,maxiter=20)
+    iClust_OS[[c]] = cv.fit
   }
   BIC_mat = getBIC(iClust_OS)
+  dev_mat = getDevR(iClust_OS)
   
-  BIC_OS = apply(BIC_mat,2,min)
-  lambda_OS = iClust_OS[[1]]$lambda[apply(BIC_mat,2,which.min),1]
+  lambda_ids = apply(BIC_mat,2,which.min)   # indices of optimal lambda for each number of clusters
+  devs=rep(0,length(K_search))
+  for(c in (K_search-1)){
+    devs[c] = dev_mat[lambda_ids[c],c]      # Deviance at optimal lambda for each cluster
+  }                                         # Order selection is done by plateauing deviance value
+     
+  lambda_vals = iClust_OS[[1]]$lambda[lambda_ids]
   
-  max_k = which.min(BIC_OS)
-  max_lambda = lambda_OS[max_k]
+  #max_k = which.max(devs)                # Problem: deviance always increases for data with any amount of noise
   
-  iClust_fit <- iClusterPlus(dt1=t(y),type="poisson",lambda=max_lambda,alpha=1,K=max_k,maxiter=10)
+  dev_inc = rep(0,length(K_search)-1)
+  for(i in 1:length(dev_inc)){
+    dev_inc[i] = (devs[i+1]-devs[i])/devs[i]         # percent increase of POD
+  }
+  max_k=which(dev_inc<0.05)[1]                       # optimal cluster selected at index right before (less than 5% increase in POD) is observed
+  if(is.na(max_k)){max_k=K_search[length(K_search)-1]}
+  max_lambda = lambda_vals[max_k]
+  
+  iClust_fit <- iClusterPlus(dt1=t(y),type="poisson",lambda=max_lambda,K=max_k,maxiter=10)
   
   ARI = adjustedRandIndex(true_clusters,iClust_fit$clusters)
   
@@ -183,7 +196,7 @@ sim.predict <- function(X,new_dat,new_SF,true_clusters){
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
                  distrib,method="EM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
                  disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
-                 ncores=10,nsims=ncores,iCluster_compare=F){
+                 ncores=10,nsims=ncores,iCluster_compare=F,penalty=T){
   
   # disp: "gene" or "cluster"
   # low: coef 3.75-3.84, phi 0.13-0.15
@@ -356,9 +369,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     true_disc = all_data[[ii]]$true_disc
     idx = all_data[[ii]]$gene_id
     
-    
+    sink(sprintf("Diagnostics/%s/progress%d.txt",dir_name,ii))
     # Order selection
-    K_search=c(1:7)
+    K_search=c(2:7)
     list_BIC=matrix(0,nrow=length(K_search),ncol=2)
     list_BIC[,1]=K_search
     print(paste("Dataset",ii,"Order Selection:"))
@@ -422,44 +435,51 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     # true_disc = all_data[[ii]]$true_disc
     # idx = rep(T,nrow(y))
     
-    print(paste("Dataset",ii,"Grid Search:"))    # track iteration
-    
-    #create matrix for grid search values
-    lambda1_search=1
-    lambda2_search=c(0.05,0.1,0.2,0.5,1,1.5,2)
-    tau_search=seq(from=0.1,to=0.9,by=0.2)
-    
-    list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
-    
-    list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(tau_search))
-    list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
-    list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
-    
-    #search for optimal penalty parameters
-    for(aa in 1:nrow(list_BIC)){
-      pref = sprintf("grid%d",ii)
-      start = as.numeric(Sys.time())
-      X<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method)
-      end = as.numeric(Sys.time())
-      list_BIC[aa,4]<-X$BIC
-      print(list_BIC[aa,])
-      print(paste("Time:",end-start,"seconds"))
-    }
-    
-    #store optimal penalty parameters
-    max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
-    max_tau<-list_BIC[max_index,3]
-    max_lambda1<-list_BIC[max_index,1]
-    max_lambda2<-list_BIC[max_index,2]
-    
-    print(paste("Dataset ", ii, "grid search results: ",list_BIC[max_index,]))
-    
-    if(length(max_index)>1){
-      warning("more than one max index")
-      max_index<-max_index[1]
+    if(penalty){
+      print(paste("Dataset",ii,"Grid Search:"))    # track iteration
+      
+      #create matrix for grid search values
+      lambda1_search=1
+      lambda2_search=c(0.05,0.1,0.2,0.5,1,1.5,2)
+      tau_search=seq(from=0.1,to=0.9,by=0.2)
+      
+      list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
+      
+      list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(tau_search))
+      list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
+      list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
+      
+      #search for optimal penalty parameters
+      for(aa in 1:nrow(list_BIC)){
+        pref = sprintf("grid%d",ii)
+        start = as.numeric(Sys.time())
+        X<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method)
+        end = as.numeric(Sys.time())
+        list_BIC[aa,4]<-X$BIC
+        print(list_BIC[aa,])
+        print(paste("Time:",end-start,"seconds"))
+      }
+      
+      #store optimal penalty parameters
+      max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
       max_tau<-list_BIC[max_index,3]
       max_lambda1<-list_BIC[max_index,1]
       max_lambda2<-list_BIC[max_index,2]
+      
+      print(paste("Dataset ", ii, "grid search results: ",list_BIC[max_index,]))
+      
+      if(length(max_index)>1){
+        warning("more than one max index")
+        max_index<-max_index[1]
+        max_tau<-list_BIC[max_index,3]
+        max_lambda1<-list_BIC[max_index,1]
+        max_lambda2<-list_BIC[max_index,2]
+      }
+    } else {
+      max_tau=0
+      max_lambda1=0
+      max_lambda2=0
+      print(paste("No Penalization"))
     }
     
     # Final run with optimal parameters
@@ -469,13 +489,15 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     end = as.numeric(Sys.time())
     X$time_elap = end-start
     
+    print("Optimal EM run complete")
+    
     cls_iClust=NA
     ARI_iClust=NA
     sil_iClust=NA
     # iCluster+
     if(iCluster_compare){
       n.lambda=25
-      iCluster_res = sim.iCluster(y,true_clusters,ncores=1,n.lambda=n.lambda)
+      iCluster_res = sim.iCluster(y[1:200,],true_clusters,ncores=1,n.lambda=n.lambda)
       # if(iCluster_res$K != true.K){
       #   cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K-1,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
       #   BIC_mat = matrix(0,nrow=25,ncol=2)
@@ -491,7 +513,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       ARI_iClust = iCluster_res$ARI
     } else{iCluster_res=NA}
     
-    
+    print("iCluster run complete")
     
     
     # Predictions:
@@ -539,44 +561,63 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       pred_acc=fit$pred_acc
     }
     
+    print("Prediction complete")
     
-    # Comparisons with Average linkage HC and K-Medoid clustering
-    d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-    model<-hclust(d,method="average")       # hierarchical clustering
-    
-    temp_silhc=rep(0,times=6)
-    temp_silmed=rep(0,times=6)
-    temp_clshc=matrix(0,nrow=n,ncol=6)
-    temp_clsmed=matrix(0,nrow=n,ncol=6)
-    for(c in 2:7){
-      cls_hc <- cutree(model,k=c)
-      fit = pam(t(norm_y),c)
-      cls_med = fit$clustering
-      temp_clshc[,c-1] = cls_hc
-      temp_clsmed[,c-1] = cls_med
-      temp_silhc[c-1] = mean(silhouette(cls_hc,d)[,3])
-      temp_silmed[c-1] = mean(silhouette(cls_med,d)[,3])
+    pam1 <- function(x,k) list(cluster = pam(t(x),k, cluster.only=TRUE))
+    hclusCut <- function(x, k){
+      list(cluster = cutree(hclust(as.dist(1-cor(x,method="spearman")),method="average"), k=k))
     }
-    hc_id=which.max(temp_silhc)
-    med_id=which.max(temp_silmed)
     
-    cls_hc=temp_clshc[,hc_id]
-    cls_med=temp_clsmed[,hc_id]
-    sil_hc=temp_silhc[hc_id]
-    sil_med=temp_silmed[hc_id]
-    K_hc=hc_id+1
-    K_med=med_id+1
+    K_hc=which.max(clusGap(log(norm_y+0.1),FUN=pam1,K.max=7)$Tab[,"gap"])
+    K_med=which.max(clusGap(norm_y,FUN=hclusCut,K.max=7)$Tab[,"gap"])
     
-    cls_EM = X_pred$final_clusters              # in case wrong order is selected. This inputs correct order and outputs final clusters
+    cls_hc = hclusCut(norm_y,K_hc)$cluster
+    cls_med = pam1(norm_y,K_med)$cluster
     
-    d2 = dist(t(norm_y))
-    if(iCluster_compare){
-      sil_iClust = mean(silhouette(cls_iClust,d2)[,3])
-    }
-    sil_EM = mean(silhouette(cls_EM,d2)[,3])
+    # # Comparisons with Average linkage HC and K-Medoid clustering
+    # d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+    # model<-hclust(d,method="average")       # hierarchical clustering
+    # 
+    # temp_silhc=rep(0,times=6)
+    # temp_silmed=rep(0,times=6)
+    # temp_clshc=matrix(0,nrow=n,ncol=6)
+    # temp_clsmed=matrix(0,nrow=n,ncol=6)
+    # for(c in 2:7){
+    #   cls_hc <- cutree(model,k=c)
+    #   fit = pam(t(norm_y),c)
+    #   cls_med = fit$clustering
+    #   temp_clshc[,c-1] = cls_hc
+    #   temp_clsmed[,c-1] = cls_med
+    #   temp_silhc[c-1] = mean(silhouette(cls_hc,d)[,3])
+    #   temp_silmed[c-1] = mean(silhouette(cls_med,d)[,3])
+    # }
+    # hc_id=which.max(temp_silhc)
+    # med_id=which.max(temp_silmed)
+    # 
+    # cls_hc=temp_clshc[,hc_id]
+    # cls_med=temp_clsmed[,hc_id]
+    # sil_hc=temp_silhc[hc_id]
+    # sil_med=temp_silmed[hc_id]
+    # K_hc=hc_id+1
+    # K_med=med_id+1
+    
+    cls_EM = X$final_clusters              # in case wrong order is selected. This inputs correct order and outputs final clusters
+    
+    # d2 = dist(t(norm_y))
+    # if(iCluster_compare){
+    #   sil_iClust = mean(silhouette(cls_iClust,d2)[,3])
+    # }
+    # sil_EM = mean(silhouette(cls_EM,d2)[,3])
     
     print(paste("Time:",X$time_elap,"seconds"))
     print(paste("Dataset ",ii,"complete"))
+    
+    sink()
+    
+    sil_iClust=NA
+    sil_EM=NA
+    sil_med=NA
+    sil_hc=NA
     
     results=list(X=X,
                  max_k=max_k,
@@ -659,10 +700,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   temp_ARI_EM = rep(0,sim)
   temp_ARI_iClust = rep(0,sim)
   
-  temp_sil_hc = rep(0,sim)
-  temp_sil_med = rep(0,sim)
-  temp_sil_EM = rep(0,sim)
-  temp_sil_iClust = rep(0,sim)
+  # temp_sil_hc = rep(0,sim)
+  # temp_sil_med = rep(0,sim)
+  # temp_sil_EM = rep(0,sim)
+  # temp_sil_iClust = rep(0,sim)
   
   temp_K_hc = rep(0,sim)
   temp_K_med = rep(0,sim)
@@ -680,16 +721,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     temp_pred_acc[ii] <- par_sim_res[[ii]]$pred_acc
     
-    #temp_pi[ii,]<-X$pi
-    #temp_coefs[[ii]]<-X$coefs
     temp_disc[ii]<-sum(!X$nondiscriminatory)
     temp_ARI[ii]<-adjustedRandIndex(true_clusters,X$final_clusters)
     
     if(tt>0){
-      temp_sensitivity[ii]<-sum(!X$nondiscriminatory[true_disc])/sum(true_disc)
+      temp_sensitivity[ii]<-sum(!X$nondiscriminatory[true_disc])/tt                   # tt = # of disc genes simulated (floor(num.disc*g))
     } else {temp_sensitivity[ii]<-NA}
     if(tt<g){
-      temp_falsepos[ii]<-sum(!X$nondiscriminatory[!true_disc])/(g-sum(true_disc))
+      temp_falsepos[ii]<-sum(!X$nondiscriminatory[!true_disc])/(g-tt)
     } else {temp_falsepos[ii]<-NA}         # take into account genes omitted b/c rowSum of count was <100 (such genes are assumed nondiscriminatory)
     
     all_sim_data[[ii]] = list(par_sim_res[[ii]]$y_pred,par_sim_res[[ii]]$true_clusters_pred)
@@ -705,10 +744,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     temp_ARI_med[ii] = adjustedRandIndex(par_sim_res[[ii]]$cls_med,true_clusters)
     temp_ARI_EM[ii] = adjustedRandIndex(par_sim_res[[ii]]$cls_EM,true_clusters)
     
-    temp_sil_hc[ii] = par_sim_res[[ii]]$sil_hc
-    temp_sil_med[ii] = par_sim_res[[ii]]$sil_med
-    temp_sil_EM[ii] = par_sim_res[[ii]]$sil_EM
-    temp_sil_iClust[ii] = par_sim_res[[ii]]$sil_iClust
+    # temp_sil_hc[ii] = par_sim_res[[ii]]$sil_hc
+    # temp_sil_med[ii] = par_sim_res[[ii]]$sil_med
+    # temp_sil_EM[ii] = par_sim_res[[ii]]$sil_EM
+    # temp_sil_iClust[ii] = par_sim_res[[ii]]$sil_iClust
     
     temp_K_hc[ii] = par_sim_res[[ii]]$K_hc
     temp_K_med[ii] = par_sim_res[[ii]]$K_med
@@ -746,11 +785,15 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   mean_ARI_EM = mean(temp_ARI_EM)
   mean_ARI_iClust = mean(temp_ARI_iClust)
   
-  #### Silhouette values comparisons
-  mean_sil_hc = mean(temp_sil_hc)
-  mean_sil_med = mean(temp_sil_med)
-  mean_sil_EM = mean(temp_sil_EM)
-  mean_sil_iClust = mean(temp_sil_iClust)
+  # #### Silhouette values comparisons
+  # mean_sil_hc = mean(temp_sil_hc)
+  # mean_sil_med = mean(temp_sil_med)
+  # mean_sil_EM = mean(temp_sil_EM)
+  # mean_sil_iClust = mean(temp_sil_iClust)
+  mean_sil_hc=NA
+  mean_sil_med=NA
+  mean_sil_EM=NA
+  mean_sil_iClust=NA
   
   # final_K_hc = as.numeric(names(which.max(table(temp_K_hc))))
   # final_K_med = as.numeric(names(which.max(table(temp_K_med))))
