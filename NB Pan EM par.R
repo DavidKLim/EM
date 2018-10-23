@@ -28,10 +28,17 @@ logsumexpc=function(v){
 }
 
 soft_thresholding=function(alpha,lambda){
-  if(abs(alpha)-lambda<0){
-    return(0)
+  a=3.7
+  if(abs(alpha)<=2*lambda){
+    if(abs(alpha)<=lambda){
+      return(0)
+    } else{
+      return(sign(alpha)*(abs(alpha)-lambda))
+    }
+  }else if(abs(alpha)>2*lambda & abs(alpha)<=a*lambda){
+    return(((a-1)*alpha - sign(alpha)*a*lambda)/(a-2))
   }else{
-    return(sign(alpha)*(abs(alpha)-lambda))
+    return(alpha)
   }
 }
  
@@ -222,7 +229,7 @@ normalizations <- function(dat){
 
 
 EM_run <- function(y, k,
-                   lambda1=0, lambda2=0, tau=0,
+                   lambda=0,alpha=0,
                    size_factors=rep(1,times=ncol(y)) ,
                    norm_y=y,
                    true_clusters=NA, true_disc=NA,
@@ -252,7 +259,7 @@ EM_run <- function(y, k,
   # Stopping Criteria
   IRLS_tol = 1E-6
   maxit_IRLS = 50
-  EM_tol = 1E-4
+  EM_tol = 1E-6
   
   # Initialize parameters
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
@@ -314,14 +321,17 @@ EM_run <- function(y, k,
               coefs[j,c]=log(0.1)
               next
               }
-            coefs[j,c]<-glm(as.numeric(y[j,cls==c])~1,family=poisson())$coef               # Initialize beta
+            coefs[j,c]<-glm(as.numeric(y[j,cls==c])~1,family=poisson())$coef               # Initialize beta (Poisson)
+            # fit<-glm.nb(as.numeric(y[j,cls==c])~1)                                      # Test: initializing with glm.nb (errors out frequently)
+            # coefs[j,c]=fit$coef
+            # test_phi[j]=1/fit$theta
           } # include if statement case for no subjects in cluster --> 0
         }
         beta <- coefs[j,]
         theta<-matrix(rep(0,times=k^2),nrow=k)
         for(c in 1:k){
           for(cc in 1:k){
-            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)
+            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],alpha*lambda)
           }
         }
         theta_list[[j]] <- theta
@@ -348,12 +358,12 @@ EM_run <- function(y, k,
       y_j = as.integer(y[j,])
       par_X[[j]] <- M_step(j=j, a=a, y_j=y_j, all_wts=wts, offset=offset,
                            k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],
-                           lambda1=lambda1,lambda2=lambda2,tau=tau,
+                           lambda=lambda,alpha=alpha,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
                            )
     }
     Mend=as.numeric(Sys.time())
-    cat(paste("M step time:",Mend-Mstart,"seconds\n"))
+    #cat(paste("M step time:",Mend-Mstart,"seconds\n"))
     
     
     for(j in 1:g){
@@ -570,9 +580,8 @@ EM_run <- function(y, k,
                logL=log_L,
                wts=wts,
                time_elap=time_elap,
-               lambda1=lambda1,
-               lambda2=lambda2,
-               tau=tau,
+               lambda=lambda,
+               alpha=alpha,
                size_factors=size_factors,
                norm_y=norm_y,DNC=DNC)
   return(result)
@@ -582,7 +591,7 @@ EM_run <- function(y, k,
 
 
 EM<-function(y, k,
-             lambda1=0, lambda2=0, tau=0,
+             lambda=0,alpha=0,
              size_factors=rep(1,times=ncol(y)) ,
              norm_y=y,
              true_clusters=NA, true_disc=NA,
@@ -607,14 +616,14 @@ EM<-function(y, k,
     SEM=T
   }
   
-  diag_file = sprintf("Diagnostics/%s/%s_%s_%s_%d_%f_%f_%f.txt",dir,method,disp,prefix,k,lambda1,lambda2,tau)
+  diag_file = sprintf("Diagnostics/%s/%s_%s_%s_%d_%f_%f.txt",dir,method,disp,prefix,k,lambda,alpha)
   dir.create(sprintf("Diagnostics/%s",dir))
   sink(file=diag_file)
   
   n = ncol(y)
   g = nrow(y)
   
-  cat(paste(sprintf("n=%d, g=%d, k=%d, l1=%f, l2=%f, tau=%f, ",n,g,k,lambda1,lambda2,tau),"\n"))
+  cat(paste(sprintf("n=%d, g=%d, k=%d, l=%f, alph=%f, ",n,g,k,lambda,alpha),"\n"))
   cat("True clusters:\n")
   write.table(true_clusters,quote=F,col.names=F)
   
@@ -691,12 +700,12 @@ EM<-function(y, k,
     #   cat(paste("Init Tau:",Tau_vals[t],"\n"))
     #   init_cls_Tau[i] <- Tau_vals[t]
     # }
-    init_cls_Tau[i] <- Tau_vals    # just setting tau val to 2 for all (for now)
+    init_cls_Tau[i] <- g/10    # just setting tau val to 2 for all (for now)
     
     if(CEM){
       maxit_search = 10
     } else { maxit_search = 2 }
-    fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
+    fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,
                               init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
                               cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_cls_Tau[i],SEM=SEM, maxit_EM=maxit_search)
     init_cls_BIC[i] <- fit$BIC
@@ -716,7 +725,7 @@ EM<-function(y, k,
   # sink(file=final_file)
   
   # NEED TO EDIT SO INIT_TAU = INITIAL TAU OF THE CORRECT INITIALIZATION
-  results=EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,cls_init=final_init_cls,
+  results=EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,cls_init=final_init_cls,
                  CEM=CEM,init_Tau=final_init_Tau,SEM=SEM,disp=disp,init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
 
   
@@ -728,9 +737,8 @@ predictions <- function(X,newdata,new_sizefactors){
   # X is the output object from the EM() function
   init_coefs=X$coefs
   init_phi=X$phi
-  init_lambda1=X$lambda1
-  init_lambda2=X$lambda2
-  init_tau=X$tau
+  init_lambda=X$lambda
+  init_alpha=X$alpha
   
   
   cl_phi=!is.null(dim(X$phi))  # dimension of phi is null when gene-wise

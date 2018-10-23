@@ -172,14 +172,21 @@ int sign(double x) {
     return (x > 0) - (x < 0);
 }
 
-double soft_thresh(double alpha, double lambda){
+double soft_thresh(double alpha, double lambda){ /* ST of SCAD penalty */
     double STval;
-    if(fabs(alpha)-lambda<0){
-        STval = 0;
-    } else {
-        STval = sign(alpha) * (fabs(alpha)-lambda);
-    }
-    
+	double a=3.7;
+	
+    if(fabs(alpha)<=2*lambda){
+		if(fabs(alpha)<=lambda){
+			STval = 0;
+		} else{
+			STval = sign(alpha)*(fabs(alpha)-lambda);
+		}
+    } else if(fabs(alpha)>2*lambda && fabs(alpha)<=a*lambda){
+        STval = ((a-1)*alpha - sign(alpha)*a*lambda)/(a-2);
+    } else{
+		STval = alpha;
+	}
     return(STval);
 }
 
@@ -287,7 +294,7 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
 
 
 // [[Rcpp::export]]
-List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, double lambda1, double lambda2, double tau, double IRLS_tol, int maxit_IRLS){
+List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
 
     arma::vec beta = coefs_j;
     arma::mat temp(maxit_IRLS, (2*k));
@@ -387,8 +394,8 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             arma::vec prod_w_trans_y = all_prod_w_trans_y.rows(good_ids);
     
             /* Update beta */
-            if(lambda1 != 0){                    /* Wei Pan grouped lasso penaltized MLE update */
-                beta(c) = (lambda1*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n )  / (lambda1*(k-1) + accu(w)/n );
+            if((1-alpha)*lambda != 0){                    /* MLE update w/ SCAD*/
+                beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n )  / ((1-alpha)*lambda*(k-1) + accu(w)/n );
             } else {
                 beta(c) = accu(prod_w_trans_y)/accu(w);
             }
@@ -421,11 +428,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         /* Update theta matrix */
         for(int cc=0; cc<k; cc++){
             for(int ccc=0; ccc<k; ccc++){
-                if(fabs(theta(cc,ccc))>=tau){
-                    theta(cc,ccc) = beta(cc)-beta(ccc);
-                } else {
-                    theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),lambda2);
-                }
+                 theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),alpha*lambda);
             }
         }
         
