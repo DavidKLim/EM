@@ -166,7 +166,7 @@ sim.iCluster = function(y,true_clusters,
   for(i in 1:length(dev_inc)){
     dev_inc[i] = (devs[i+1]-devs[i])/devs[i]         # percent increase of POD
   }
-  max_k=which(dev_inc<0.05)[1]                       # optimal cluster selected at index right before (less than 5% increase in POD) is observed
+  max_k=which(dev_inc<0.02)[1]                       # optimal cluster selected at index right before (less than 5% increase in POD) is observed
   if(is.na(max_k)){max_k=K_search[length(K_search)-1]}
   max_lambda = lambda_vals[max_k]
   
@@ -250,7 +250,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   # Unpenalized run to find initial cluster estimates based on K=k
   k=true.K
   if(!fixed_parms){
-    X_init<-EM(y=init_y,k=k,lambda1=0,lambda2=0,tau=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters,prefix="init",dir=dir_name,method=method,disp=disp)
+    X_init<-EM(y=init_y,k=k,lambda=0,alpha=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters,prefix="init",dir=dir_name,method=method,disp=disp)
     init_coefs<-X_init$coefs              # save init estimates for coefs & pi
     init_phi<-X_init$phi
   } else{
@@ -379,7 +379,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     for(aa in 1:nrow(list_BIC)){
       pref = sprintf("order%d",ii)
       start=as.numeric(Sys.time())
-      X<-EM(y=y,k=list_BIC[aa,1],lambda1=0,lambda2=0,tau=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # no penalty
+      X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # no penalty
       end=as.numeric(Sys.time())
       list_BIC[aa,2]<-X$BIC
       if(list_BIC[aa,1]==true.K){
@@ -439,53 +439,48 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       print(paste("Dataset",ii,"Grid Search:"))    # track iteration
       
       #create matrix for grid search values
-      lambda1_search=1
-      lambda2_search=c(0.05,0.1,0.2,0.5,1,1.5,2)
-      tau_search=seq(from=0.1,to=0.9,by=0.2)
+      lambda_search=seq(0.1,5.1,0.5)
+      alpha_search=seq(0,0.3,0.03)
       
-      list_BIC=matrix(0,nrow=length(lambda1_search)*length(lambda2_search)*length(tau_search),ncol=4) # matrix of BIC's: one for each combination of penalty params 
+      list_BIC=matrix(0,nrow=length(lambda_search)*length(alpha_search),ncol=3) # matrix of BIC's: one for each combination of penalty params 
       
-      list_BIC[,1]=rep(lambda1_search,each=length(lambda2_search)*length(tau_search))
-      list_BIC[,2]=rep(rep(lambda2_search,each=length(tau_search)),times=length(lambda1_search))
-      list_BIC[,3]=rep(tau_search,times=length(lambda1_search)*length(lambda2_search))
+      list_BIC[,1]=rep(lambda_search,each=length(alpha_search))
+      list_BIC[,2]=rep(alpha_search,times=length(lambda_search))
       
       #search for optimal penalty parameters
       for(aa in 1:nrow(list_BIC)){
         pref = sprintf("grid%d",ii)
         start = as.numeric(Sys.time())
-        X<-EM(y=y,k=max_k,tau=list_BIC[aa,3],lambda1=list_BIC[aa,1],lambda2=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method)
+        X<-EM(y=y,k=max_k,lambda=list_BIC[aa,1],alpha=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method)
         end = as.numeric(Sys.time())
-        list_BIC[aa,4]<-X$BIC
+        list_BIC[aa,3]<-X$BIC
         print(list_BIC[aa,])
         print(paste("Time:",end-start,"seconds"))
       }
       
       #store optimal penalty parameters
-      max_index<-which(list_BIC[,4]==min(list_BIC[,4]))
-      max_tau<-list_BIC[max_index,3]
-      max_lambda1<-list_BIC[max_index,1]
-      max_lambda2<-list_BIC[max_index,2]
+      max_index<-which(list_BIC[,3]==min(list_BIC[,3]))
+      max_lambda<-list_BIC[max_index,1]
+      max_alpha<-list_BIC[max_index,2]
       
       print(paste("Dataset ", ii, "grid search results: ",list_BIC[max_index,]))
       
       if(length(max_index)>1){
         warning("more than one max index")
         max_index<-max_index[1]
-        max_tau<-list_BIC[max_index,3]
-        max_lambda1<-list_BIC[max_index,1]
-        max_lambda2<-list_BIC[max_index,2]
+        max_lambda<-list_BIC[max_index,1]
+        max_alpha<-list_BIC[max_index,2]
       }
     } else {
-      max_tau=0
-      max_lambda1=0
-      max_lambda2=0
+      max_lambda=0
+      max_alpha=0
       print(paste("No Penalization"))
     }
     
     # Final run with optimal parameters
     pref = sprintf("final%d",ii)
     start = as.numeric(Sys.time())
-    X<-EM(y=y,k=max_k,tau=max_tau,lambda1=max_lambda1,lambda2=max_lambda2,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
+    X<-EM(y=y,k=max_k,lambda=max_lambda,alpha=max_alpha,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
     end = as.numeric(Sys.time())
     X$time_elap = end-start
     
@@ -497,7 +492,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     # iCluster+
     if(iCluster_compare){
       n.lambda=25
-      iCluster_res = sim.iCluster(y[1:200,],true_clusters,ncores=1,n.lambda=n.lambda)
+      iCluster_res = sim.iCluster(norm_y,true_clusters,ncores=1,n.lambda=n.lambda)
       # if(iCluster_res$K != true.K){
       #   cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K-1,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
       #   BIC_mat = matrix(0,nrow=25,ncol=2)
@@ -621,9 +616,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     results=list(X=X,
                  max_k=max_k,
-                 max_lambda1=max_lambda1,
-                 max_lambda2=max_lambda2,
-                 max_tau=max_tau,
+                 max_lambda=max_lambda,
+                 max_alpha=max_alpha,
                  true_clusters=true_clusters,
                  true_disc=true_disc,
                  iCluster_res=iCluster_res,
@@ -647,9 +641,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   
   
   temp_ks<-rep(0,times=sim)
-  temp_lambda1s<-rep(0,times=sim)
-  temp_lambda2s<-rep(0,times=sim)
-  temp_taus<-rep(0,times=sim)
+  temp_lambdas<-rep(0,times=sim)
+  temp_alphas<-rep(0,times=sim)
   #temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
   #temp_coefs<-list()
   temp_disc<-rep(0,times=sim)
@@ -715,9 +708,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     true_disc=par_sim_res[[ii]]$true_disc
     
     temp_ks[ii] = par_sim_res[[ii]]$max_k
-    temp_lambda1s[ii] = par_sim_res[[ii]]$max_lambda1
-    temp_lambda2s[ii] = par_sim_res[[ii]]$max_lambda2
-    temp_taus[ii] = par_sim_res[[ii]]$max_tau
+    temp_lambdas[ii] = par_sim_res[[ii]]$max_lambda
+    temp_alphas[ii] = par_sim_res[[ii]]$max_alpha
     
     temp_pred_acc[ii] <- par_sim_res[[ii]]$pred_acc
     
@@ -761,14 +753,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   mean_falsepos<-mean(temp_falsepos)
   
   tab_k = table(temp_ks)
-  tab_lambda2 = table(temp_lambda2s)
-  tab_tau = table(temp_taus)
+  tab_lambda = table(temp_lambdas)
+  tab_alpha = table(temp_alphas)
   
-  #### Final_K, lambda2, tau represent most frequently found K, lambda2, and tau
+  #### Final_K, lambda, alpha represent most frequently found K, lambda, and alpha
   # final_k = as.numeric(names(which.max(tab_k)))
   final_k=mean(temp_ks)
-  final_lambda2 = as.numeric(names(which.max(tab_lambda2)))
-  final_tau = as.numeric(names(which.max(tab_tau)))
+  final_lambda = as.numeric(names(which.max(tab_lambda)))
+  final_alpha = as.numeric(names(which.max(tab_alpha)))
   
   #### iCluster+ results
   imean_ARI = mean(itemp_ARI)
@@ -805,10 +797,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   
   results<-list(K=final_k,
                 all_k=temp_ks,
-                lambda2=final_lambda2,
-                all_lambda2=temp_lambda2s,
-                tau=final_tau,
-                all_tau=temp_taus,
+                lambda=final_lambda,
+                all_lambda=temp_lambdas,
+                alpha=final_alpha,
+                all_alpha=temp_alphas,
                 ARI=mean_ARI,
                 disc=mean_disc,
                 sens=mean_sensitivity,

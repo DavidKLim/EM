@@ -45,7 +45,7 @@ collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05
                        distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n_per)
   tab<-matrix(0,nrow=nsims,ncol=27)      # 3 conditions, 7 things to tabulate
-  colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda2","tau","ARI",
+  colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda","alpha","ARI",
                    "sens","false.pos","i_K","i_ARI","i_lambda","pred_acc","ARI_hc","ARI_med","ARI_EM","ARI_iClust",
                    "sil_HC","sil_med","sil_EM","sil_iClust","K_HC","K_med","Order_Acc")
   ii=1
@@ -71,8 +71,8 @@ collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05
       tab[ii,1:5]<-c(n,g[l],fold_change[j],true_k[i],num_disc[k])
       tab[ii,6]<-X$K
       tab[ii,7]<-X$disc
-      tab[ii,8]<-X$lambda2
-      tab[ii,9]<-X$tau
+      tab[ii,8]<-X$lambda
+      tab[ii,9]<-X$alpha
       tab[ii,10]<-X$ARI
       tab[ii,11]<-X$sens
       tab[ii,12]<-X$falsepos
