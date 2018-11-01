@@ -18,6 +18,7 @@ library("parallel")
 library("pheatmap")
 library("iClusterPlus")
 library("cluster")
+library("NbClust")
 
 
 
@@ -166,7 +167,7 @@ sim.iCluster = function(y,true_clusters,
   for(i in 1:length(dev_inc)){
     dev_inc[i] = (devs[i+1]-devs[i])/devs[i]         # percent increase of POD
   }
-  max_k=which(dev_inc<0.02)[1]                       # optimal cluster selected at index right before (less than 5% increase in POD) is observed
+  max_k=which(dev_inc<0.05)[1]                       # optimal cluster selected at index right before (less than 5% increase in POD) is observed
   if(is.na(max_k)){max_k=K_search[length(K_search)-1]}
   max_lambda = lambda_vals[max_k]
   
@@ -194,7 +195,7 @@ sim.predict <- function(X,new_dat,new_SF,true_clusters){
 
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
-                 distrib,method="EM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
+                 distrib,method="CSEM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
                  disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
                  ncores=10,nsims=ncores,iCluster_compare=F,penalty=T){
   
@@ -371,15 +372,17 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     sink(sprintf("Diagnostics/%s/progress%d.txt",dir_name,ii))
     # Order selection
-    K_search=c(2:7)
+    K_search=c(1:7)
     list_BIC=matrix(0,nrow=length(K_search),ncol=2)
     list_BIC[,1]=K_search
     print(paste("Dataset",ii,"Order Selection:"))
+    list_X = list()
     
     for(aa in 1:nrow(list_BIC)){
       pref = sprintf("order%d",ii)
       start=as.numeric(Sys.time())
-      X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # no penalty
+      X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,
+            true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # no penalty
       end=as.numeric(Sys.time())
       list_BIC[aa,2]<-X$BIC
       if(list_BIC[aa,1]==true.K){
@@ -387,20 +390,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       }
       print(list_BIC[aa,])
       print(paste("Time:",end-start,"seconds"))
+      list_X[[aa]]=X
     }
-    
-  
-    sink(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.txt",dir_name,method,disp,ii))
-    
     max_k=list_BIC[which.min(list_BIC[,2]),1]
+    
+    sink(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.txt",dir_name,method,disp,ii))
     cat(paste("True order:",true.K,"\n"))
     cat(paste("Optimal order selected:",max_k,"\n"))
     cat("RUN WITH CORRECT ORDER:\n")
-    MSE_coefs = sum((compare_X$coefs - sim_coefs[idx,])^2)/(sum(idx)*true.K)
+    MSE_coefs = sum((compare_X$coefs[,order(compare_X$coefs[1,])] - sim_coefs[idx,])^2)/(sum(idx)*true.K)
     if(is.null(ncol(init_phi))){
       MSE_phi = sum((init_phi[idx]-compare_X$phi)^2)/(sum(idx)*true.K) # test
     } else{
-      MSE_phi = sum(((10/exp(sim_coefs[idx,])^2)-compare_X$phi)^2)/(sum(idx)*true.K) # test
+      MSE_phi = sum((init_phi[idx,]-compare_X$phi)^2)/(sum(idx)*true.K) # test
     }
     cat(paste("ARI:",adjustedRandIndex(compare_X$final_clusters,true_clusters),"\n"))
     cat(paste("MSE of true vs discovered coefs:",MSE_coefs,"\n"))
@@ -439,8 +441,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       print(paste("Dataset",ii,"Grid Search:"))    # track iteration
       
       #create matrix for grid search values
-      lambda_search=seq(0.1,5.1,0.5)
-      alpha_search=seq(0,0.3,0.03)
+      lambda_search=seq(0.1,2.0,0.1)
+      alpha_search=seq(0,1,0.05)
       
       list_BIC=matrix(0,nrow=length(lambda_search)*length(alpha_search),ncol=3) # matrix of BIC's: one for each combination of penalty params 
       
@@ -451,7 +453,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       for(aa in 1:nrow(list_BIC)){
         pref = sprintf("grid%d",ii)
         start = as.numeric(Sys.time())
-        X<-EM(y=y,k=max_k,lambda=list_BIC[aa,1],alpha=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method)
+        X<-EM(y=y,k=max_k,lambda=list_BIC[aa,1],alpha=list_BIC[aa,2],size_factors=size_factors,norm_y=norm_y,
+              true_clusters=true_clusters,true_disc=true_disc,disp=disp,prefix=pref,dir=dir_name,method=method,
+              init_cls=list_X[[max_k]]$final_clusters,init_parms=T,init_coefs=list_X[[max_k]]$coefs,init_phi=list_X[[max_k]]$phi)
         end = as.numeric(Sys.time())
         list_BIC[aa,3]<-X$BIC
         print(list_BIC[aa,])
@@ -480,7 +484,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     # Final run with optimal parameters
     pref = sprintf("final%d",ii)
     start = as.numeric(Sys.time())
-    X<-EM(y=y,k=max_k,lambda=max_lambda,alpha=max_alpha,size_factors=size_factors,norm_y=norm_y,true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)
+    X<-EM(y=y,k=max_k,lambda=max_lambda,alpha=max_alpha,size_factors=size_factors,norm_y=norm_y,
+          true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp,
+          init_cls=list_X[[max_k]]$final_clusters,init_parms=T,init_coefs=list_X[[max_k]]$coefs,init_phi=list_X[[max_k]]$phi)
     end = as.numeric(Sys.time())
     X$time_elap = end-start
     
@@ -558,16 +564,40 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     print("Prediction complete")
     
-    pam1 <- function(x,k) list(cluster = pam(t(x),k, cluster.only=TRUE))
-    hclusCut <- function(x, k){
-      list(cluster = cutree(hclust(as.dist(1-cor(x,method="spearman")),method="average"), k=k))
+    set.seed(123)
+    results_hc=list()
+    selected <- c( "kl", "ch", "hartigan",  "cindex", "db", "silhouette", "duda", "pseudot2", "beale", "ratkowsky", "ball", "ptbiserial", "gap", "mcclain", "gamma", "gplus", "tau", "dunn", "hubert", "sdindex", "dindex", "sdbw")
+    max_K_hc_avail=0
+    
+    for (i in 1:length(selected)) {
+      pdf(sprintf("Diagnostics/%s/hc_OS%d.pdf",dir_name,ii))
+      results_hc[[i]] <- try(NbClust(t(log(norm_y+0.1)), min.nc=min(K_search), max.nc=max(K_search), method="average", index=selected[i]))
+      dev.off()
+      max_K_hc_avail=max_K_hc_avail+(length(results_hc[[i]])>1)
+      cat(paste("HC order select method: ",selected[i],"\n"))
     }
+    max_K_hcs = rep(NA,max_K_hc_avail)
+    for(i in 1:max_K_hc_avail){
+      if(length(results_hc[[i]])>1){
+        max_K_hcs[i] = try(results_hc[[i]]$Best.nc[1])
+      }
+    }
+    K_hc = as.numeric(unique(max_K_hcs)[order(unique(max_K_hcs))][which.max(table(max_K_hcs))])
+    cat(paste("HC K: ",K_hc, "\n"))
     
-    K_hc=which.max(clusGap(log(norm_y+0.1),FUN=pam1,K.max=7)$Tab[,"gap"])
-    K_med=which.max(clusGap(norm_y,FUN=hclusCut,K.max=7)$Tab[,"gap"])
+    pam_fit = list()
+    sil.vals = rep(NA,max(K_search))
+    for(c in K_search){
+      if(c==1) next         # can't search k=1
+      pam_fit[[c]] = pam(t(log(norm_y+0.1)),c)
+      sil.vals[c] = pam_fit[[c]]$silinfo$avg.width
+      cat(paste("K-med order select avg silhouette: ", sil.vals[c],"\n"))
+    }
+    K_med = which.max(sil.vals)
+    cat(paste("K-med K: ",K_med, "\n"))
     
-    cls_hc = hclusCut(norm_y,K_hc)$cluster
-    cls_med = pam1(norm_y,K_med)$cluster
+    cls_hc = cutree(hclust(as.dist(1-cor(norm_y, method="spearman")),method="average"),K_hc)
+    cls_med = pam(t(log(norm_y+0.1)),K_med)$cluster
     
     # # Comparisons with Average linkage HC and K-Medoid clustering
     # d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
@@ -666,6 +696,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     library(DESeq2)
     library(iClusterPlus)
     library(cluster)
+    library(NbClust)
     sourceCpp("M_step.cpp")
     })
   
@@ -701,9 +732,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   temp_K_hc = rep(0,sim)
   temp_K_med = rep(0,sim)
   
+  all_X = list()
+  
   # Summarize results
   for(ii in 1:sim){
     X=par_sim_res[[ii]]$X
+    all_X[[ii]]=X
     true_clusters=par_sim_res[[ii]]$true_clusters
     true_disc=par_sim_res[[ii]]$true_disc
     
@@ -795,21 +829,27 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   
   # Store for tabulation:
   
-  results<-list(K=final_k,
+  results<-list(all_X=all_X,
+                K=final_k,
                 all_k=temp_ks,
                 lambda=final_lambda,
                 all_lambda=temp_lambdas,
                 alpha=final_alpha,
                 all_alpha=temp_alphas,
+                all_ARI=temp_ARI,
                 ARI=mean_ARI,
+                all_disc=temp_disc,
                 disc=mean_disc,
+                all_sens=temp_sensitivity,
                 sens=mean_sensitivity,
+                all_falsepos=temp_falsepos,
                 falsepos=mean_falsepos,
                 all_data=all_data,
                 all_iCluster_res=all_iCluster_res,
                 imean_ARI=imean_ARI,
                 ifinal_k=ifinal_k,
                 ifinal_lambda=ifinal_lambda,
+                all_pred_acc=temp_pred_acc,
                 mean_pred_acc=mean_pred_acc,
                 all_sim_data=all_sim_data,
                 ARI_HC=mean_ARI_hc,
@@ -821,7 +861,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                 sil_EM=mean_sil_EM,
                 sil_iClust=mean_sil_iClust,
                 final_K_hc=final_K_hc,
-                final_K_med=final_K_med)
+                final_K_med=final_K_med,
+                all_K_hc=temp_K_hc,
+                all_K_med=temp_K_med)
   
   return(results)
 }

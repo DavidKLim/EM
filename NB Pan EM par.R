@@ -237,7 +237,7 @@ EM_run <- function(y, k,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
                    init_phi=matrix(0,nrow=nrow(y),ncol=k),
                    disp,cls_init,
-                   CEM=F,init_Tau=2,SEM=F,
+                   CEM=F,init_Tau=1,SEM=F,
                    maxit_EM=100){
   
   start_time <- Sys.time()
@@ -312,7 +312,11 @@ EM_run <- function(y, k,
     if(a==1){         # Initializations for 1st EM iteration
       if(init_parms){
         coefs=init_coefs
-        phi=init_phi
+        if(cl_phi==0){
+          phi_g=init_phi
+        } else{
+          phi=init_phi
+        }
       }
       for(j in 1:g){
         if(!init_parms){
@@ -321,7 +325,7 @@ EM_run <- function(y, k,
               coefs[j,c]=log(0.1)
               next
               }
-            coefs[j,c]<-glm(as.numeric(y[j,cls==c])~1,family=poisson())$coef               # Initialize beta (Poisson)
+            coefs[j,c]<-glm(as.integer(y[j,cls==c])~1,family=poisson())$coef               # Initialize beta (Poisson)
             # fit<-glm.nb(as.numeric(y[j,cls==c])~1)                                      # Test: initializing with glm.nb (errors out frequently)
             # coefs[j,c]=fit$coef
             # test_phi[j]=1/fit$theta
@@ -378,11 +382,12 @@ EM_run <- function(y, k,
         #phi[j,] <- rep(phi_g[j],times=k)
       }
       
-      ids = list()
-      for(c in 1:k){
-        ids[[c]]=which(theta_list[[j]][c,]==0)
-        coefs[j,ids[[c]]] = rep(mean(coefs[j,ids[[c]]]),times=length(ids[[c]]))
-      }
+      # # Ad hoc averaging of cluster log means when nondiscriminatory
+      # ids = list()
+      # for(c in 1:k){
+      #   ids[[c]]=which(theta_list[[j]][c,]==0)
+      #   coefs[j,ids[[c]]] = rep(mean(coefs[j,ids[[c]]]),times=length(ids[[c]]))
+      # }
     }
     
     if(cl_phi==1){
@@ -424,7 +429,7 @@ EM_run <- function(y, k,
     Q[a]<-pt1+pt2
     
     # break condition for EM
-    if(a>5){if(abs((Q[a]-Q[a-5])/Q[a])<EM_tol) {
+    if(Tau==1){if(abs((Q[a]-Q[a-5])/Q[a])<EM_tol) {
       finalwts<-wts
       break
     }}
@@ -457,9 +462,9 @@ EM_run <- function(y, k,
       for(c in 1:k){
         wts[c,]<-exp((1/Tau)*(log(pi[c])+l[c,])-logdenom)
       }
-      if(a<=5){
+      if(Tau>1){
         Tau = 0.9*Tau
-      } else{ Tau=1 }     # after 2 iteration, CEM --> EM     
+      } else{ Tau=1 }     # after Tau hits 1 --> fix at 1
     }
     
     # UB and LB on weights
@@ -477,10 +482,33 @@ EM_run <- function(y, k,
 
     if(SEM){
       # SEM
+      draw_wts=wts                 # initialize
       for(i in 1:n){
-        wts[,i] = rmultinom(1,1,wts[,i])
+        set.seed(i)
+        draw_wts[,i] = rmultinom(1,1,wts[,i])
       }
-    }
+      seed_mult=1
+      while(any(rowSums(draw_wts)==0)){
+        cat("Drawing again",seed_mult,"\n")
+        for(i in 1:n){
+          set.seed(seed_mult*n+i)
+          for(c in 1:k){
+            if(wts[c,i]<=(1E-50*10^seed_mult) & seed_mult<=48){
+              wts[c,i]=1E-50*10^seed_mult
+            } else if(wts[c,i]>=(1-(1E-50*10^seed_mult)) & seed_mult<=48){
+              wts[c,i]=1-1E-50*10^seed_mult
+            }
+          }
+          draw_wts[,i] = rmultinom(1,1,wts[,i])
+        }
+        seed_mult=seed_mult+1
+        if(seed_mult>250){
+          draw_wts[,n]=rep(1/k,k)
+          break
+          }
+      }
+      wts=draw_wts
+    }          # Keep drawing until at least one in each cluster
     
     # Diagnostics Tracking
     current_clusters<-rep(0,times=n)
@@ -592,25 +620,20 @@ EM_run <- function(y, k,
 
 EM<-function(y, k,
              lambda=0,alpha=0,
-             size_factors=rep(1,times=ncol(y)) ,
+             size_factors=rep(1,times=ncol(y)),
              norm_y=y,
              true_clusters=NA, true_disc=NA,
              init_parms=FALSE,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
              init_phi=matrix(0,nrow=nrow(y),ncol=k),
+             init_cls=NA,
              disp=c("gene","cluster"),
-             method=c("CEM","EM","SEM","CSEM"),
+             method=c("EM","CSEM"),
              prefix="", dir="NA"){
   
   if(method=="EM"){
     CEM=F
     SEM=F
-  } else if(method=="CEM"){
-    CEM=T
-    SEM=F
-  } else if(method=="SEM"){
-    CEM=F
-    SEM=T
   } else if(method=="CSEM"){
     CEM=T
     SEM=T
@@ -626,108 +649,103 @@ EM<-function(y, k,
   cat(paste(sprintf("n=%d, g=%d, k=%d, l=%f, alph=%f, ",n,g,k,lambda,alpha),"\n"))
   cat("True clusters:\n")
   write.table(true_clusters,quote=F,col.names=F)
+    
+  init_Tau=g
   
-  # Initial Clusterings
-  ## Hierarchical Clustering
-  d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-  model<-hclust(d,method="average")       # hierarchical clustering
-  cls_hc <- cutree(model,k=k)
+  if(all(is.na(init_cls))){
+    # Initial Clusterings
+    ## Hierarchical Clustering
+    d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+    model<-hclust(d,method="average")       # hierarchical clustering
+    cls_hc <- cutree(model,k=k)
   
-  ## K-means Clustering
-  cls_km <- kmeans(t(log(norm_y+0.1)),k)$cluster
+    ## K-means Clustering
+    cls_km <- kmeans(t(log(norm_y+0.1)),k)$cluster
   
-  #TESTING RANDOM CLUSTERING
+    #TESTING RANDOM CLUSTERING
   
-  r_it=3
-  rand_inits = matrix(0,nrow=n,ncol=r_it)
-  rand_init_BIC = rep(0,r_it)
+    r_it=3
+    rand_inits = matrix(0,nrow=n,ncol=r_it)
   
-  for(r in 1:r_it){
-    set.seed(r)
-    rand_inits[,r] = sample(1:k,n,replace=TRUE)
-    while(sum(1:k %in% rand_inits[,r]) < k){
+    for(r in 1:r_it){
+      set.seed(r)
       rand_inits[,r] = sample(1:k,n,replace=TRUE)
-    }
-  }
-  colnames(rand_inits) = paste("rand",c(1:r_it),sep="")
-  
-  # Iterate through 2-it EM with each initialization
-  all_init_cls <- cbind(cls_hc,cls_km,rand_inits)
-  init_cls_BIC <- rep(0,times=ncol(all_init_cls))
-  
-  # initial Tau search for CEM #
-  Tau_vals = 2
-  #Tau_vals = c(2,20,200)
-  #Tau_vals = c(2,5,20,50,100,1000,5000,10000,50000,100000)
-  init_cls_Tau = rep(0,ncol(all_init_cls))
-  
-  for(i in 1:ncol(all_init_cls)){
-    ########################## SIMULATION ONLY #############################
-    if((!is.null(true_clusters) & !is.na(true_clusters)) & k>1){
-      all_perms=allPerms(1:k)
-      all_clusts=list()
-      temp_clust<-rep(0,times=n)
-      
-      for(iii in 1:nrow(all_perms)){
-        for(ii in 1:n){
-          temp_clust[ii]<-all_perms[iii,all_init_cls[ii,i]]
-        }
-        all_clusts[[iii]]<-temp_clust
+      while(sum(1:k %in% rand_inits[,r]) < k){
+        rand_inits[,r] = sample(1:k,n,replace=TRUE)
       }
-      
-      all_clusts[[nrow(all_perms)+1]]<-all_init_cls[,i]     # contains all permutations of cluster indices
-      match_index<-rep(0,times=nrow(all_perms)+1)
-      
-      for(ii in 1:(nrow(all_perms)+1)){
-        match_index[ii]<-mean(true_clusters==all_clusts[[ii]])     # compares each permutation to true --> % of match
-      }
-      
-      all_init_cls[,i]<-all_clusts[[which.max(match_index)]]
     }
-    ########################## SIMULATION ONLY #############################
+    colnames(rand_inits) = paste("rand",c(1:r_it),sep="")
+  
+    # Iterate through 2-it EM with each initialization
+    all_init_cls <- cbind(cls_hc,cls_km,rand_inits)
+    init_cls_BIC <- rep(0,times=ncol(all_init_cls))
+  
+    all_fits = list()
     
-    cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
-    # if(CEM){
-    #   for(t in 1:length(Tau_vals)){
-    #     fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
-    #                  init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-    #                  cls_init=all_init_cls[,i], CEM=CEM,init_Tau=Tau_vals[t] ,SEM=SEM, maxit_EM=10)
-    #     if(all(fit$wts < 0.999 & fit$wts > 0.001)){
-    #       break
-    #     }
-    #   }
-    #   
-    #   cat(paste("Init Tau:",Tau_vals[t],"\n"))
-    #   init_cls_Tau[i] <- Tau_vals[t]
-    # }
-    init_cls_Tau[i] <- g/10    # just setting tau val to 2 for all (for now)
+    for(i in 1:ncol(all_init_cls)){
+      ########################## SIMULATION ONLY #############################
+      # if((!is.null(true_clusters) & !is.na(true_clusters)) & k>1){
+      #   all_perms=allPerms(1:k)
+      #   all_clusts=list()
+      #   temp_clust<-rep(0,times=n)
+      #
+      #   for(iii in 1:nrow(all_perms)){
+      #     for(ii in 1:n){
+      #       temp_clust[ii]<-all_perms[iii,all_init_cls[ii,i]]
+      #     }
+      #     all_clusts[[iii]]<-temp_clust
+      #   }
+      #
+      #   all_clusts[[nrow(all_perms)+1]]<-all_init_cls[,i]     # contains all permutations of cluster indices
+      #   match_index<-rep(0,times=nrow(all_perms)+1)
+      #
+      #   for(ii in 1:(nrow(all_perms)+1)){
+      #     match_index[ii]<-mean(true_clusters==all_clusts[[ii]])     # compares each permutation to true --> % of match
+      #   }
+      #
+      #   all_init_cls[,i]<-all_clusts[[which.max(match_index)]]
+      # }
+      ########################## SIMULATION ONLY #############################
+  
+      # if(CEM){
+      #   for(t in 1:length(Tau_vals)){
+      #     fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
+      #                  init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
+      #                  cls_init=all_init_cls[,i], CEM=CEM,init_Tau=Tau_vals[t] ,SEM=SEM, maxit_EM=10)
+      #     if(all(fit$wts < 0.999 & fit$wts > 0.001)){
+      #       break
+      #     }
+      #   }
+      #
+      #   cat(paste("Init Tau:",Tau_vals[t],"\n"))
+      #   init_cls_Tau[i] <- Tau_vals[t]
+      # }
+  
+      cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
+      
+      fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,
+                                init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
+                                cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=100)
+      all_fits [[i]] = fit
+      init_cls_BIC[i] <- fit$BIC
+    }
+  
+    fit_id = which.min(init_cls_BIC)
     
-    if(CEM){
-      maxit_search = 10
-    } else { maxit_search = 2 }
-    fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,
-                              init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                              cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_cls_Tau[i],SEM=SEM, maxit_EM=maxit_search)
-    init_cls_BIC[i] <- fit$BIC
+    cat("FINAL INITIALIZATION:\n")
+    cat(paste(colnames(all_init_cls)[fit_id],"\n"))
+    init_cls = all_init_cls[,fit_id[1]]
+    cat("FINAL TAU VALUE:\n")
+    cat(paste(init_Tau,"\n"))
   }
   
-
-  cat("FINAL INITIALIZATION:\n")
-  cat(paste(colnames(all_init_cls)[which.min(init_cls_BIC)],"\n"))
-  final_init_cls = all_init_cls[,which.min(init_cls_BIC)[1]]
-  final_init_Tau = init_cls_Tau[which.min(init_cls_BIC)[1]]
-  cat("FINAL TAU VALUE:\n")
-  cat(paste(final_init_Tau,"\n"))
-  
-  # sink()
-  # 
-  # final_file = sprintf("Diagnostics/%s/final_%s_%d_%f_%f_%f.txt",prefix,k,lambda1,lambda2,tau)
-  # sink(file=final_file)
-  
-  # NEED TO EDIT SO INIT_TAU = INITIAL TAU OF THE CORRECT INITIALIZATION
-  results=EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,cls_init=final_init_cls,
-                 CEM=CEM,init_Tau=final_init_Tau,SEM=SEM,disp=disp,init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi)
-
+  if(all(is.na(init_cls))){
+    results=all_fits[[fit_id]]
+  } else{
+    results=EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,
+                   init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
+                   cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=100)
+  }
   
   sink()
   return(results)

@@ -1,4 +1,4 @@
-run.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=c(2000),n_per=c(25,50),
+run.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,1.5),num_disc=c(.05),g=c(2000),n_per=c(25,50),
                    distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,
                    ncores=10,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none"),more_options=""){
   setwd("/netscr/deelim/out")
@@ -37,11 +37,12 @@ run.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=
       cmdf = paste(cmd, collapse = "")
       write.table(cmdf, file = out, col.names = F, row.names = F, quote = F)
       run = sprintf("bsub -M 15 -q week -n %d -R \"span[hosts=1]\" -o /netscr/deelim/dump R CMD BATCH %s", ncores,out)
+      Sys.sleep(1)
       system(run)
   }}}}}
 }
 
-collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05),g=c(2000),n_per=c(25,50),
+collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,1.5),num_disc=c(.05),g=c(2000),n_per=c(25,50),
                        distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n_per)
   tab<-matrix(0,nrow=nsims,ncol=27)      # 3 conditions, 7 things to tabulate
@@ -71,8 +72,8 @@ collect.sim = function(prefix="",true_k=c(2,4),fold_change=c(1,2),num_disc=c(.05
       tab[ii,1:5]<-c(n,g[l],fold_change[j],true_k[i],num_disc[k])
       tab[ii,6]<-X$K
       tab[ii,7]<-X$disc
-      tab[ii,8]<-X$lambda
-      tab[ii,9]<-X$alpha
+      tab[ii,8]<-mean(X$all_lambda)
+      tab[ii,9]<-mean(X$all_alpha)
       tab[ii,10]<-X$ARI
       tab[ii,11]<-X$sens
       tab[ii,12]<-X$falsepos
