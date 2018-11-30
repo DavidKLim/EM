@@ -172,20 +172,20 @@ int sign(double x) {
     return (x > 0) - (x < 0);
 }
 
-double soft_thresh(double alpha, double lambda){ /* ST of SCAD penalty */
+double soft_thresh(double theta, double lambda){ /* ST of SCAD penalty */
     double STval;
 	double a=3.7;
 	
-    if(fabs(alpha)<=2*lambda){
-		if(fabs(alpha)<=lambda){
+    if(fabs(theta)<=2*lambda){
+		if(fabs(theta)<=lambda){
 			STval = 0;
 		} else{
-			STval = sign(alpha)*(fabs(alpha)-lambda);
+			STval = sign(theta)*(fabs(theta)-lambda);
 		}
-    } else if(fabs(alpha)>2*lambda && fabs(alpha)<=a*lambda){
-        STval = ((a-1)*alpha - sign(alpha)*a*lambda)/(a-2);
+    } else if(fabs(theta)>2*lambda && fabs(theta)<=a*lambda){
+        STval = ((a-1)*theta - sign(theta)*a*lambda)/(a-2);
     } else{
-		STval = alpha;
+		STval = theta;
 	}
     return(STval);
 }

@@ -27,18 +27,18 @@ logsumexpc=function(v){
   lse 
 }
 
-soft_thresholding=function(alpha,lambda){
+soft_thresholding=function(theta,lambda){
   a=3.7
-  if(abs(alpha)<=2*lambda){
-    if(abs(alpha)<=lambda){
+  if(abs(theta)<=2*lambda){
+    if(abs(theta)<=lambda){
       return(0)
     } else{
-      return(sign(alpha)*(abs(alpha)-lambda))
+      return(sign(theta)*(abs(theta)-lambda))
     }
-  }else if(abs(alpha)>2*lambda & abs(alpha)<=a*lambda){
-    return(((a-1)*alpha - sign(alpha)*a*lambda)/(a-2))
+  }else if(abs(theta)>2*lambda & abs(theta)<=a*lambda){
+    return(((a-1)*theta - sign(theta)*a*lambda)/(a-2))
   }else{
-    return(alpha)
+    return(theta)
   }
 }
  
@@ -232,6 +232,7 @@ EM_run <- function(y, k,
                    lambda=0,alpha=0,
                    size_factors=rep(1,times=ncol(y)) ,
                    norm_y=y,
+                   purity=rep(1,ncol(y)),offsets=0,
                    true_clusters=NA, true_disc=NA,
                    init_parms=FALSE,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
@@ -259,7 +260,7 @@ EM_run <- function(y, k,
   # Stopping Criteria
   IRLS_tol = 1E-6
   maxit_IRLS = 50
-  EM_tol = 1E-6
+  EM_tol = 1E-12
   
   # Initialize parameters
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
@@ -271,7 +272,7 @@ EM_run <- function(y, k,
   temp_list <- list()             # store temp to see progression of IRLS
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
   
-  offset=log(size_factors)
+  offset=log(size_factors) + offsets
   #offset=rep(0,times=n)            # no offsets
   
   Q<-rep(0,times=maxit_EM)
@@ -304,6 +305,7 @@ EM_run <- function(y, k,
   #   }
   # }
   DNC=0
+  disc_ids=rep(T,g)
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
@@ -358,7 +360,7 @@ EM_run <- function(y, k,
       # print(head(coefs))
       # print("phi:")
       # print(head(phi))
-      if((a>=5 & all(theta_list[[j]]==0))){next}
+      if((Tau<=1 & a>=5 & all(theta_list[[j]]==0))){next}
       y_j = as.integer(y[j,])
       par_X[[j]] <- M_step(j=j, a=a, y_j=y_j, all_wts=wts, offset=offset,
                            k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],
@@ -371,7 +373,7 @@ EM_run <- function(y, k,
     
     
     for(j in 1:g){
-      if((a>=5 & all(theta_list[[j]]==0))){next}
+      if((Tau<=1 & a>=5 & all(theta_list[[j]]==0))){next}
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
@@ -382,12 +384,17 @@ EM_run <- function(y, k,
         #phi[j,] <- rep(phi_g[j],times=k)
       }
       
-      # # Ad hoc averaging of cluster log means when nondiscriminatory
-      # ids = list()
-      # for(c in 1:k){
-      #   ids[[c]]=which(theta_list[[j]][c,]==0)
-      #   coefs[j,ids[[c]]] = rep(mean(coefs[j,ids[[c]]]),times=length(ids[[c]]))
-      # }
+      # Ad hoc averaging of cluster log means when nondiscriminatory
+      ids = list()
+      n_k = rowSums(wts)
+      for(c in 1:k){
+        ids[[c]]=which(theta_list[[j]][c,]==0)
+        coefs[j,ids[[c]]] = rep(sum(n_k[ids[[c]]]*coefs[j,ids[[c]]])/sum(n_k[ids[[c]]]),times=length(ids[[c]]))               # weighted (by # in each cl) average
+      }
+    }
+    # Marker of all nondisc genes (T for disc, F for nondisc)
+    for(j in 1:g){
+      disc_ids[j]=any(theta_list[[j]]!=0)
     }
     
     if(cl_phi==1){
@@ -419,7 +426,6 @@ EM_run <- function(y, k,
         } else if(cl_phi==0){
           l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi_g,mu=exp(coefs[,c] + offset[i]),log=TRUE))
         }
-        #l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phis,mu=exp(coefs[,c] + offset[i]),log=TRUE))
       }    # subtract out 0.1 that was added earlier
     }
     
@@ -429,7 +435,7 @@ EM_run <- function(y, k,
     Q[a]<-pt1+pt2
     
     # break condition for EM
-    if(Tau==1){if(abs((Q[a]-Q[a-5])/Q[a])<EM_tol) {
+    if(Tau==1 & a>5){if(abs((Q[a]-Q[a-5])/Q[a])<EM_tol) {
       finalwts<-wts
       break
     }}
@@ -510,6 +516,11 @@ EM_run <- function(y, k,
       wts=draw_wts
     }          # Keep drawing until at least one in each cluster
     
+    # Weighting by purity
+    for(i in 1:n){
+      wts[,i]=wts[,i]*purity[i]
+    }      # default: purity = 1 --> wts stay the same.
+    
     # Diagnostics Tracking
     current_clusters<-rep(0,times=n)
     for(i in 1:n){
@@ -575,17 +586,50 @@ EM_run <- function(y, k,
       m_row[c] <- sum(theta_list[[j]][c,]!=0) + 1         # of parameters estimated
     }
     m[j]=min(m_row)
+    if(sum(coefs[j,]==-30)>1){
+      m[j]=m[j]+(sum(coefs[j,]==-30)-1)
+    }
     if(m[j]==1){nondiscriminatory[j]=TRUE}
   }
-  pred.nondiscriminatory<-mean(nondiscriminatory)
+  if(lambda*alpha==0){
+    m=rep(k,g)
+  }
   
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
   if(cl_phi==1){
-    BIC=-2*log_L+log(n*g)*(2*sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params,
+    BIC=-2*log_L+log(n)*(2*sum(m)+(k-1))         # -2log(L) + log(#obs)*(#parameters estimated). minimum = best. g*k: total params,
                                                  # 2*sum(m): total # of discriminatory beta parameters + phi parameters (no redundancies), k-1: df of cluster proportions, 
   } else if(cl_phi==0){
-    BIC=-2*log_L+log(n*g)*(sum(m)+(k-1)+g)       # g: dispersion parameters
+    BIC=-2*log_L+log(n)*(sum(m)+(k-1)+g)       # g: dispersion parameters
   }
+  
+  cat(paste("total # coefs estimated =",sum(m),"\n"))
+  cat(paste("total # params estimated =",(BIC+2*log_L)/log(n),"\n"))
+  cat(paste("-2log(L) =",-2*log_L,"\n"))
+  cat(paste("log(n) =",log(n),"\n"))
+  cat(paste("plog(n) =",BIC+2*log_L,"\n"))
+  cat(paste("BIC =",BIC,"\n"))
+  
+  disc_stats=cbind(m,(!nondiscriminatory)^2,disc_ids^2)
+  colnames(disc_stats) = c("#params","disc","disc_ids")
+  write.table(head(disc_stats,n=10),quote=F)
+  write.table(tail(disc_stats,n=10),quote=F)
+  cat("-------------------------------------\n")
+  cat("Coefs:\n")
+  write.table(head(coefs,n=10),quote=F)
+  write.table(tail(coefs,n=10),quote=F)
+  cat("-------------------------------------\n")
+  cat("Phi:\n")
+  if(cl_phi==1){
+    write.table(head(phi,n=10),quote=F)
+    write.table(tail(phi,n=10),quote=F)
+  } else if(cl_phi==0){
+    write.table(head(phi_g,n=10),quote=F)
+    write.table(tail(phi_g,n=10),quote=F)
+  }
+  cat("-------------------------------------\n")
+  
+  
   end_time <- Sys.time()
   time_elap <- as.numeric(end_time)-as.numeric(start_time)
   
@@ -622,6 +666,7 @@ EM<-function(y, k,
              lambda=0,alpha=0,
              size_factors=rep(1,times=ncol(y)),
              norm_y=y,
+             purity=rep(1,ncol(y)),offsets=0,              # Offsets: effect of log(covariate) on count #
              true_clusters=NA, true_disc=NA,
              init_parms=FALSE,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
@@ -650,9 +695,11 @@ EM<-function(y, k,
   cat("True clusters:\n")
   write.table(true_clusters,quote=F,col.names=F)
     
-  init_Tau=g
-  
-  if(all(is.na(init_cls))){
+  init_Tau=sqrt(g)
+  if(k==1){
+    init_cls=rep(1,n)
+  }
+  if(all(is.na(init_cls)) & k>1){
     # Initial Clusterings
     ## Hierarchical Clustering
     d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
@@ -664,7 +711,7 @@ EM<-function(y, k,
   
     #TESTING RANDOM CLUSTERING
   
-    r_it=3
+    r_it=20
     rand_inits = matrix(0,nrow=n,ncol=r_it)
   
     for(r in 1:r_it){
@@ -723,9 +770,9 @@ EM<-function(y, k,
   
       cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
       
-      fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,
+      fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
                                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                                cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=100)
+                                cls_init=all_init_cls[,i], CEM=F,init_Tau=1,SEM=F, maxit_EM=20)
       all_fits [[i]] = fit
       init_cls_BIC[i] <- fit$BIC
     }
@@ -739,19 +786,16 @@ EM<-function(y, k,
     cat(paste(init_Tau,"\n"))
   }
   
-  if(all(is.na(init_cls))){
-    results=all_fits[[fit_id]]
-  } else{
-    results=EM_run(y,k,lambda,alpha,size_factors,norm_y,true_clusters,true_disc,
-                   init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                   cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=100)
-  }
+  results=EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
+                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
+                 cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=100)
   
   sink()
   return(results)
 }
 
-predictions <- function(X,newdata,new_sizefactors){
+predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=0){
+  ############# NEED TO INCORPORATE PURITY IN LL ########################
   # X is the output object from the EM() function
   init_coefs=X$coefs
   init_phi=X$phi
@@ -783,7 +827,7 @@ predictions <- function(X,newdata,new_sizefactors){
   #              true_clusters=NA,init_parms=TRUE,init_coefs=init_coefs,init_phi=init_phi)
   
   init_size_factors = new_sizefactors
-  offset=log(init_size_factors)
+  offset=log(init_size_factors) + offsets
   n=ncol(newdata)
   k=ncol(init_coefs)
   

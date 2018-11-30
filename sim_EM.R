@@ -370,7 +370,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     true_disc = all_data[[ii]]$true_disc
     idx = all_data[[ii]]$gene_id
     
-    sink(sprintf("Diagnostics/%s/progress%d.txt",dir_name,ii))
+    filt_sens = sum(idx[1:tt])/tt
+    filt_falsepos = sum(idx[(tt+1):g])/(g-tt)
+    
+    sink(sprintf("Diagnostics/%s/progress%d_%s_%s.txt",dir_name,ii,method,disp))
     # Order selection
     K_search=c(1:7)
     list_BIC=matrix(0,nrow=length(K_search),ncol=2)
@@ -381,8 +384,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     for(aa in 1:nrow(list_BIC)){
       pref = sprintf("order%d",ii)
       start=as.numeric(Sys.time())
-      X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,
-            true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # no penalty
+      X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=1,size_factors=size_factors,norm_y=norm_y,
+            true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # alpha = 1: all L1. No penalty here
       end=as.numeric(Sys.time())
       list_BIC[aa,2]<-X$BIC
       if(list_BIC[aa,1]==true.K){
@@ -393,6 +396,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       list_X[[aa]]=X
     }
     max_k=list_BIC[which.min(list_BIC[,2]),1]
+    unpen_BIC = min(list_BIC[,2])
     
     sink(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.txt",dir_name,method,disp,ii))
     cat(paste("True order:",true.K,"\n"))
@@ -441,7 +445,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       print(paste("Dataset",ii,"Grid Search:"))    # track iteration
       
       #create matrix for grid search values
-      lambda_search=seq(0.1,2.0,0.1)
+      lambda_search=c(0.1,seq(0.25,2.5,0.25))
       alpha_search=seq(0,1,0.05)
       
       list_BIC=matrix(0,nrow=length(lambda_search)*length(alpha_search),ncol=3) # matrix of BIC's: one for each combination of penalty params 
@@ -475,9 +479,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
         max_lambda<-list_BIC[max_index,1]
         max_alpha<-list_BIC[max_index,2]
       }
+      
+      pen_BIC = min(list_BIC[,3])
+      
+      if(pen_BIC>=unpen_BIC){
+        max_lambda=0
+        max_alpha=1
+        print("Algorithm selected unpenalized model")
+      } else{
+        print(paste("Penalized model with lambda=",max_lambda,"and alpha=",max_alpha))
+      }
     } else {
       max_lambda=0
-      max_alpha=0
+      max_alpha=1
       print(paste("No Penalization"))
     }
     
@@ -664,7 +678,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                  sil_med=sil_med,
                  sil_hc=sil_hc,
                  K_hc=K_hc,
-                 K_med=K_med)
+                 K_med=K_med,
+                 filt_sens=filt_sens,
+                 filt_falsepos=filt_falsepos)
     return(results)
   }
   
@@ -732,6 +748,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   temp_K_hc = rep(0,sim)
   temp_K_med = rep(0,sim)
   
+  temp_filt_sens = rep(0,sim)
+  temp_filt_falsepos = rep(0,sim)
+  
   all_X = list()
   
   # Summarize results
@@ -777,6 +796,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     temp_K_hc[ii] = par_sim_res[[ii]]$K_hc
     temp_K_med[ii] = par_sim_res[[ii]]$K_med
+    
+    temp_filt_sens[ii] = par_sim_res[[ii]]$filt_sens
+    temp_filt_falsepos[ii] = par_sim_res[[ii]]$filt_falsepos
   }
   
   #mean_pi<-colSums(temp_pi)/sim
@@ -827,6 +849,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   final_K_hc = mean(temp_K_hc)
   final_K_med = mean(temp_K_med)
   
+  final_filt_sens = mean(temp_filt_sens)
+  final_filt_falsepos = mean(temp_filt_falsepos)
+  
   # Store for tabulation:
   
   results<-list(all_X=all_X,
@@ -863,7 +888,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                 final_K_hc=final_K_hc,
                 final_K_med=final_K_med,
                 all_K_hc=temp_K_hc,
-                all_K_med=temp_K_med)
+                all_K_med=temp_K_med,
+                filt_sens=final_filt_sens,
+                filt_falsepos=final_filt_falsepos,
+                all_filt_sens=temp_filt_sens,
+                all_filt_falsepos=temp_filt_falsepos)
   
   return(results)
 }
