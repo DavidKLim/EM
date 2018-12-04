@@ -232,7 +232,7 @@ EM_run <- function(y, k,
                    lambda=0,alpha=0,
                    size_factors=rep(1,times=ncol(y)) ,
                    norm_y=y,
-                   purity=rep(1,ncol(y)),offsets=0,
+                   purity=rep(1,ncol(y)),offsets=rep(0,ncol(y)),
                    true_clusters=NA, true_disc=NA,
                    init_parms=FALSE,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
@@ -272,7 +272,7 @@ EM_run <- function(y, k,
   temp_list <- list()             # store temp to see progression of IRLS
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
   
-  offset=log(size_factors) + offsets
+  offset=log2(size_factors) + offsets
   #offset=rep(0,times=n)            # no offsets
   
   Q<-rep(0,times=maxit_EM)
@@ -422,9 +422,9 @@ EM_run <- function(y, k,
     for(i in 1:n){
       for(c in 1:k){
         if(cl_phi==1){
-          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=exp(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=2^(coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
         } else if(cl_phi==0){
-          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi_g,mu=exp(coefs[,c] + offset[i]),log=TRUE))
+          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi_g,mu=2^(coefs[,c] + offset[i]),log=TRUE))
         }
       }    # subtract out 0.1 that was added earlier
     }
@@ -516,10 +516,10 @@ EM_run <- function(y, k,
       wts=draw_wts
     }          # Keep drawing until at least one in each cluster
     
-    # Weighting by purity
-    for(i in 1:n){
-      wts[,i]=wts[,i]*purity[i]
-    }      # default: purity = 1 --> wts stay the same.
+    # # Weighting by purity : found that this makes no difference
+    # for(i in 1:n){
+    #   wts[,i]=wts[,i]*purity[i]
+    # }      # default: purity = 1 --> wts stay the same.
     
     # Diagnostics Tracking
     current_clusters<-rep(0,times=n)
@@ -772,7 +772,7 @@ EM<-function(y, k,
       
       fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
                                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                                cls_init=all_init_cls[,i], CEM=F,init_Tau=1,SEM=F, maxit_EM=20)
+                                cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=20)
       all_fits [[i]] = fit
       init_cls_BIC[i] <- fit$BIC
     }
@@ -827,7 +827,7 @@ predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=
   #              true_clusters=NA,init_parms=TRUE,init_coefs=init_coefs,init_phi=init_phi)
   
   init_size_factors = new_sizefactors
-  offset=log(init_size_factors) + offsets
+  offset=log2(init_size_factors) + offsets
   n=ncol(newdata)
   k=ncol(init_coefs)
   
@@ -837,9 +837,9 @@ predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=
   for(i in 1:n){
     for(c in 1:k){
       if(cl_phi){
-        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=exp(init_coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=2^(init_coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       } else if(!cl_phi){
-        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi,mu=exp(init_coefs[,c] + offset[i]),log=TRUE))
+        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi,mu=2^(init_coefs[,c] + offset[i]),log=TRUE))
       }
     }    # subtract out 0.1 that was added earlier
   }

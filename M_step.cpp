@@ -342,7 +342,8 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
                     } else {
                         eta(ii,jj) = beta(jj) + offset(ii);
                     }
-                    mu(ii,jj) = exp(eta(ii,jj));
+                    /*mu(ii,jj) = exp(eta(ii,jj));*/
+                    mu(ii,jj) = pow(2,eta(ii,jj));
                 }
             }
         }
@@ -410,7 +411,8 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
     
             for(int ii=0; ii<n; ii++){
                 eta(ii,c) = beta(c) + offset(ii);
-                mu(ii,c) = exp(eta(ii,c));
+                /*mu(ii,c) = exp(eta(ii,c));*/
+                mu(ii,c) = pow(2,eta(ii,c));
             }
     
             /* Estimate phi */

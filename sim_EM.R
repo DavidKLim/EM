@@ -37,13 +37,13 @@ simulate_data=function(n,k,g,init_pi,b,size_factors,distrib,phi=matrix(0,nrow=g,
   if(distrib=="poisson"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rpois( 1, lambda = size_factors[i]*exp(b[j,cl[i]]))
+        y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]]))
       }
     }
   } else if(distrib=="nb"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rnbinom( 1, size = 1/phi[j,cl[i]], mu = size_factors[i]*exp(b[j,cl[i]]))
+        y[j,i] = rnbinom( 1, size = 1/phi[j,cl[i]], mu = size_factors[i]*2^(b[j,cl[i]]))
       }
     }
   }
@@ -66,13 +66,13 @@ simulate_data_g=function(n,k,g,init_pi,b,size_factors,distrib,phi=rep(0,times=g)
   if(distrib=="poisson"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rpois( 1, lambda = size_factors[i]*exp(b[j,cl[i]]))
+        y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]]))
       }
     }
   } else if(distrib=="nb"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rnbinom( 1, size = 1/phi[j], mu = size_factors[i]*exp(b[j,cl[i]]))
+        y[j,i] = rnbinom( 1, size = 1/phi[j], mu = size_factors[i]*2^(b[j,cl[i]]))
       }
     }
   }
@@ -91,13 +91,13 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
   for(j in 1:g){
     start = Sys.time()
     cat("gene",j,"/",g,"\n")
-    fit0 = glm.nb(as.numeric(y[j,]) ~ 1 + offset(log(size_factors)),trace=0)
+    fit0 = glm.nb(as.numeric(y[j,]) ~ 1 + offset(log2(size_factors)),trace=0)
     #fit0 = glm.nb(y[j,] ~ 1)
     
     r0 = residuals(fit0,type="pearson")
     theta0 = fit0$theta
     coef0 = fit0$coefficients
-    mu0 = exp(coef0)
+    mu0 = 2^(coef0)
     rh = matrix(0,nrow=R,ncol=n)
     
     for(h in 1:R){

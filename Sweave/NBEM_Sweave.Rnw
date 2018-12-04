@@ -44,6 +44,7 @@
 %  \usepackage{Times}
 \usepackage{amsmath}
 \usepackage{mathtools}
+\usepackage{xfrac}
 \usepackage{graphicx,psfrag,epsf}
 \usepackage{enumerate}
 \usepackage{url} % not crucial - just used below for the URL
@@ -267,8 +268,11 @@ One such analysis of key interest in cancer genomics is that of clustering subje
 Biases and artifacts inherent in RNA-seq data also need to be accounted for during clustering. This is typically done using one of an array of normalization steps \citep{Li2015}, although none have been shown to be uniformly superior. Also, the high dimensionality of genetic dataset necessitates a dimension reduction scheme that can pinpoint genes that may be most likely to be informative in clustering, as a majority of genes may be uninformative and vary due to noise. (\textbf{ADD SENTENCE ON IMPACT OF NOISE/UNINFORMATIVE GENES CITING PRIOR WORK}). Thus, many methods use some criterion to pre-filter genes that are nondiscriminatory in nature \citep{Ritter2015}. A widely-used method of pre-filtering is done by ranking and thresholding genes based on its median absolute deviation (MAD) \citep{Chung2008} (\textbf{Alternatives to discuss?}). Additionally, dealing with count data requires different distributional assumptions for model-based methods. The most naive model-based assumption with untransformed count data is the Poisson distribution, which is used alongside a penalized likelihood scheme by a very popular integrative method called iCluster+ \citep{Mo2013}. We believe, however, that such a model also has its limitations, as it does not account for extra-Poisson variation. There are also some non-model-based methods that have been shown to be efficacious with RNA-seq data, such as the average-linkage hierarchical clustering (HC) and K-medoids clustering (K-med) methods \citep{Jaskowiak2018}. HC works by iteratively fusing the two closest clusters together, starting with $n$ clusters and going down. The closeness is determined by a distance matrix and a linkage scheme. Typically, a 1-spearman or 1-pearson correlation is most commonly used, and Jaskowiak proposes that the average-linkage scheme provides the best results with RNA-seq. K-med is very similar in procedure to the widely-known K-means algorithm, but rather than assigning the means as the centroids, K-med assigns datapoints as centroids (medoids). K-med works similarly to K-means by minimizing the distance between cluster members and their corresponding centroid, but is more robust and can better handle count data. Although these do not have a mode of variable selection, they may be useful in clustering nonetheless after some pre-filtering scheme.
 
 %OUR APPROACH%
-In this paper, we propose a finite mixture Negative Binomial model (\textbf{NEED BETTER NAME FOR METHOD}), incorporating a modified version of the group truncated lasso penalty. This penalty has been shown to be able to shrink cluster means closer to one another as well as select features by a thresholding parameter \citep{Pan2013}. There are four primary steps to our method. First, we pre-filter out genes with low variability using the MAD criterion to remove likely uninformative genes. Second, we select the optimal number of clusters in the Order Selection step using the Bayesian Information Criterion (BIC). Third, we search over a grid of possible combinations of the penalty parameters, and select the optimal tuning parameters using the BIC. Fourth, we input the optimal order and parameters into a full run of our algorithm.
+In this paper, we introduce FSCseq (Feature Selection and Clustering of RNA-seq), which proposes a finite mixture Negative Binomial model (\textbf{NEED BETTER NAME FOR METHOD}), incorporating a combination of the L2 and the SCAD penalty \citep{Fan2001}. By applying this penalty on the difference in log means, we are able to shrink cluster parameters together, while selecting out genes whose difference in expression across clusters is sufficiently low. The adaptive nature of the SCAD penalty reduces the bias introduced by a classic L1 penalty, while maintaining the thresholding aspect of the lasso.
 
+There are four primary steps to our method. First, we pre-filter out genes with low variability using the MAD criterion to remove likely uninformative genes. Second, we select the optimal number of clusters in the Order Selection step using the Bayesian Information Criterion (BIC). Third, we search over a grid of possible combinations of the penalty parameters, and select the optimal tuning parameters using the BIC. Fourth, we input the optimal order and parameters into a full run of our algorithm.
+
+\textbf{Not sure if we do this anymore (below)}
 We also explore an alternative E step update to potentially overcome the limitation of the classic EM of converging to a local maximum. Also, we assess the degrees of freedom in the fitted dispersion parameters per gene. Our framework allows for a separate fitted dispersion per cluster, but a single parameter per gene may suffice and perhaps be more appropriate.
 
 %%%%%%%%%%%%%%%%%%%%%%
@@ -294,20 +298,20 @@ f(\mathbf{y};\boldsymbol{\mu},\boldsymbol{\phi}) = \prod_{i=1}^n \prod_{j=1}^g \
 
 where $\sum_{k=1}^K \pi_k = 1$ are the mixing proportions, $\mu_{jk}$ is the mean of cluster k in gene j, and $\phi_j$ is the dispersion parameter of gene j. The link and variance functions are given as follows:
 \begin{align}
-log(\mu_{ijk}) = & \beta_{jk} + s_i \\
+log_2(\mu_{ijk}) = & \beta_{jk} + s_i \\
 V(y_{jk}) = & \mu_{jk} + \phi_j\mu_{jk}^2
 \end{align}
 
-where $\beta_{jk}$ represents the cluster log mean for gene j and cluster k, and $s_i$ is the log of the subject-specific normalization factors calculated by DESeq2 \citep{Love2014}. We pass these normalization factors here as offsets into our regression model to correct for sequencing depth. Note that the equation calls for one common dispersion parameter per gene. The analog that we will assess is the use of separate cluster-specific dispersions, which replaces $\phi_j$ with $\phi_{jk}$ above. It is not known which scheme for these dispersions is more appropriate. Many prominent methods with RNA-seq use gene-specific dispersion parameters to account for extra-Poisson variation within each gene. However, it can be argued that in cases where the differences in dispersion between clusters is very large, estimating additional cluster-specific dispersion parameters may be required to better fit the model. But, it is also possible that this may lead to overfitting and skew the clustering results. In this paper, we find that one common dispersion per gene tends to be more accurate in terms of performance, but we will include the option to use separate cluster-specific dispersions as well.
+where $\beta_{jk}$ represents the cluster log base 2 mean (henceforth called "cluster log means") for gene j and cluster k, and $s_i$ is the log of the subject-specific normalization factors calculated by DESeq2 \citep{Love2014}. We pass these normalization factors here as offsets into our regression model to correct for sequencing depth. Note that the equation calls for one common dispersion parameter per gene. The analog that we will assess is the use of separate cluster-specific dispersions, which replaces $\phi_j$ with $\phi_{jk}$ above. It is not known which scheme for these dispersions is more appropriate. Many prominent methods with RNA-seq use gene-specific dispersion parameters to account for extra-Poisson variation within each gene. However, it can be argued that in cases where the differences in dispersion between clusters is very large, estimating additional cluster-specific dispersion parameters may be required to better fit the model. But, it is also possible that this may lead to overfitting and skew the clustering results. In this paper, we find that one common dispersion per gene tends to be more accurate in terms of performance, but we will include the option to use separate cluster-specific dispersions as well.
 
 % 2.1.1 Penalty
 \subsubsection{Penalty}
-The penalty we incorporate is the so-called grouped truncated lasso penalty, which uses a hybrid of the lasso (L1) and ridge (L2) penalties \citep{Tibshirani1994}. This penalty performs shrinkage of cluster log means towards each other, as well as selection of genes whose differences in cluster log means are small. The incorporations of both types of penalties offset the drawbacks of each penalty, much like the elastic net penalty \citep{Zou2005}.
+The penalty we incorporate is a modified version of the grouped truncated lasso penalty, which uses a hybrid of the lasso (L1) and ridge (L2) penalties \citep{Pan2013}. We replace the lasso with the Smoothly Clipped Absolute Deviation (SCAD) penalty, which is shown to introduce less bias than the classic L1 penalty while still being able to threshold coefficients to zero. We incorporate both penalties with an additional parameter to balance between the two penalty terms, like in the elastic net penalty \citep{Zou2005}. In this context, rather than penalizing coefficients ($\beta$) to zero like in a typical regression setting, we penalize the difference between log cluster means (denoted by $\theta$) to zero.
 \begin{equation}
-p_{\lambda}(\beta)=\frac{\lambda_1}{2}\sum_{k<l} \norm{\beta_k-\beta_l-\theta_{kl}}_2^2 + \lambda_2 \sum_{k<l}TLP(\norm{\theta_{kl}}_2;\tau)
+p_{\lambda}(\beta)=\frac{\lambda(1-\alpha)}{2}\sum_{k<l} \norm{\beta_k-\beta_l-\theta_{kl}}_2^2 + \lambda\alpha \sum_{k<l}SCAD(\norm{\theta_{kl}}_2)
 \end{equation}
 
-where $\theta_{kl}=\beta_k-\beta_l$ is a reparametrization to store the difference between cluster means in the previous iteration, and $TLP(\alpha;\tau)=min(\abs{\alpha},\tau)$. In this penalization scheme, $\lambda_1$ is the parameter that controls shrinkage of the cluster means towards one another, and $\lambda_2$ is the parameter that controls selection by thresholding two cluster means to be equal if they are close enough together. The $\tau$ parameter is a threshold that introduces no further penalty when the difference between cluster means is sufficiently large. When the difference in estimated log means is sufficiently small, i.e. $\abs{\beta_{jk} - \beta_{jl}}<\lambda_2$ the coefficients are set equal by setting them equal to the mean of the two parameters.
+where $\theta_{kl}=\beta_k-\beta_l$ is a reparametrization to store the difference between estimated cluster log means in the previous iteration, and $SCAD(\theta)=$ \textbf{Insert form of SCAD penalty here}. In this penalization scheme, $\lambda$ controls the amount of penalization introduced, and $\alpha$ parameter balances between the L2 and SCAD penalties. Note that under this penalty scheme, the difference in log means can never be set exactly to zero. However, the $\theta_{kl}$ parameter would be thresholded to zero when the log mean of cluster $k$ and $l$ are sufficiently close, which would indicate that the respective gene is nondiscriminatory across these two clusters.
 
 %%% 2.2 Computation %%%
 \subsection{Computation}
@@ -329,7 +333,9 @@ We calculate the conditional expectation of the $z_{ik}$ given the current estim
 
 At convergence, we are able to assign patients according to these posterior probabilities. These probabilities will also allow for partial cluster membership, as their values will be between 0 and 1, but the final cluster label is assigned to the cluster that corresponds to the maximum value of the posterior probabilities for that subject.
 
-The EM algorithm is known to be able to converge to the local maximum or saddle point rather than the global maximum \citep{Yu2018}. To prevent this, we compare multiple initializations with a shorter EM run. Then, we choose the optimal initialization based on the BIC. We also introduce a variant of the E step that has been known to address this issue. Replacing the E step update with classification E step update has been shown to help the EM algorithm to not get stuck at a local maxima \citep{Biernacki2003}. In our numerical analyses, we will explore the effects of using this alternate E step update on performance, and we will incorporate the classification E step as an optional substitute for the classic E step in our method.
+The EM algorithm is known to be able to converge to the local maximum or saddle point rather than the global maximum \citep{Yu2018}. To prevent this, we compare many initializations with a shorter EM run. Then, we choose the optimal initialization based on the BIC.
+
+We also tried replacing the E step update with the classification E step update. This method (called CEM) has been shown to help the algorithm to not get stuck at a local maxima \citep{Biernacki2003}, but we found that the convergence of the CEM took much longer, and was not feasible to select across many initializations in higher dimensions. The CEM by itself (without searching multiple initializations) did not reliably attain the global maximum, so we also attempted searching initializations via EM, then using CEM in the final run. However, the CEM often knocked the good starting point back into a local maximum. Thus, we determined that a scheme with short EM runs with a final EM run yielded the best results in this setting. However, we leave the CEM as an alternative to the EM in our package.
 
 % 2.2.2 M Step
 \subsubsection{M Step}
@@ -354,11 +360,12 @@ Therefore, we have $w_{ik}=\sqrt{\dfrac{\hat{z}^{(m)}_{ik} g'(\eta)^2}{V(\mu)}}$
 
 \begin{equation}
 \begin{split}
-\hat{\beta}_k^{(m+1)}&=\dfrac{\frac{1}{n}\sum_{i=1}^{n}w_{ik}\tilde{y}_{ik}+\lambda_1[\sum_{l>k}(\hat{\beta}_l^{(m)}+\hat{\theta}_{kl}^{(m)})+\sum_{l<k}(\hat{\beta}_l^{(m+1)}-\hat{\theta}_{lk}^{(m)})]}{\lambda_1(K-1)+\frac{1}{n}\sum_{i=1}^{n}w_{ik}} \\
-\hat{\theta}_{kl}^{(m+1)}&=\begin{cases} 
-      \hat{\beta}_k^{(m+1)}-\hat{\beta}_l^{(m+1)} & \norm*{\hat{\theta}_{kl}^{(m)}}_2 \geq \tau \\
-      ST(\hat{\beta}_k^{(m+1)}-\hat{\beta}_l^{(m+1)},\lambda_2) & otherwise
-   \end{cases}
+\hat{\beta}_k^{(m+1)}&=\dfrac{\frac{1}{n}\sum_{i=1}^{n}w_{ik}\tilde{y}_{ik}+\lambda(1-\alpha)[\sum_{l>k}(\hat{\beta}_l^{(m)}+\hat{\theta}_{kl}^{(m)})+\sum_{l<k}(\hat{\beta}_l^{(m+1)}-\hat{\theta}_{lk}^{(m)})]}{\lambda(1-\alpha)(K-1)+\frac{1}{n}\sum_{i=1}^{n}w_{ik}} \\
+\hat{\theta}_{kl}^{(m+1)}&=\begin{dcases} 
+      sgn(\hat{\theta}_{kl}^{(m)})(\norm{\hat{\theta}_{kl}^{(m+1)}}-\alpha\lambda) & \norm{\hat{\theta}_{kl}^{(m)}} \leq 2\lambda\alpha \\
+      \frac{(a-1)\hat{\theta}_{kl}^{(m)} - sgn(\hat{\theta}_{kl}^{(m)})a\lambda\alpha}{(a-2)} & 2\lambda\alpha < \norm{\hat{\theta}_{kl}^{(m)}} \leq a\lambda\alpha \\
+      \hat{\theta}_{kl}^{(m)} & \norm{\hat{\theta}_{kl}^{(m)}} > a\lambda\alpha
+   \end{dcases}
 \end{split}
 \end{equation}
 
@@ -369,7 +376,7 @@ The stopping criterion for the EM algorithm is based on a threshold on the Q fun
 
 The stopping criterion for the IRLS in the M step is based on a threshold on the sum of squares of the parameters. The algorithm is considered to have converged if $\lvert \boldsymbol{\beta}^{(l+1)}-\boldsymbol{\beta}^{(l)} \rvert + \lvert \boldsymbol{\phi}^{(l+1)}-\boldsymbol{\phi}^{(l)} \rvert < \epsilon_2$
 
-We set both $\epsilon_1 = 10^{-6}$ and $\epsilon_2 = 10^{-6}$.
+We set $\epsilon_1 = 10^{-12}$ and $\epsilon_2 = 10^{-6}$.
 
 % 2.2.3 Tuning Parameters
 \subsubsection{Tuning Parameters}
@@ -407,26 +414,47 @@ It is well-known that a majority of the genes in a typical dataset is nondiscrim
 
 (MAYBE ADD: NB GOF pvalue vs MAD)
 
-We simulated 100 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change ($LFC$), number of clusters ($K$), number of samples per cluster ($n_k$), number of genes ($g$), and proportion of discriminatory genes ($p_{disc}$). We searched over $LFC=(0.5, 1, 2)$, $K=(2, 3, ..., 7)$, $n_k=(25, 50)$, $g=(1000, 2000)$, and $p_{disc}=(0.05, 0.1)$
+We simulated 24 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change ($LFC$), number of clusters ($K$), number of samples per cluster ($n_k$), number of genes ($g$), and proportion of discriminatory genes ($p_{disc}$). We searched over $LFC=(1, 2)$, $K=(2, 3, ..., 7)$, $n_k=(25, 50)$, $g=2000$, and $p_{disc}=0.05$
 
-To explore the behaviors in various realistic settings, we simulated low, medium, and high expression and noise values based on the 25th, 50th, and 75th quantiles of the estimates of expression and dispersion in the TCGA Breast Cancer dataset. These values were approximately $\beta=(3.75,6.5,7.85)$ and $\phi=(0.15,0.35,1.00)$, respectively.
+To explore the behaviors in various realistic settings, we simulated low, medium, and high expression and noise values based on the 25th, 50th, and 75th quantiles of the estimates of expression and dispersion in the TCGA Breast Cancer dataset. These values were approximately $\beta=(3.75,6.5)$ and $\phi=(0.15,0.35,0.50,1.00)$, respectively.
 
-After simulating, we imposed pre-filtering and kept just the genes with the top 25\% of MAD. \ref{tab:1} shows the performance statistics with varying coefficients and noise, averaged across all of the other variables ($LFC$, $K$, $n_k$, $g$, and $p_{disc}$). One very promising added utility of our method is the ability to perform prediction based on the estimated parameters and the posterior weights from the E step. We analyze the performance of clustering, discovering discriminatory genes across clusters, as well as predicting on newly simulated samples (floor(0.1*n)) in \ref{tab:1}
+After simulating, we imposed pre-filtering and kept just the genes with the top 25\% of MAD. \ref{tab:1} shows the performance statistics with varying coefficients and noise, averaged across all of the other variables ($LFC$, $K$, $n_k$, $g$, and $p_{disc}$). One very promising added utility of our method is the ability to perform prediction based on the estimated parameters and the posterior weights from the E step. 
 
-<<xtable1, results=tex, echo=FALSE>>==
+We also compare with three competing methods: iCluster+, average-linkage hierarchical clustering (HC), and K-medoids (K-med). Order selection for HC was done by using the NbClust package \citep{Charrad2014}, which compares thirty different techniques of order selection for agglomerative/K-means clustering methods. The optimal order was selected based on which value was selected most often by these methods. Order selection for K-medoids was done by selecting the order which maximizes the silhouette value. In this procedure, $K=1$ was excluded because it is not possible to derive a silhouette value with just one cluster.
+
+Order selection for iCluster+ was difficult to automatize, as the paper suggests looking graphically for a plateau of the deviance ratio (\% Variability Explained) as the the optimal number of clusters. Mo suggests in the manual of the iClusterPlus package that for increased noise in the dataset, the deviance ratio will continue to increase with higher order, so the highest deviance ratio will almost always be at the highest number of clusters. In order to systemize the procedure across numerous simulation cases, we selected an arbitrary threshold of 0.05, such that if the percent increase in variability explained is less that 0.05 with an added cluster, it is deemed insignificant, and the order is selected as the immediately previous number. We analyze the performance of clustering, discovering discriminatory genes across clusters, as well as predicting on newly simulated samples (floor(0.1*n)) in \ref{tab:1}.
+
+<<xtable12, results=tex, echo=FALSE>>==
 library(xtable)
 #load("C:/Users/limdd/Documents/Research/Simulations/gene_fixed_mad25_icluster_and_pred/second/sim_res_tab1.RData")
-load("C:/Users/limdd/Documents/Research/Simulations/filtmad20/sim_res.RData")
-table1=table1[,c(1:6,18,7:13,17,14,16,15)]
-colnames(table1) = c("$\\beta$","$\\phi$","true K","LFC","$n_{k}$","K","OA","$p_{disc}$","ARI","Sens","FPR","PA","iK","iARI","hcK","hcARI","kmK","kmARI")
-tab1 = xtable(table1,
+#load("C:/Users/limdd/Documents/Research/Simulations/filtmad20/sim_res.RData")
+load("C:/Users/limdd/Documents/Research/Simulations/elasticSCAD/24sims/sim_res.RData")
+
+#head(table1)
+colnames(table1) = c("$\\beta$","$\\phi$","LFC","$n_{k}$","K","$\\hat{K}$","OA","$p_{disc}$","$\\hat{p_{disc}}$","ARI","sens","FPR","MADsens","MADFPR","PA","iK","iARI","hcK","hcARI","kmK","kmARI")
+
+table1_EM_low=table1[c(1:16,33:48),1:15]
+table1_EM_hi=table1[c(17:32,49:64),1:15]
+table1_other_low=table1[c(1:16,33:48),c(1:6,16,18,20,10,17,19,21)]
+table1_other_hi=table1[c(17:32,49:64),c(1:6,16,18,20,10,17,19,21)]
+
+tab1 = xtable(table1_EM_low,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta$) and high/low noise ($\\phi$) in simulated datasets on performance. Each row is based on 50 simulated datasets. Order Accuracy (OA) is the proportion of datasets that correctly selected the true K (order), and prediction accuracy (PA) is the proportion of new simulated subjects that were correctly clustered. PA takes into account only runs that correctly selected order, and missing values denote no dataset correctly selected the true K.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75 and 6.50 $) with low and medium noise ($\\phi = 0.15 and 0.35$) in simulated datasets on performance. Each row is based on 24 simulated datasets. Order Accuracy (OA) is the proportion of datasets that correctly selected the true K (order), and prediction accuracy (PA) is the proportion of new simulated subjects that were correctly clustered. PA takes into account only runs that correctly selected order, and missing values denote no dataset correctly selected the true K.",
               label = "tab:1",na.print="")      # K=3, n=50, g=1000
 print(tab1,include.rownames=F, sanitize.text.function=identity,
               floating.environment = "sidewaystable")
       #,add.to.row=list(pos=as.list(4),command="\\rowcolor[gray]{.9}"))
+
+tab2 = xtable(table1_EM_hi,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75 and 6.50$) with high and very high noise ($\\phi = 0.50 and 1.00$) in simulated datasets on performance.",
+              label = "tab:2",na.print="")      # K=3, n=50, g=1000
+print(tab2,include.rownames=F, sanitize.text.function=identity,
+              floating.environment = "sidewaystable")
+
 @
 
 As the average expression of the genes ($\beta$) goes up, we see that clustering performance (ARI) and order selection accuracy both increase. This is because as the mean expression for a gene increases, the distance two clusters in that particular gene increases. since the log fold change creates a greater separation at higher expressions. For example, the distance between $\beta=3$ and $\beta=4$ is much smaller than the distance between $\beta=6$ and $\beta=7$, since $\mu=e^{\beta}$, and $e^4-e^3 < e^7-e^6$.
@@ -437,27 +465,47 @@ Another useful feature of our algorithm is the ability to perform simultaneous v
 
 A common integrative clustering method that is able to handle count data is iCluster+. It assumes a Poisson distribution on the data, and uses a L1 penalized likelihood model to estimate the parameters, while using a sampling scheme from the posterior distribution of the latent variables to discover clustering labels. We compared our method to just the count data portion of iCluster+'s integrative method.
 
-Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering and K-medoids. There has been a study that suggests that these were among the most robust and efficient in clustering this type of data.
+Also, Two other clustering methods that have been found to be very useful for clustering RNA-seq count data are average-linkage hierarchical clustering (HC) and K-medoids (KM). There has been a study that suggests that these were among the most robust and efficient in clustering this type of data. Order selection for HC was done by selecting the order that was most often selected by the 30 different methods available via the NbClust package. Order selection for K-medoids was performed by maximizing the average silhouette value. Silhouette values are not applicable for $K=1$, so the order search for K-medoids omitted the case with just one cluster. \ref{tab:3} and \ref{tab:4} show side-by-side comparisons of order selection and clustering performances for the EM, iCluster+, HC, and KM.
+
+<<xtable34, results=tex, echo=FALSE>>=
+tab3 = xtable(table1_other_low,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75 and 6.50$) with low and medium noise ($\\phi = 0.15 and 0.35$) in simulated datasets on performance, compared to competing methods average-linkage hierarchical clustering (HC) and K-medoids (KM).",
+              label = "tab:3",na.print="")      # K=3, n=50, g=1000
+
+print(tab3,include.rownames=F, sanitize.text.function=identity,
+              floating.environment = "sidewaystable")
+
+tab4 = xtable(table1_other_hi,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75 and 6.50$) with high and very high noise ($\\phi = 0.50 and 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:4",na.print="")      # K=3, n=50, g=1000
+
+print(tab4,include.rownames=F, sanitize.text.function=identity,
+              floating.environment = "sidewaystable")
+@
 
 Here, we introduce some variants of our method. For one, we have so far restricted the simulations to contain gene-specific dispersions. It is not currently known whether a scheme with one dispersion parameter across all clusters for each gene adequately portrays real data. It may sometimes be more appropriate to introduce cluster-specific dispersion parameters to better fit the data, yielding more accurate estimates. However, this may also result in overfitting the data, which would cause our model to get stuck at a local maxima. One potential drawback that may result is that the order may be underestimated, as the extra dispersion parameters may cause the algorithm to favor a smaller number of clusters in the data.
 
 Secondly, prior work has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step. This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. We use a simulated annealing method \citep{Rose1998,Si2013} to slowly wean off the noise-adding effects of the CEM, and revert to the original EM. \ref{tab:2} shows the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. Results are based on 10 simulated datasets for each case. (1) gEM is the EM with gene-specific dispersions, as before; (2) gCEM is the CEM with gene-specific dispersions; (3) clEM is the EM with cluster-specific dispersions; and (4) clCEM is the CEM with cluster-specific dispersions.
 
 %%%%% EXCLUDE ICLUSTER+ COMPARISON FOR TABLES 3 AND 4. JUST COMMENT ON IT IN PAPER %%%%%%%%%%%%%
-<<xtable2,results=tex,echo=FALSE>>==
+<<xtable5,results=tex,echo=FALSE>>==
 #load("C:/Users/limdd/Documents/Research/Simulations/g_v_cl__EM_v_CEM/gvcl_EMvCEM.RData")
 #colnames(tab_g) = c("$K$","ARI","$p_{disc}$","Sensitivity","FPR","Pred Acc")
-colnames(table2) = c("$K$","OA","ARI","$p_{disc}$","Sens","FPR","PA")
-tab2 = xtable(table2,
-              digits=2,
-              table.placement="!h",
-              caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: For fair comparisons, ARI values are based on runs with true number of clusters. The simulated dispersions were gene-specific.",
-              label = "tab:2",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
-print(tab2,include.rownames=T, sanitize.text.function=identity)
+
+
+# colnames(table2) = c("$K$","OA","ARI","$p_{disc}$","Sens","FPR","PA")
+# tab5 = xtable(table2,
+#               digits=2,
+#               table.placement="!h",
+#               caption="Clustering, discovery, and prediction performance of variants of EM. Also, the clustering performances of iCluster+, average-linkage hierarchical clustering, and K-medoids. Note: For fair comparisons, ARI values are based on runs with true number of clusters. The simulated dispersions were gene-specific.",
+#               label = "tab:5",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
+# print(tab5,include.rownames=T, sanitize.text.function=identity)
 
 @
-
-From \ref{tab:2}, we see that iCluster+ seems to overestimate the order in each case. Because it treats count data as distributed Poisson, it is likely that iCluster+ is not able to account for the extra-Poisson variation caused by the simulated noise. Also, in general, the order is underestimated for the EM runs with cluster-specific dispersion parameters than the runs with gene-specific dispersion parameters. This is due to the fact that allowing for cluster-specific dispersions overfits the data, so the cluster-specific dispersions is sufficient to explain the unaccounted clusters in the results. Because of this, the clustering accuracy suffers.
 
 We also notice the effect of the classification E step modification in our algorithm. We see that for a gene-specific dispersion scheme, the CEM seems to increase the ARI slightly. We notice that in \ref{tab:2}, the CEM caused the cluster-specific dispersion EM model to select the incorrect order. This portrays a risk of the CEM, as the variant E step adds randomness by drawing posterior probabilities closer together, and may lead to such instabilities.
 
@@ -482,10 +530,10 @@ HC clusters seemed to yield the lowest p-value in this case, but upon closer exa
 load("C:/Users/limdd/Documents/Research/Real Data/TCGA BRCA/BRCA_compare_res.RData")
 colnames(tab) = c("K","ARI","Silhouette","L-R p-value","Fisher's p-value")
 
-tab3 = xtable(tab,digits=3,caption="Cluster Analyses and p-values from Log-Rank survival test (L-R) and Fisher's Exact test of TCGA Breast Cancer dataset on NB-EM, iCluster+, Average-linkage hierarchical clustering (HC), and K-medoids (K-Med). *Note: Due to lack of an order selection step, annotated number of clusters $K=4$ was plugged in.",
-              label="tab:3",table.placement="H",na.print="",
+tab6 = xtable(tab,digits=3,caption="Cluster Analyses and p-values from Log-Rank survival test (L-R) and Fisher's Exact test of TCGA Breast Cancer dataset on NB-EM, iCluster+, Average-linkage hierarchical clustering (HC), and K-medoids (K-Med).",
+              label="tab:6",table.placement="H",na.print="",
               floating.environment = "table*")
-print(tab3,sanitize.text.function=identity,table.placement="H")
+print(tab6,sanitize.text.function=identity,table.placement="H")
 
 @
 
@@ -531,9 +579,9 @@ The EM order selection step yielded $K=4$, while the iCluster+ order selection s
 load("C:/Users/limdd/Documents/Research/Real Data/TCGA BLCA/BLCA_compare_res.RData")
 colnames(tab) = c("K","ARI","Silhouette","L-R p-value","Fisher's p-value")
 
-tab4 = xtable(tab,digits=3,caption="Cluster Analyses and p-values of TCGA Bladder Cancer data from Log-Rank survival test (L-R) and Fisher's Exact test on NB-EM, iCluster+, Average-linkage hierarchical clustering (HC), and K-medoids (K-Med).",
-              label="tab:4",table.placement="H",na.print="",floating.environment = "table*")
-print(tab4,sanitize.text.function=identity,table.placement="H")
+tab7 = xtable(tab,digits=3,caption="Cluster Analyses and p-values of TCGA Bladder Cancer data from Log-Rank survival test (L-R) and Fisher's Exact test on NB-EM, iCluster+, Average-linkage hierarchical clustering (HC), and K-medoids (K-Med).",
+              label="tab:7",table.placement="H",na.print="",floating.environment = "table*")
+print(tab7,sanitize.text.function=identity,table.placement="H")
 
 @
 
