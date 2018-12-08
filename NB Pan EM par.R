@@ -337,7 +337,7 @@ EM_run <- function(y, k,
         theta<-matrix(rep(0,times=k^2),nrow=k)
         for(c in 1:k){
           for(cc in 1:k){
-            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],alpha*lambda)
+            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],alpha/(1-alpha))
           }
         }
         theta_list[[j]] <- theta

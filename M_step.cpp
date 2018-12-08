@@ -430,7 +430,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         /* Update theta matrix */
         for(int cc=0; cc<k; cc++){
             for(int ccc=0; ccc<k; ccc++){
-                 theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),alpha*lambda);
+                 theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),alpha/(1-alpha));
             }
         }
         
