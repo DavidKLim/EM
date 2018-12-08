@@ -139,10 +139,11 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
 
 
 sim.iCluster = function(y,true_clusters,
-                        ncores=10,n.lambda=25){
+                        ncores=10,n.lambda=25,K_min=2,K_max=7      # K_search = 2:7 for simulations, 2:15 for real data
+                        ){
   
   # list of K to search over
-  K_search = c(2:7)
+  K_search=c(K_min:K_max)
   
   # iClusterPlus #
   iClust_OS <- list()
@@ -584,11 +585,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     max_K_hc_avail=0
     
     for (i in 1:length(selected)) {
+      cat(paste("HC order select method: ",selected[i],"\n"))
       pdf(sprintf("Diagnostics/%s/hc_OS%d.pdf",dir_name,ii))
       results_hc[[i]] <- try(NbClust(t(log(norm_y+0.1)), min.nc=min(K_search), max.nc=max(K_search), method="average", index=selected[i]))
       dev.off()
       max_K_hc_avail=max_K_hc_avail+(length(results_hc[[i]])>1)
-      cat(paste("HC order select method: ",selected[i],"\n"))
     }
     max_K_hcs = rep(NA,max_K_hc_avail)
     for(i in 1:max_K_hc_avail){
