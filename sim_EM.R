@@ -385,7 +385,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     for(aa in 1:nrow(list_BIC)){
       pref = sprintf("order%d",ii)
       start=as.numeric(Sys.time())
-      X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=1,size_factors=size_factors,norm_y=norm_y,
+      X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,
             true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # alpha = 1: all L1. No penalty here
       end=as.numeric(Sys.time())
       list_BIC[aa,2]<-X$BIC
@@ -447,7 +447,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       
       #create matrix for grid search values
       lambda_search=c(0.1,seq(0.25,2.5,0.25))
-      alpha_search=seq(0,1,0.05)
+      alpha_search=c(seq(0,0.95,0.05),0.99)
       
       list_BIC=matrix(0,nrow=length(lambda_search)*length(alpha_search),ncol=3) # matrix of BIC's: one for each combination of penalty params 
       
