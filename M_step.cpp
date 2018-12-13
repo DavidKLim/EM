@@ -350,9 +350,9 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         
         if(est_phi==1 && cl_phi==0){
             phi_g = phi_ml_g(y_j,mu,all_wts,10,0);
-            for(int c=0; c<k; c++){
-                phi_j(c) = phi_g;
-            }
+        }
+        for(int c=0; c<k; c++){
+          phi_j(c) = phi_g;
         }
         
         

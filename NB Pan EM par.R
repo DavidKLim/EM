@@ -307,8 +307,8 @@ EM_run <- function(y, k,
   DNC=0
   disc_ids=rep(T,g)
   
-  diff_phi=rep(0,maxit_EM)
-  est_phi=1                          # 1 for true, 0 for false
+  diff_phi=matrix(0,nrow=maxit_EM,ncol=g)
+  est_phi=rep(1,g)                          # 1 for true, 0 for false
   
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
@@ -366,7 +366,7 @@ EM_run <- function(y, k,
       if((Tau<=1 & a>=5 & all(theta_list[[j]]==0))){next}
       y_j = as.integer(y[j,])
       par_X[[j]] <- M_step(j=j, a=a, y_j=y_j, all_wts=wts, offset=offset,
-                           k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi,
+                           k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],
                            lambda=lambda,alpha=alpha,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
                            )
@@ -407,16 +407,23 @@ EM_run <- function(y, k,
     }
     
     if(a>5){
-      if(cl_phi==1){
-        diff_phi[a]=sum(abs(phi_list[[a]]-phi_list[[a-5]])/(phi_list[[a-5]]*g*k))
-      } else if(cl_phi==0){
-        diff_phi[a]=sum(abs(phi_list[[a]]-phi_list[[a-5]])/(phi_list[[a-5]]*g))
+      for(j in 1:g){
+        if(cl_phi==1){
+          diff_phi[a,j]=mean(abs(phi_list[[a]][j,]-phi_list[[a-5]][j,])/phi_list[[a-5]][j,])
+        } else if(cl_phi==0){
+          diff_phi[a,j]=abs(phi_list[[a]][j]-phi_list[[a-5]][j])/phi_list[[a-5]][j]
+        }
+        cat(paste("Avg % diff in phi est (across 5 its) gene ",j," = ",diff_phi[a,j],"\n"))
+        if(diff_phi[a,j]<0.01){
+          est_phi[j]=0
+          cat(paste("Gene ",j, "Avg % diff < 0.01: stopped phi estimation in M step\n"))
+        } else{
+          est_phi[j]=1
+        }
       }
-      if(diff_phi[a]<0.01){
-        est_phi=0
-      } else{
-        est_phi=1
-      }
+      cat(paste("Avg % diff in phi est (across 5 its) =\n"))
+      write.table(t(diff_phi[a,]))
+      cat("\n")
     }
     
     
