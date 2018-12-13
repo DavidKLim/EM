@@ -172,18 +172,18 @@ int sign(double x) {
     return (x > 0) - (x < 0);
 }
 
-double soft_thresh(double theta, double lambda){ /* ST of SCAD penalty */
-    double STval;
+double soft_thresh(double theta, double lambda, double alpha){ /* ST of SCAD penalty */
+  double STval;
 	double a=3.7;
 	
-    if(fabs(theta)<=2*lambda){
-		if(fabs(theta)<=lambda){
-			STval = 0;
-		} else{
-			STval = sign(theta)*(fabs(theta)-lambda);
-		}
-    } else if(fabs(theta)>2*lambda && fabs(theta)<=a*lambda){
-        STval = ((a-1)*theta - sign(theta)*a*lambda)/(a-2);
+    if(fabs(theta)<=2*lambda*alpha){
+  		if(fabs(theta)<=lambda*alpha){
+  			STval = 0;
+  		} else{
+  			STval = sign(theta)*(fabs(theta)-alpha/(1-alpha));
+  		}
+    } else if(fabs(theta)>2*lambda*alpha && fabs(theta)<=a*lambda*alpha){
+        STval = ((a-1)*theta - sign(theta)*a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha)));
     } else{
 		STval = theta;
 	}
@@ -294,7 +294,7 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
 
 
 // [[Rcpp::export]]
-List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
+List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, int est_phi, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
 
     arma::vec beta = coefs_j;
     arma::mat temp(maxit_IRLS, (2*k));
@@ -348,7 +348,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             }
         }
         
-        if(cl_phi==0){
+        if(est_phi==1 && cl_phi==0){
             phi_g = phi_ml_g(y_j,mu,all_wts,10,0);
             for(int c=0; c<k; c++){
                 phi_j(c) = phi_g;
@@ -417,8 +417,8 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
     
             /* Estimate phi */
             //Rprintf("phi.ml iter %d, cluster %d \n",i+1,c+1);
-            if(cl_phi==1){
-                phi_j(c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
+            if(cl_phi==1 && est_phi==1){
+              phi_j(c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
             }
             
             /* Testing fixing phi to be = 10 */
@@ -430,7 +430,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         /* Update theta matrix */
         for(int cc=0; cc<k; cc++){
             for(int ccc=0; ccc<k; ccc++){
-                 theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),alpha/(1-alpha));
+                 theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),lambda,alpha);
             }
         }
         

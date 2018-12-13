@@ -27,16 +27,16 @@ logsumexpc=function(v){
   lse 
 }
 
-soft_thresholding=function(theta,lambda){
+soft_thresholding=function(theta,lambda,alpha){
   a=3.7
-  if(abs(theta)<=2*lambda){
-    if(abs(theta)<=lambda){
+  if(abs(theta)<=2*lambda*alpha){
+    if(abs(theta)<=lambda*alpha){
       return(0)
     } else{
-      return(sign(theta)*(abs(theta)-lambda))
+      return(sign(theta)*(abs(theta)-alpha/(1-alpha)))
     }
-  }else if(abs(theta)>2*lambda & abs(theta)<=a*lambda){
-    return(((a-1)*theta - sign(theta)*a*lambda)/(a-2))
+  }else if(abs(theta)>2*lambda*alpha & abs(theta)<=a*lambda*alpha){
+    return(((a-1)*theta - sign(theta)*a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha))))
   }else{
     return(theta)
   }
@@ -307,6 +307,9 @@ EM_run <- function(y, k,
   DNC=0
   disc_ids=rep(T,g)
   
+  diff_phi=rep(0,maxit_EM)
+  est_phi=1                          # 1 for true, 0 for false
+  
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
     EMstart= as.numeric(Sys.time())
@@ -337,7 +340,7 @@ EM_run <- function(y, k,
         theta<-matrix(rep(0,times=k^2),nrow=k)
         for(c in 1:k){
           for(cc in 1:k){
-            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],alpha/(1-alpha))
+            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda,alpha)
           }
         }
         theta_list[[j]] <- theta
@@ -363,7 +366,7 @@ EM_run <- function(y, k,
       if((Tau<=1 & a>=5 & all(theta_list[[j]]==0))){next}
       y_j = as.integer(y[j,])
       par_X[[j]] <- M_step(j=j, a=a, y_j=y_j, all_wts=wts, offset=offset,
-                           k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],
+                           k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi,
                            lambda=lambda,alpha=alpha,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
                            )
@@ -401,6 +404,19 @@ EM_run <- function(y, k,
       phi_list[[a]] <- phi
     } else if(cl_phi==0){
       phi_list[[a]] <- phi_g
+    }
+    
+    if(a>5){
+      if(cl_phi==1){
+        diff_phi[a]=sum(abs(phi_list[[a]]-phi_list[[a-5]])/(phi_list[[a-5]]*g*k))
+      } else if(cl_phi==0){
+        diff_phi[a]=sum(abs(phi_list[[a]]-phi_list[[a-5]])/(phi_list[[a-5]]*g))
+      }
+      if(diff_phi[a]<0.01){
+        est_phi=0
+      } else{
+        est_phi=1
+      }
     }
     
     
@@ -676,6 +692,15 @@ EM<-function(y, k,
              method=c("EM","CSEM"),
              prefix="", dir="NA"){
   
+  if(alpha==1){
+    stop("alpha must be less than 1; choose a smaller number instead")
+  } else if(alpha < 0 | alpha > 1){
+    stop("alpha not within range [0,1)")
+  }
+  if(lambda<0){
+    stop("lambda must be greater than 0")
+  }
+  
   if(method=="EM"){
     CEM=F
     SEM=F
@@ -711,7 +736,7 @@ EM<-function(y, k,
   
     #TESTING RANDOM CLUSTERING
   
-    r_it=20
+    r_it=25
     rand_inits = matrix(0,nrow=n,ncol=r_it)
   
     for(r in 1:r_it){
@@ -772,7 +797,7 @@ EM<-function(y, k,
       
       fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
                                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                                cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=20)
+                                cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=15)
       all_fits [[i]] = fit
       init_cls_BIC[i] <- fit$BIC
     }
@@ -794,7 +819,7 @@ EM<-function(y, k,
   return(results)
 }
 
-predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=0){
+predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=rep(0,ncol(y))){
   ############# NEED TO INCORPORATE PURITY IN LL ########################
   # X is the output object from the EM() function
   init_coefs=X$coefs
