@@ -7,7 +7,7 @@
 #init_y<-cbind(init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y,init_y)
 
 # BRCA
-load('BRCA_env.RData')
+load('sim_y.RData')
 init_y = y
 
 library("stats")
@@ -19,8 +19,48 @@ library("pheatmap")
 library("iClusterPlus")
 library("cluster")
 library("NbClust")
+library("NB.MClust")
 
-
+fit_DESeq_intercept=function(y,calc_vsd=F,calc_rld=F){
+  n=ncol(y)
+  coldata<-data.frame(matrix(rep(1,n),nrow=n))
+  rownames(coldata)<-colnames(y)
+  colnames(coldata)<-"int_only"
+  dds<-DESeqDataSetFromMatrix(countData = y,
+                              colData = coldata,
+                              design = ~ 1)
+  vsd=NA
+  rld=NA
+  size_factors=NA
+  norm_y=NA
+  
+  dds=tryCatch({
+    dds<-DESeq(dds)
+  },error=function(err){
+    tryCatch({
+    print("All genes contain a 0. Using alternate size factor estimation")
+    dds<-DESeq(dds, sfType = "iterate")
+    return(dds)
+    },error=function(err){
+      print("Alternate SF estimation didn't converge. Trying zero-inflated model")
+      dds<-DESeq(dds, sfType = "poscounts", useT=T, minmu=1e-6,minReplicatesForReplace = Inf)
+      return(dds)
+    })
+  })
+  
+  if(!is.na(dds)){
+    if(calc_vsd){
+      vsd=varianceStabilizingTransformation(dds)
+    }
+    if(calc_rld){
+      rld=rlogTransformation(dds)
+    }
+    size_factors<-sizeFactors(dds)
+    norm_y<-counts(dds,normalized=TRUE)
+  }
+  
+  return(list(dds=dds,vsd=vsd,rld=rld,size_factors=size_factors,norm_y=norm_y))
+}
 
 # Function to simulate data
 simulate_data=function(n,k,g,init_pi,b,size_factors,distrib,phi=matrix(0,nrow=g,ncol=k)){
@@ -137,7 +177,6 @@ NB.GOF = function(y,size_factors=rep(1,ncol(y)),nsim=1000){
   return(pMC)
 }
 
-
 sim.iCluster = function(y,true_clusters,
                         ncores=10,n.lambda=25,K_min=2,K_max=7      # K_search = 2:7 for simulations, 2:15 for real data
                         ){
@@ -192,13 +231,31 @@ sim.predict <- function(X,new_dat,new_SF,true_clusters){
   return(list(pred_acc=pred_acc,sim_cls=X$final_clusters))
 }
 
-
+sim.NB.MClust = function(y,K_search){
+  fit=NB.MClust(Count=t(y),K=K_search)
+  
+  max_k=fit$K
+  cls=fit$cluster
+  coefs = fit$parameters$mu
+  phi = 1/fit$parameters$theta
+  PPs = fit$parameters$posterior
+  pi = fit$parameters$prior
+  
+  results = list(fit=fit,
+                 max_k=max_k,
+                 cls=cls,
+                 coefs=coefs,
+                 phi=phi,
+                 PPs=PPs,
+                 pi=pi)
+  return(results)
+}
 
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
-                 distrib,method="CSEM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
+                 distrib,method="EM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
                  disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
-                 ncores=10,nsims=ncores,iCluster_compare=F,penalty=T){
+                 ncores=10,nsims=ncores,iCluster_compare=T,penalty=T){
   
   # disp: "gene" or "cluster"
   # low: coef 3.75-3.84, phi 0.13-0.15
@@ -232,22 +289,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   }
   true_clusters<-NA        # TRUE clusters not known for real data
   
-  
-  init_y<-init_y[1:g,1:n]
-  row_names<-paste("gene",seq(g))
-  col_names<-paste("subj",seq(n))
-  cts<-as.matrix(init_y)
-  rownames(cts)<-row_names
-  colnames(cts)<-col_names
-  coldata<-data.frame(matrix(paste("cl",true_clusters,sep=""),nrow=n))
-  rownames(coldata)<-colnames(cts)
-  colnames(coldata)<-"cluster"
-  dds<-DESeqDataSetFromMatrix(countData = cts,
-                              colData = coldata,
-                              design = ~ 1)
-  dds<-DESeq(dds)
-  init_size_factors<-sizeFactors(dds)
-  init_norm_y<-counts(dds,normalized=TRUE)
+  fit_DESeq = fit_DESeq_intercept(init_y[1:g,1:n])
+  init_size_factors <- fit_DESeq$size_factors
+  init_norm_y <- fit_DESeq$norm_y
   
   # Unpenalized run to find initial cluster estimates based on K=k
   k=true.K
@@ -262,9 +306,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       init_phi <- rep(fixed_phi,g)
     } else{ init_phi <- matrix(fixed_phi,nrow=g,ncol=k,byrow=T) }
   }
-  
-  
-  size_factors<-init_size_factors    # use this for all simulations
   
   sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
   fold_change<-fold.change
@@ -281,7 +322,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   cat(sim_pi)
   cat("\n==========================================")
   cat("SIZE FACTORS:\n")
-  cat(size_factors)
+  cat(init_size_factors)
   cat("\n==========================================")
   cat("SIMULATED COEFFICIENTS:\n")
   write.table(sim_coefs,quote=F)
@@ -307,9 +348,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     #init_phi = rep(0,g)
     
     if(disp=="cluster"){    # check for whether init_phi is of dimension 1
-      sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,distrib=distrib,phi=init_phi) # cluster-wise disp param
+      sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=init_size_factors,distrib=distrib,phi=init_phi) # cluster-wise disp param
     } else{
-      sim.dat<-simulate_data_g(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=size_factors,distrib=distrib,phi=init_phi) # gene-specific disp param
+      sim.dat<-simulate_data_g(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=init_size_factors,distrib=distrib,phi=init_phi) # gene-specific disp param
     }
     y<-sim.dat$y
     z<-sim.dat$z
@@ -319,7 +360,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     }
     norm_y = y
     for(i in 1:n){
-      norm_y[,i] = y[,i]/size_factors[i]
+      norm_y[,i] = y[,i]/init_size_factors[i]
     }
     true_disc=c(rep(TRUE,tt),rep(FALSE,(g-tt)))
     
@@ -330,7 +371,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     # true_disc <- true_disc[idx]
     
     # No filtering
-    #idx = rep(T,g)
+    filt_ids = rep(T,g) # No filtering
     
     if(filt_method=="pval"){
       pvals = NB.GOF(y=y,size_factors=size_factors,nsim=1000)
@@ -353,7 +394,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,
-                         size_factors=size_factors,
+                         size_factors=init_size_factors,
                          norm_y=norm_y,
                          true_disc=true_disc
                          ,gene_id=idx
@@ -367,12 +408,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     y = all_data[[ii]]$y
     true_clusters = all_data[[ii]]$true_clusters
-    norm_y = all_data[[ii]]$norm_y
     true_disc = all_data[[ii]]$true_disc
     idx = all_data[[ii]]$gene_id
     
     filt_sens = sum(idx[1:tt])/tt
     filt_falsepos = sum(idx[(tt+1):g])/(g-tt)
+    
+    norm_y = all_data[[ii]]$norm_y               # ACTUAL norm_y based on simulated size factors
+    size_factors = all_data[[ii]]$size_factors
+    
+    # fit=fit_DESeq_intercept(y,calc_vsd=F,calc_rld=F)       # ESTIMATE based on DESeq2
+    # size_factors=fit$size_factors
+    # norm_y=fit$norm_y
+    # rm(fit)
     
     sink(sprintf("Diagnostics/%s/progress%d_%s_%s.txt",dir_name,ii,method,disp))
     # Order selection
@@ -446,8 +494,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       print(paste("Dataset",ii,"Grid Search:"))    # track iteration
       
       #create matrix for grid search values
-      lambda_search=c(0.1,seq(0.25,2.5,0.25))
-      alpha_search=c(seq(0,0.95,0.05),0.99)
+      lambda_search=c(0.1,seq(0.25,3.5,0.25))
+      alpha_search=seq(0,0.5,0.05)        # alpha can't = 1
       
       list_BIC=matrix(0,nrow=length(lambda_search)*length(alpha_search),ncol=3) # matrix of BIC's: one for each combination of penalty params 
       
@@ -485,14 +533,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       
       if(pen_BIC>=unpen_BIC){
         max_lambda=0
-        max_alpha=1
+        max_alpha=0
         print("Algorithm selected unpenalized model")
       } else{
         print(paste("Penalized model with lambda=",max_lambda,"and alpha=",max_alpha))
       }
     } else {
       max_lambda=0
-      max_alpha=1
+      max_alpha=0
       print(paste("No Penalization"))
     }
     
@@ -507,13 +555,13 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     print("Optimal EM run complete")
     
-    cls_iClust=NA
-    ARI_iClust=NA
-    sil_iClust=NA
+    cls_EM=X$final_clusters
+    
+    
     # iCluster+
     if(iCluster_compare){
       n.lambda=25
-      iCluster_res = sim.iCluster(norm_y,true_clusters,ncores=1,n.lambda=n.lambda)
+      iCluster_res = sim.iCluster(round(norm_y,0),true_clusters,ncores=1,n.lambda=n.lambda,K_min=2,K_max=7)
       # if(iCluster_res$K != true.K){
       #   cv.fit = tune.iClusterPlus(cpus=1,dt1=t(y),type="poisson",K=true.K-1,alpha=1,n.lambda=n.lambda,scale.lambda=1,maxiter=20)
       #   BIC_mat = matrix(0,nrow=25,ncol=2)
@@ -525,9 +573,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       #   
       #   iClust_fit <- iClusterPlus(dt1=t(y),type="poisson",lambda=max_lambda,alpha=1,K=true.K-1,maxiter=10)
       # }
+      K_iClust = iCluster_res$K
       cls_iClust = iCluster_res$cls
       ARI_iClust = iCluster_res$ARI
     } else{iCluster_res=NA}
+    rm("iCluster_res")
     
     print("iCluster run complete")
     
@@ -614,50 +664,64 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     cls_hc = cutree(hclust(as.dist(1-cor(norm_y, method="spearman")),method="average"),K_hc)
     cls_med = pam(t(log(norm_y+0.1)),K_med)$cluster
     
-    # # Comparisons with Average linkage HC and K-Medoid clustering
-    # d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-    # model<-hclust(d,method="average")       # hierarchical clustering
-    # 
-    # temp_silhc=rep(0,times=6)
-    # temp_silmed=rep(0,times=6)
-    # temp_clshc=matrix(0,nrow=n,ncol=6)
-    # temp_clsmed=matrix(0,nrow=n,ncol=6)
-    # for(c in 2:7){
-    #   cls_hc <- cutree(model,k=c)
-    #   fit = pam(t(norm_y),c)
-    #   cls_med = fit$clustering
-    #   temp_clshc[,c-1] = cls_hc
-    #   temp_clsmed[,c-1] = cls_med
-    #   temp_silhc[c-1] = mean(silhouette(cls_hc,d)[,3])
-    #   temp_silmed[c-1] = mean(silhouette(cls_med,d)[,3])
-    # }
-    # hc_id=which.max(temp_silhc)
-    # med_id=which.max(temp_silmed)
-    # 
-    # cls_hc=temp_clshc[,hc_id]
-    # cls_med=temp_clsmed[,hc_id]
-    # sil_hc=temp_silhc[hc_id]
-    # sil_med=temp_silmed[hc_id]
-    # K_hc=hc_id+1
-    # K_med=med_id+1
     
-    cls_EM = X$final_clusters              # in case wrong order is selected. This inputs correct order and outputs final clusters
+    # NB.MClust
+    NBMB_fit = sim.NB.MClust(round(norm_y,0),2:7)
+    K_NBMB = NBMB_fit$max_k
+    cls_NBMB =NBMB_fit$cls
     
-    # d2 = dist(t(norm_y))
-    # if(iCluster_compare){
-    #   sil_iClust = mean(silhouette(cls_iClust,d2)[,3])
-    # }
-    # sil_EM = mean(silhouette(cls_EM,d2)[,3])
+    cat(paste("NB.MClust K:",K_NBMB,"\n"))
+    cat("Finished NB.MClust\n")
+    
+    # Mclust (log, variance-stabilizing, and rlog transforms)
+    fit = fit_DESeq_intercept(y,calc_vsd=T,calc_rld=T)
+    log_norm_y=log(norm_y+0.1)
+    if(!is.na(fit$dds)){
+      vsd_y = assay(fit$vsd)
+      rld_y = assay(fit$rld)
+    }
+    cat("Finished performing vsd/rld transformations\n")
+    
+    K_vsd_mclust=NA
+    K_rld_mclust=NA
+    cls_vsd_mclust=NA
+    cls_rld_mclust=NA
+    
+    mclust_log_fit=Mclust(t(log_norm_y),G=1:7)
+    K_log_mclust = mclust_log_fit$G
+    cls_log_mclust = mclust_log_fit$classification
+    rm("mclust_log_fit")
+    cat("mclust log transform order: ",K_log_mclust,"\n")
+    
+    if(!is.na(fit$dds)){
+      mclust_vsd_fit=Mclust(t(vsd_y),G=1:7)
+      K_vsd_mclust = mclust_vsd_fit$G
+      cls_vsd_mclust = mclust_vsd_fit$classification
+      rm("mclust_vsd_fit")
+      cat("mclust vsd transform order: ",K_vsd_mclust,"\n")
+      
+      mclust_rld_fit=Mclust(t(rld_y),G=1:7)
+      K_rld_mclust = mclust_rld_fit$G
+      cls_rld_mclust = mclust_rld_fit$classification
+      rm("mclust_rld_fit")
+      cat("mclust rld transform order: ",K_rld_mclust,"\n")
+    }
+    
+    rm("fit")
+    
     
     print(paste("Time:",X$time_elap,"seconds"))
     print(paste("Dataset ",ii,"complete"))
     
     sink()
     
-    sil_iClust=NA
-    sil_EM=NA
-    sil_med=NA
-    sil_hc=NA
+    all_Ks = cbind(max_k,K_iClust,K_NBMB,K_log_mclust,K_vsd_mclust,K_rld_mclust,K_hc,K_med)
+    names(all_Ks) = c("EM","iClust","NBMB","logMC","vsdMC","rldMC","HC","KM")
+    all_cls = cbind(cls_EM,cls_iClust,cls_NBMB,
+          cls_log_mclust,cls_vsd_mclust,cls_rld_mclust,
+          cls_hc,cls_med)
+    colnames(all_cls) = c("EM","iClust","NBMB","logMC","vsdMC","rldMC","HC","KM")
+    
     
     results=list(X=X,
                  max_k=max_k,
@@ -665,42 +729,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                  max_alpha=max_alpha,
                  true_clusters=true_clusters,
                  true_disc=true_disc,
-                 iCluster_res=iCluster_res,
                  pred_acc=pred_acc,
                  y_pred=y_pred,
                  true_clusters_pred=true_clusters_pred,
-                 cls_hc=cls_hc,
-                 cls_med=cls_med,
-                 cls_EM=cls_EM,
-                 cls_iClust=cls_iClust,
-                 ARI_iClust=ARI_iClust,
-                 sil_iClust=sil_iClust,
-                 sil_EM=sil_EM,
-                 sil_med=sil_med,
-                 sil_hc=sil_hc,
-                 K_hc=K_hc,
-                 K_med=K_med,
+                 all_Ks=all_Ks,all_cls=all_cls,
                  filt_sens=filt_sens,
                  filt_falsepos=filt_falsepos)
     return(results)
   }
-  
-  
-  
-  temp_ks<-rep(0,times=sim)
-  temp_lambdas<-rep(0,times=sim)
-  temp_alphas<-rep(0,times=sim)
-  #temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
-  #temp_coefs<-list()
-  temp_disc<-rep(0,times=sim)
-  temp_ARI<-rep(0,times=sim)
-  temp_sensitivity<-rep(0,times=sim)
-  temp_falsepos<-rep(0,times=sim)
-  temp_pred_acc<-rep(0,times=sim)
 
   ## ADD PARALLELIZATION HERE ##
   cl<-makeCluster(ncores)
-  clusterExport(cl=cl,varlist=c(ls(),"EM","EM_run","logsumexpc","soft_thresholding","NB.GOF","simulate_data","simulate_data_g","sim.iCluster","sim.predict","predictions"),envir=environment())
+  clusterExport(cl=cl,varlist=c(ls(),"fit_DESeq_intercept","EM","EM_run","logsumexpc","soft_thresholding","NB.GOF",
+                                "simulate_data","simulate_data_g","sim.iCluster","sim.predict","predictions","sim.NB.MClust"),envir=environment())
   clusterEvalQ(cl,{
     library(stats)
     library(MASS)
@@ -714,6 +755,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     library(iClusterPlus)
     library(cluster)
     library(NbClust)
+    library(NB.MClust)
     sourceCpp("M_step.cpp")
     })
   
@@ -730,137 +772,142 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   
   
   all_sim_data <- list(list())
-  all_iCluster_res <- list(list())
   
-  itemp_ARI = rep(0,sim)
-  itemp_K = rep(0,sim)
-  itemp_lambda = rep(0,sim)
+  # Initialize EM results
+  temp_ks<-rep(0,times=sim)
+  temp_lambdas<-rep(0,times=sim)
+  temp_alphas<-rep(0,times=sim)
+  #temp_pi<-matrix(rep(0,times=k*sim),nrow=sim)
+  #temp_coefs<-list()
+  temp_disc<-rep(0,times=sim)
+  temp_ARI<-rep(0,times=sim)
+  temp_sensitivity<-rep(0,times=sim)
+  temp_falsepos<-rep(0,times=sim)
+  temp_pred_acc<-rep(0,times=sim)
   
+  # Initialize all other results Ks
+  temp_K_iClust = rep(0,sim)
+  temp_K_hc = rep(0,sim)
+  temp_K_med = rep(0,sim)
+  temp_K_NBMB = rep(0,sim)
+  temp_K_log_mclust = rep(0,sim)
+  temp_K_vsd_mclust = rep(0,sim)
+  temp_K_rld_mclust = rep(0,sim)
+  
+  # Initialize all other results ARIs
+  temp_ARI_iClust = rep(0,sim)
   temp_ARI_hc = rep(0,sim)
   temp_ARI_med = rep(0,sim)
-  temp_ARI_EM = rep(0,sim)
-  temp_ARI_iClust = rep(0,sim)
+  temp_ARI_NBMB = rep(0,sim)
+  temp_ARI_log_mclust = rep(0,sim)
+  temp_ARI_vsd_mclust = rep(0,sim)
+  temp_ARI_rld_mclust = rep(0,sim)
+  
   
   # temp_sil_hc = rep(0,sim)
   # temp_sil_med = rep(0,sim)
   # temp_sil_EM = rep(0,sim)
   # temp_sil_iClust = rep(0,sim)
-  
-  temp_K_hc = rep(0,sim)
-  temp_K_med = rep(0,sim)
-  
+
   temp_filt_sens = rep(0,sim)
   temp_filt_falsepos = rep(0,sim)
   
   all_X = list()
-  
+  all_Ks = list()
+  all_cls = list()
+
   # Summarize results
   for(ii in 1:sim){
-    X=par_sim_res[[ii]]$X
-    all_X[[ii]]=X
     true_clusters=par_sim_res[[ii]]$true_clusters
     true_disc=par_sim_res[[ii]]$true_disc
+    all_Ks[[ii]]=par_sim_res[[ii]]$all_Ks
+    all_cls[[ii]]=par_sim_res[[ii]]$all_cls
     
-    temp_ks[ii] = par_sim_res[[ii]]$max_k
+    # Store EM results
+    X=par_sim_res[[ii]]$X
+    all_X[[ii]]=X
+    temp_ks[ii]=all_Ks[[ii]]["EM"]
     temp_lambdas[ii] = par_sim_res[[ii]]$max_lambda
     temp_alphas[ii] = par_sim_res[[ii]]$max_alpha
-    
-    temp_pred_acc[ii] <- par_sim_res[[ii]]$pred_acc
-    
     temp_disc[ii]<-sum(!X$nondiscriminatory)
     temp_ARI[ii]<-adjustedRandIndex(true_clusters,X$final_clusters)
-    
+    temp_pred_acc[ii] <- par_sim_res[[ii]]$pred_acc
     if(tt>0){
       temp_sensitivity[ii]<-sum(!X$nondiscriminatory[true_disc])/tt                   # tt = # of disc genes simulated (floor(num.disc*g))
     } else {temp_sensitivity[ii]<-NA}
     if(tt<g){
       temp_falsepos[ii]<-sum(!X$nondiscriminatory[!true_disc])/(g-tt)
     } else {temp_falsepos[ii]<-NA}         # take into account genes omitted b/c rowSum of count was <100 (such genes are assumed nondiscriminatory)
-    
-    all_sim_data[[ii]] = list(par_sim_res[[ii]]$y_pred,par_sim_res[[ii]]$true_clusters_pred)
-    if(iCluster_compare){
-      all_iCluster_res[[ii]] = par_sim_res[[ii]]$iCluster_res
-      itemp_ARI[ii] = all_iCluster_res[[ii]]$ARI
-      itemp_K[ii] = all_iCluster_res[[ii]]$K
-      itemp_lambda[ii] = all_iCluster_res[[ii]]$lambda
-      temp_ARI_iClust[ii] = par_sim_res[[ii]]$ARI_iClust
-    }
-    
-    temp_ARI_hc[ii] = adjustedRandIndex(par_sim_res[[ii]]$cls_hc,true_clusters)
-    temp_ARI_med[ii] = adjustedRandIndex(par_sim_res[[ii]]$cls_med,true_clusters)
-    temp_ARI_EM[ii] = adjustedRandIndex(par_sim_res[[ii]]$cls_EM,true_clusters)
-    
-    # temp_sil_hc[ii] = par_sim_res[[ii]]$sil_hc
-    # temp_sil_med[ii] = par_sim_res[[ii]]$sil_med
-    # temp_sil_EM[ii] = par_sim_res[[ii]]$sil_EM
-    # temp_sil_iClust[ii] = par_sim_res[[ii]]$sil_iClust
-    
-    temp_K_hc[ii] = par_sim_res[[ii]]$K_hc
-    temp_K_med[ii] = par_sim_res[[ii]]$K_med
-    
     temp_filt_sens[ii] = par_sim_res[[ii]]$filt_sens
     temp_filt_falsepos[ii] = par_sim_res[[ii]]$filt_falsepos
+    all_sim_data[[ii]] = list(par_sim_res[[ii]]$y_pred,par_sim_res[[ii]]$true_clusters_pred)
+    
+    # Store all other Ks
+    temp_K_iClust[ii] = all_Ks[[ii]]["iClust"]
+    temp_K_hc[ii] = all_Ks[[ii]]["HC"]
+    temp_K_med[ii] = all_Ks[[ii]]["KM"]
+    temp_K_NBMB[ii] = all_Ks[[ii]]["NBMB"]
+    temp_K_log_mclust[ii] = all_Ks[[ii]]["logMC"]
+    temp_K_vsd_mclust[ii] = all_Ks[[ii]]["vsdMC"]
+    temp_K_rld_mclust[ii] = all_Ks[[ii]]["rldMC"]
+    
+    temp_ARI_iClust[ii] = adjustedRandIndex(all_cls[[ii]][,"iClust"],true_clusters)
+    temp_ARI_hc[ii] = adjustedRandIndex(all_cls[[ii]][,"HC"],true_clusters)
+    temp_ARI_med[ii] = adjustedRandIndex(all_cls[[ii]][,"KM"],true_clusters)
+    temp_ARI_NBMB[ii] = adjustedRandIndex(all_cls[[ii]][,"NBMB"],true_clusters)
+    temp_ARI_log_mclust[ii] = adjustedRandIndex(all_cls[[ii]][,"logMC"],true_clusters)
+    temp_ARI_vsd_mclust[ii] = adjustedRandIndex(all_cls[[ii]][,"vsdMC"],true_clusters)
+    temp_ARI_rld_mclust[ii] = adjustedRandIndex(all_cls[[ii]][,"rldMC"],true_clusters)
+    
   }
   
+  #### AVERAGE EM RESULTS ####
   #mean_pi<-colSums(temp_pi)/sim
   #mean_coefs<-Reduce('+',temp_coefs)/sim
   mean_disc<-mean(temp_disc)/g
   mean_ARI<-mean(temp_ARI)
   mean_sensitivity<-mean(temp_sensitivity)
   mean_falsepos<-mean(temp_falsepos)
-  
-  tab_k = table(temp_ks)
-  tab_lambda = table(temp_lambdas)
-  tab_alpha = table(temp_alphas)
-  
-  #### Final_K, lambda, alpha represent most frequently found K, lambda, and alpha
-  # final_k = as.numeric(names(which.max(tab_k)))
-  final_k=mean(temp_ks)
-  final_lambda = as.numeric(names(which.max(tab_lambda)))
-  final_alpha = as.numeric(names(which.max(tab_alpha)))
-  
-  #### iCluster+ results
-  imean_ARI = mean(itemp_ARI)
-  # ifinal_k = as.numeric(names(which.max(table(itemp_K))))
-  ifinal_k = mean(itemp_K)
-  ifinal_lambda = as.numeric(names(which.max(table(itemp_lambda))))
-  
-  #### mean prediction accuracy
+  K=mean(temp_ks)
   mean_pred_acc = mean(temp_pred_acc,na.rm=T)
   
-  #### ARI from Average-linkage HC and K-medoid
-  mean_ARI_hc = mean(temp_ARI_hc)
-  mean_ARI_med = mean(temp_ARI_med)
-  mean_ARI_EM = mean(temp_ARI_EM)
-  mean_ARI_iClust = mean(temp_ARI_iClust)
+  #### AVERAGE OTHER Ks ####
+  K_iClust = mean(temp_K_iClust)         # range: 1:7
+  K_HC = mean(temp_K_hc)                 # range: 1:7
+  K_KM = mean(temp_K_med)                # range: 2:7
+  K_NBMB = mean(temp_K_NBMB)             # range: 2:7
+  K_log_MC = mean(temp_K_log_mclust)     # range: 1:7
+  K_vsd_MC = mean(temp_K_vsd_mclust)     # range: 1:7
+  K_rld_MC = mean(temp_K_rld_mclust)     # range: 1:7
+  
+  #### AVERAGE OTHER ARIs ####
+  ARI_iClust = mean(temp_ARI_iClust)
+  ARI_HC = mean(temp_ARI_hc)
+  ARI_KM = mean(temp_ARI_med)
+  ARI_NBMB = mean(temp_ARI_NBMB)
+  ARI_log_MC = mean(temp_ARI_log_mclust)
+  ARI_vsd_MC = mean(temp_ARI_vsd_mclust)
+  ARI_rld_MC = mean(temp_ARI_rld_mclust)
+  
+  #### Pre-filtering Sens/FP average ####
+  filt_sens = mean(temp_filt_sens)
+  filt_falsepos = mean(temp_filt_falsepos)
   
   # #### Silhouette values comparisons
   # mean_sil_hc = mean(temp_sil_hc)
   # mean_sil_med = mean(temp_sil_med)
   # mean_sil_EM = mean(temp_sil_EM)
   # mean_sil_iClust = mean(temp_sil_iClust)
-  mean_sil_hc=NA
-  mean_sil_med=NA
-  mean_sil_EM=NA
-  mean_sil_iClust=NA
   
-  # final_K_hc = as.numeric(names(which.max(table(temp_K_hc))))
-  # final_K_med = as.numeric(names(which.max(table(temp_K_med))))
+  # Results for tabulation:
   
-  final_K_hc = mean(temp_K_hc)
-  final_K_med = mean(temp_K_med)
-  
-  final_filt_sens = mean(temp_filt_sens)
-  final_filt_falsepos = mean(temp_filt_falsepos)
-  
-  # Store for tabulation:
-  
-  results<-list(all_X=all_X,
-                K=final_k,
+  results<-list(all_data=all_data,
+                all_sim_data=all_sim_data,
+                
+                all_X=all_X,
+                K=K,
                 all_k=temp_ks,
-                lambda=final_lambda,
                 all_lambda=temp_lambdas,
-                alpha=final_alpha,
                 all_alpha=temp_alphas,
                 all_ARI=temp_ARI,
                 ARI=mean_ARI,
@@ -870,30 +917,19 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                 sens=mean_sensitivity,
                 all_falsepos=temp_falsepos,
                 falsepos=mean_falsepos,
-                all_data=all_data,
-                all_iCluster_res=all_iCluster_res,
-                imean_ARI=imean_ARI,
-                ifinal_k=ifinal_k,
-                ifinal_lambda=ifinal_lambda,
+            
                 all_pred_acc=temp_pred_acc,
                 mean_pred_acc=mean_pred_acc,
-                all_sim_data=all_sim_data,
-                ARI_HC=mean_ARI_hc,
-                ARI_med=mean_ARI_med,
-                ARI_EM=mean_ARI_EM,
-                ARI_iClust=mean_ARI_iClust,
-                sil_HC=mean_sil_hc,
-                sil_med=mean_sil_med,
-                sil_EM=mean_sil_EM,
-                sil_iClust=mean_sil_iClust,
-                final_K_hc=final_K_hc,
-                final_K_med=final_K_med,
-                all_K_hc=temp_K_hc,
-                all_K_med=temp_K_med,
-                filt_sens=final_filt_sens,
-                filt_falsepos=final_filt_falsepos,
+                
+                all_Ks=all_Ks,all_cls=all_cls,
+                
+                K_iClust=K_iClust, K_HC=K_HC, K_KM=K_KM, K_NBMB=K_NBMB, K_log_MC=K_log_MC, K_vsd_MC=K_vsd_MC, K_rld_MC=K_rld_MC,
+                ARI_iClust=ARI_iClust, ARI_HC=ARI_HC, ARI_KM=ARI_KM, ARI_NBMB=ARI_NBMB, ARI_log_MC=ARI_log_MC, ARI_vsd_MC=ARI_vsd_MC, ARI_rld_MC=ARI_rld_MC,
+              
+                filt_sens=filt_sens,filt_falsepos=filt_falsepos,
                 all_filt_sens=temp_filt_sens,
-                all_filt_falsepos=temp_filt_falsepos)
+                all_filt_falsepos=temp_filt_falsepos
+                )
   
   return(results)
 }
