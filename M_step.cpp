@@ -298,6 +298,10 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
 
     arma::vec beta = coefs_j;
     arma::mat temp(maxit_IRLS, (2*k));
+    arma::mat temp_beta(maxit_IRLS,k);
+    arma::mat temp_phi(maxit_IRLS,k);
+    int continue_beta = 1;       /* Continue estimating beta as long as it's 1 (set to 0 when under SSE IRLS tol level)*/
+    int continue_phi = 1;
     temp.zeros();
     
     
@@ -348,12 +352,13 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             }
         }
         
-        if(est_phi==1 && cl_phi==0){
-            phi_g = phi_ml_g(y_j,mu,all_wts,10,0);
+        if(est_phi==1 && cl_phi==0 && continue_phi==1){
+          phi_g = phi_ml_g(y_j,mu,all_wts,10,0);
+          for(int c=0; c<k; c++){
+            phi_j(c) = phi_g;
+          }
         }
-        for(int c=0; c<k; c++){
-          phi_j(c) = phi_g;
-        }
+        
         
         
         /* Initiate temp matrix to track IRLS */
@@ -365,6 +370,11 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         for(int ii=0; ii<k; ii++){
             temp(i,idx) = phi_j(ii);
             idx++;
+        }
+        
+        for(int ii=0; ii<k; ii++){
+          temp_beta(i,ii) = beta(ii);
+          temp_phi(i,ii) = phi_j(ii);
         }
     
         /* CDA */
@@ -395,18 +405,20 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             arma::vec prod_w_trans_y = all_prod_w_trans_y.rows(good_ids);
     
             /* Update beta */
-            if((1-alpha)*lambda != 0){                    /* MLE update w/ SCAD*/
-                beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n )  / ((1-alpha)*lambda*(k-1) + accu(w)/n );
-            } else {
-                beta(c) = accu(prod_w_trans_y)/accu(w);
-            }
+            if(continue_beta==1){
+              if((1-alpha)*lambda != 0){                    /* MLE update w/ SCAD*/
+                  beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n )  / ((1-alpha)*lambda*(k-1) + accu(w)/n );
+              } else {
+                  beta(c) = accu(prod_w_trans_y)/accu(w);
+              }
     
-            if(beta(c) < (-30)){
-                /* Rprintf("Cluster %d, gene %d truncated at -30",c+1,j); */
-                beta(c) = -30;
-            } else if(beta(c)>30){
-                /* Rprintf("Cluster %d, gene %d truncated at +30",c+1,j); */
-                beta(c) = 30;
+              if(beta(c) < (-30)){
+                  /* Rprintf("Cluster %d, gene %d truncated at -30",c+1,j); */
+                  beta(c) = -30;
+              } else if(beta(c)>30){
+                  /* Rprintf("Cluster %d, gene %d truncated at +30",c+1,j); */
+                  beta(c) = 30;
+              }
             }
     
             for(int ii=0; ii<n; ii++){
@@ -417,7 +429,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
     
             /* Estimate phi */
             //Rprintf("phi.ml iter %d, cluster %d \n",i+1,c+1);
-            if(cl_phi==1 && est_phi==1){
+            if(cl_phi==1 && est_phi==1 && continue_phi==1){
               phi_j(c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
             }
             
@@ -435,16 +447,26 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         }
         
         if(i>0){
-            double SSE=0;
-            for(int cc=0; cc<2*k; cc++){
-                SSE += pow(temp(i,cc)-temp(i-1,cc),2);
+            double SSE_beta=0;
+            double SSE_phi=0;
+            for(int cc=0; cc<k; cc++){
+              SSE_beta += pow(temp_beta(i,cc)-temp_beta(i-1,cc),2);
+              SSE_phi += pow(temp_phi(i,cc)-temp_phi(i-1,cc),2);
             }
-            if(SSE<IRLS_tol){
-                break;
+            Rprintf("SSE beta: %f, SSE phi: %f\n",SSE_beta,SSE_phi);
+            if(SSE_beta<IRLS_tol){
+              continue_beta=0;
+            }
+            if(SSE_phi<IRLS_tol){
+              continue_phi=0;
             }
         }
+        
         if(i==maxit_IRLS-1){
-            break;
+          break;
+        }
+        if(continue_beta==0 && continue_phi==0){
+          break;
         }
     }
     

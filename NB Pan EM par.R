@@ -258,7 +258,7 @@ EM_run <- function(y, k,
   }
   
   # Stopping Criteria
-  IRLS_tol = 1E-6
+  IRLS_tol = 1E-12     # for both phi and beta
   maxit_IRLS = 50
   EM_tol = 1E-12
   
@@ -413,17 +413,18 @@ EM_run <- function(y, k,
         } else if(cl_phi==0){
           diff_phi[a,j]=abs(phi_list[[a]][j]-phi_list[[a-5]][j])/phi_list[[a-5]][j]
         }
-        cat(paste("Avg % diff in phi est (across 5 its) gene ",j," = ",diff_phi[a,j],"\n"))
+        #cat(paste("Avg % diff in phi est (across 5 its) gene ",j," = ",diff_phi[a,j],"\n"))
         if(diff_phi[a,j]<0.01){
           est_phi[j]=0
-          cat(paste("Gene ",j, "Avg % diff < 0.01: stopped phi estimation in M step\n"))
+          #cat(paste("Gene ",j, "Avg % diff < 0.01: stopped phi estimation in M step\n"))
         } else{
           est_phi[j]=1
         }
       }
-      cat(paste("Avg % diff in phi est (across 5 its) =\n"))
-      write.table(t(diff_phi[a,]))
-      cat("\n")
+      # cat(paste("Avg % diff in phi est (across 5 its) =\n"))
+      # write.table(t(diff_phi[a,]))
+      # cat("\n")
+      cat(paste("Avg % diff in phi est (across 5 its) gene 1 = ",diff_phi[a,1],"\n"))
     }
     
     
