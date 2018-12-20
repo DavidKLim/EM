@@ -70,160 +70,126 @@ normalizations <- function(dat){
               idx=idx)
   return(res)
 }
- 
-# phi.ml <-
-#   function(y, mu, n = sum(weights), weights, limit = 10,
-#            eps = .Machine$double.eps^0.25,
-#            trace = FALSE){
-#     lambda = 1E-50            ### change to phi instead of theta? ###
-#     score <- function(n, ph, mu, y, w){
-#       sum(w*(digamma((1/ph) + y) - digamma(1/ph) + log(1/ph) +
-#                1 - log((1/ph) + mu) - (y + (1/ph))/(mu + (1/ph))))*(-1/ph^2) + 2*lambda*ph
-#     }
-#     info <- function(n, ph, mu, y, w){
-#       sum(w*( - trigamma((1/ph) + y) + trigamma((1/ph)) - ph +
-#                 2/(mu + (1/ph)) - (y + (1/ph))/(mu + (1/ph))^2))*(1/ph^4) + 2*lambda
-#     }
-#     if(inherits(y, "lm")) {
-#       mu <- y$fitted.values
-#       y <- if(is.null(y$y)) mu + residuals(y) else y$y
-#     }
-#     if(missing(weights)) weights <- rep(1, length(y))
-#     #t0 <- n/sum(weights*(y/mu - 1)^2)
-#     p0 <- sum(weights*(y/mu - 1)^2)/n
-#     it <- 0
-#     del <- 1
-#     if(trace) message(sprintf("phi.ml: iter %d 'phi = %f'",
-#                               it, signif(p0)), domain = NA)
-#     while((it <- it + 1) < limit && abs(del) > eps) {
-#       p0 <- abs(p0)
-#       del <- score(n, p0, mu, y, weights)/(i <- info(n, p0, mu, y, weights))
-#       p0 <- p0 + del
-#       if(trace) message("phi.ml: iter", it," phi =", signif(p0))
-#     }
-#     
-#     if(p0 < 0) {
-#       p0 <- 0
-#       warning("estimate truncated at zero")
-#       attr(p0, "warn") <- gettext("estimate truncated at zero")
-#     }
-#     
-#     if(it == limit) {
-#       warning("iteration limit reached")
-#       attr(p0, "warn") <- gettext("iteration limit reached")
-#     }
-#     attr(p0, "SE") <- sqrt(1/i)
-#     res <- list(p0=p0)
-#     return(res)
-#   }
 
 
+EM<-function(y, k,
+             lambda=0,alpha=0,
+             size_factors=rep(1,times=ncol(y)),
+             norm_y=y,
+             purity=rep(1,ncol(y)),offsets=0,              # Offsets: effect of log(covariate) on count #
+             true_clusters=NA, true_disc=NA,
+             init_parms=FALSE,
+             init_coefs=matrix(0,nrow=nrow(y),ncol=k),
+             init_phi=matrix(0,nrow=nrow(y),ncol=k),
+             init_cls=NA,
+             disp=c("gene","cluster"),
+             method=c("EM","CEM"),
+             prefix="", dir="NA"){
+  
+  # y: raw counts
+  # k: #clusters
+  # size_factors: SF's derived from DESeq2
+  # norm_y: counts normalized for sequencing depth by DESeq2
+  # purity: input custom values to weight E step weights by purity (DISABLED)
+  # offsets: option to include additional offsets. must be length n 
+  # true_clusters: if applicable. For diagnostics tracking of ARI
+  # true_disc: if applicable. For diagnostics tracking of disc/nondisc genes
+  # init_parms: TRUE if initial coefficient estimates/dispersion estimates are input
+  # init_coefs & init_phi: Initial estimates, if applicable
+  # disp = c(gene, cluster), depending on whether dispersions are gene-specific or cluster-specific
+  # cls_init: Initial clustering
+  # init_Tau: only applicable when CEM = TRUE
+  
+  if(alpha==1){
+    stop("alpha must be less than 1; choose a smaller number instead")
+  } else if(alpha < 0 | alpha > 1){
+    stop("alpha not within range [0,1)")
+  }
+  if(lambda<0){
+    stop("lambda must be greater than 0")
+  }
+  
+  if(method=="EM"){
+    CEM=F
+  } else if(method=="CEM"){
+    CEM=T
+  } else{
+    stop("method must be 'EM' or 'CEM'.")
+  }
+  
+  diag_file = sprintf("Diagnostics/%s/%s_%s_%s_%d_%f_%f.txt",dir,method,disp,prefix,k,lambda,alpha)
+  dir.create(sprintf("Diagnostics/%s",dir))
+  sink(file=diag_file)
+  
+  n = ncol(y)
+  g = nrow(y)
+  
+  cat(paste(sprintf("n=%d, g=%d, k=%d, l=%f, alph=%f, ",n,g,k,lambda,alpha),"\n"))
+  cat("True clusters:\n")
+  write.table(true_clusters,quote=F,col.names=F)
+  
+  init_Tau=sqrt(g)
+  if(k==1){
+    init_cls=rep(1,n)
+  }
+  if(all(is.na(init_cls)) & k>1){
+    # Initial Clusterings
+    ## Hierarchical Clustering
+    d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
+    model<-hclust(d,method="average")       # hierarchical clustering
+    cls_hc <- cutree(model,k=k)
+    
+    ## K-means Clustering
+    cls_km <- kmeans(t(log(norm_y+0.1)),k)$cluster
+    
+    #TESTING RANDOM CLUSTERING
+    
+    r_it=25
+    rand_inits = matrix(0,nrow=n,ncol=r_it)
+    
+    for(r in 1:r_it){
+      set.seed(r)
+      rand_inits[,r] = sample(1:k,n,replace=TRUE)
+      while(sum(1:k %in% rand_inits[,r]) < k){
+        rand_inits[,r] = sample(1:k,n,replace=TRUE)
+      }
+    }
+    colnames(rand_inits) = paste("rand",c(1:r_it),sep="")
+    
+    # Iterate through 2-it EM with each initialization
+    all_init_cls <- cbind(cls_hc,cls_km,rand_inits)
+    init_cls_BIC <- rep(0,times=ncol(all_init_cls))
+    
+    all_fits = list()
+    
+    for(i in 1:ncol(all_init_cls)){
+      
+      cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
+      
+      fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
+                   init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
+                   cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,maxit_EM=15)
+      all_fits [[i]] = fit
+      init_cls_BIC[i] <- fit$BIC
+    }
+    
+    fit_id = which.min(init_cls_BIC)
+    
+    cat("FINAL INITIALIZATION:\n")
+    cat(paste(colnames(all_init_cls)[fit_id],"\n"))
+    init_cls = all_init_cls[,fit_id[1]]
+    cat("FINAL TAU VALUE:\n")
+    cat(paste(init_Tau,"\n"))
+  }
+  
+  results=EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
+                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
+                 cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,maxit_EM=100)
+  
+  sink()
+  return(results)
+}
 
-# M.step<-function(j){
-#   
-#   
-#   beta<-coefs[j,]                                                   # Retrieve beta & theta from
-#   theta<-theta_list[[j]]                                            # previous iteration
-# 
-#   
-#   temp<-matrix(0,ncol=(2*k),nrow=maxit_IRLS)    # Temporarily store beta to test for convergence of IRLS
-#   dat_j<-dat[dat[,"g"]==j,]                     # subset just the j'th gene
-#   
-#   
-#   for(i in 1:maxit_IRLS){
-#     eta <- 
-#       if(a==1 & i==1){
-#         matrix(rep(beta,times=n),nrow=n,byrow=TRUE)              # first initialization of eta
-#       }else if(a>1 & i==1){
-#         matrix(rep(beta,times=n),nrow=n,byrow=TRUE) + offset     # Retrieval of eta for IRLS (prev. beta + offset)
-#       }else{eta}
-#     
-#     temp[i,]<-c(beta,phi[j,])
-#     
-#     for(c in 1:k){
-#       
-#       dat_jc<-dat_j[dat_j[,"clusts"]==c,]    # subset data for j'th gene, c'th cluster
-#       
-#       family=negative.binomial(theta=1/phi[j,c])        # can specify family here (plug in updated phi)
-#       
-#       linkinv<-family$linkinv              # g^(-1) (eta) = mu
-#       mu.eta<-family$mu.eta                # g' = d(mu)/d(eta)
-#       variance<-family$variance
-#       
-#       # Estimate beta #
-#       mu = linkinv(eta)
-#       mu.eta.val = mu.eta(eta)
-#       
-#       good <- (dat_jc[,"weights"]>0) & (mu.eta.val[,c] != 0)
-#       trans_y <- (eta[,c] - offset)[good] + (dat_jc[,"count"][good] - mu[,c][good]) / mu.eta.val[,c][good]    # subtract size factor from transf. y
-#       w <- sqrt(dat_jc[,"weights"][good]*mu.eta.val[,c][good]^2/variance(mu[,c])[good])     # weights used in IRLS
-#       
-#       beta[c] <-
-#         if(lambda1 != 0){
-#           ((lambda1*((sum(beta)-beta[c]) + (sum(theta[c,])-theta[c,c])))  +  ((1/n)*sum(w*trans_y))) / ((lambda1*(k-1)) + (1/n)*sum(w))
-#         } else { beta[c]<-sum(w*trans_y)/sum(w) }
-#       
-#       #in case beta goes to -inf/+inf: continue with warning
-#       if(beta[c]<(-100)){
-#         warning(paste("Cluster",c,"Gene",j,"goes to -infinity"))
-#         beta[c] = -100
-#       }
-#       if(beta[c]>100){
-#         warning(paste("Cluster",c,"Gene",j,"goes to +infinity"))
-#         beta[c] = 100
-#       }
-#       
-#       eta[,c]<-beta[c] + offset      # add back size factors to eta
-#       mu[,c]<-linkinv(eta[,c])
-#       
-#       
-#       # Estimate phi #
-#   
-#       # USING PENALIZED PHI ESTIMATION:::
-#       if(all((dat_jc[dat_jc[,"weights"]==1,"count"]-dat_jc[dat_jc[,"weights"]==1,"count"][1])==0)==FALSE){
-#         phi[j,c]<- phi.ml(y=dat_jc[,"count"],
-#              mu=mu[,c],
-#              weights=dat_jc[,"weights"],
-#              limit=100,trace=TRUE)$p0
-#       } else{phi[j,c]=0}
-#       # if condition sets phi = 0 if all observations in cluster are equal
-#       ########################################
-#       
-#     }
-#     
-#     
-#     # update on theta (beta_i - beta_j)
-#     for(c in 1:k){
-#       for(cc in 1:k){
-#         if(abs(theta[c,cc])>=tau){theta[c,cc]<-beta[c]-beta[cc]}        # TLP from Pan paper
-#         else{theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda2)}
-#       }
-#     }
-#     
-#     # break conditions for IRLS
-#     if(i>1){
-#       if(sum((temp[i,]-temp[i-1,])^2)<IRLS_tol){   # Sum of Squares of estimated parameters
-#         coefs_j<-beta
-#         theta_j<-theta
-#         temp_j<-temp[1:i,]
-#         phi_j<-phi[j,]
-#         break
-#       }
-#     }
-#     if(i==maxit_IRLS){
-#       coefs_j<-beta
-#       theta_j<-theta  
-#       temp_j<-temp[1:i,]
-#       phi_j<-phi[j,]
-#     }
-#   }
-#   
-#   results=list(coefs_j=coefs_j,
-#                theta_j=theta_j,
-#                temp_j=temp_j,
-#                phi_j=phi_j)
-#   return(results)
-# }
 
 
 
@@ -238,13 +204,14 @@ EM_run <- function(y, k,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
                    init_phi=matrix(0,nrow=nrow(y),ncol=k),
                    disp,cls_init,
-                   CEM=F,init_Tau=1,SEM=F,
+                   CEM=F,init_Tau=1,
                    maxit_EM=100){
+
   
   start_time <- Sys.time()
   
-  n<-ncol(y)
-  g<-nrow(y)
+  n<-ncol(y)         # number of samples
+  g<-nrow(y)         # number of genes
   
   # adds 0.1 to all y
   y = y+0.1
@@ -285,25 +252,11 @@ EM_run <- function(y, k,
     wts[c,]=(cls==c)^2
   }
   
-  # Initialize 0.8 and rest 0.2 weights
-  # wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
-  # for(c in 1:k){
-  #   wts[c,]=0.8*(cls==c)^2 + (0.2/(k-1))*(cls!=c)^2
-  # }
-  
-  # 4.34 gb used
-  #print(paste("Memory used before EM:",mem_used()))
-  
   # For use in CEM in E step #
   Tau = init_Tau
   cat(paste("Tau =",Tau,"\n"))
   
   phi_g = rep(0,times=g)
-  # if(cl_phi==0){
-  #   for(j in 1:g){
-  #     phi_g[j]=1/(glm.nb(as.integer(y[j,])~1+offset(offset))$theta)
-  #   }
-  # }
   DNC=0
   disc_ids=rep(T,g)
   
@@ -331,10 +284,8 @@ EM_run <- function(y, k,
               next
               }
             coefs[j,c]<-glm(as.integer(y[j,cls==c])~1,family=poisson())$coef               # Initialize beta (Poisson)
-            # fit<-glm.nb(as.numeric(y[j,cls==c])~1)                                      # Test: initializing with glm.nb (errors out frequently)
-            # coefs[j,c]=fit$coef
-            # test_phi[j]=1/fit$theta
-          } # include if statement case for no subjects in cluster --> 0
+                                                                                          # Test: initializing with glm.nb (errors out frequently)
+          }
         }
         beta <- coefs[j,]
         theta<-matrix(rep(0,times=k^2),nrow=k)
@@ -351,18 +302,6 @@ EM_run <- function(y, k,
     
     Mstart=as.numeric(Sys.time())
     for(j in 1:g){
-      # print(paste("j=",j,"a=",a,"k=",k,"lambda1=",lambda1,"lambda2=",lambda2,"tau=",tau,"IRLS_tol=",IRLS_tol,"maxit_IRLS=",maxit_IRLS))
-      # print(paste("offset:",offset))
-      # print("dat:")
-      # print(head(dat))
-      # print("y:")
-      # print(head(y))
-      # print("theta_list[[1]]:")
-      # print(theta_list[[1]])
-      # print("coefs:")
-      # print(head(coefs))
-      # print("phi:")
-      # print(head(phi))
       if((Tau<=1 & a>=5 & all(theta_list[[j]]==0))){next}
       y_j = as.integer(y[j,])
       par_X[[j]] <- M_step(j=j, a=a, y_j=y_j, all_wts=wts, offset=offset,
@@ -372,7 +311,6 @@ EM_run <- function(y, k,
                            )
     }
     Mend=as.numeric(Sys.time())
-    #cat(paste("M step time:",Mend-Mstart,"seconds\n"))
     
     
     for(j in 1:g){
@@ -384,7 +322,6 @@ EM_run <- function(y, k,
         phi[j,] <- par_X[[j]]$phi_j
       } else if(cl_phi==0){
         phi_g[j] <- (par_X[[j]]$phi_j)[1]
-        #phi[j,] <- rep(phi_g[j],times=k)
       }
       
       # Ad hoc averaging of cluster log means when nondiscriminatory
@@ -413,17 +350,12 @@ EM_run <- function(y, k,
         } else if(cl_phi==0){
           diff_phi[a,j]=abs(phi_list[[a]][j]-phi_list[[a-5]][j])/phi_list[[a-5]][j]
         }
-        #cat(paste("Avg % diff in phi est (across 5 its) gene ",j," = ",diff_phi[a,j],"\n"))
         if(diff_phi[a,j]<0.01){
           est_phi[j]=0
-          #cat(paste("Gene ",j, "Avg % diff < 0.01: stopped phi estimation in M step\n"))
         } else{
           est_phi[j]=1
         }
       }
-      # cat(paste("Avg % diff in phi est (across 5 its) =\n"))
-      # write.table(t(diff_phi[a,]))
-      # cat("\n")
       cat(paste("Avg % diff in phi est (across 5 its) gene 1 = ",diff_phi[a,1],"\n"))
     }
     
@@ -510,8 +442,8 @@ EM_run <- function(y, k,
       }
     }
 
-    if(SEM){
-      # SEM
+    if(CEM){
+      # CEM
       draw_wts=wts                 # initialize
       for(i in 1:n){
         set.seed(i)
@@ -684,151 +616,13 @@ EM_run <- function(y, k,
   
 }
 
-
-
-EM<-function(y, k,
-             lambda=0,alpha=0,
-             size_factors=rep(1,times=ncol(y)),
-             norm_y=y,
-             purity=rep(1,ncol(y)),offsets=0,              # Offsets: effect of log(covariate) on count #
-             true_clusters=NA, true_disc=NA,
-             init_parms=FALSE,
-             init_coefs=matrix(0,nrow=nrow(y),ncol=k),
-             init_phi=matrix(0,nrow=nrow(y),ncol=k),
-             init_cls=NA,
-             disp=c("gene","cluster"),
-             method=c("EM","CSEM"),
-             prefix="", dir="NA"){
-  
-  if(alpha==1){
-    stop("alpha must be less than 1; choose a smaller number instead")
-  } else if(alpha < 0 | alpha > 1){
-    stop("alpha not within range [0,1)")
-  }
-  if(lambda<0){
-    stop("lambda must be greater than 0")
-  }
-  
-  if(method=="EM"){
-    CEM=F
-    SEM=F
-  } else if(method=="CSEM"){
-    CEM=T
-    SEM=T
-  }
-  
-  diag_file = sprintf("Diagnostics/%s/%s_%s_%s_%d_%f_%f.txt",dir,method,disp,prefix,k,lambda,alpha)
-  dir.create(sprintf("Diagnostics/%s",dir))
-  sink(file=diag_file)
-  
-  n = ncol(y)
-  g = nrow(y)
-  
-  cat(paste(sprintf("n=%d, g=%d, k=%d, l=%f, alph=%f, ",n,g,k,lambda,alpha),"\n"))
-  cat("True clusters:\n")
-  write.table(true_clusters,quote=F,col.names=F)
-    
-  init_Tau=sqrt(g)
-  if(k==1){
-    init_cls=rep(1,n)
-  }
-  if(all(is.na(init_cls)) & k>1){
-    # Initial Clusterings
-    ## Hierarchical Clustering
-    d<-as.dist(1-cor(norm_y, method="spearman"))  ##Spearman correlation distance w/ log transform##
-    model<-hclust(d,method="average")       # hierarchical clustering
-    cls_hc <- cutree(model,k=k)
-  
-    ## K-means Clustering
-    cls_km <- kmeans(t(log(norm_y+0.1)),k)$cluster
-  
-    #TESTING RANDOM CLUSTERING
-  
-    r_it=25
-    rand_inits = matrix(0,nrow=n,ncol=r_it)
-  
-    for(r in 1:r_it){
-      set.seed(r)
-      rand_inits[,r] = sample(1:k,n,replace=TRUE)
-      while(sum(1:k %in% rand_inits[,r]) < k){
-        rand_inits[,r] = sample(1:k,n,replace=TRUE)
-      }
-    }
-    colnames(rand_inits) = paste("rand",c(1:r_it),sep="")
-  
-    # Iterate through 2-it EM with each initialization
-    all_init_cls <- cbind(cls_hc,cls_km,rand_inits)
-    init_cls_BIC <- rep(0,times=ncol(all_init_cls))
-  
-    all_fits = list()
-    
-    for(i in 1:ncol(all_init_cls)){
-      ########################## SIMULATION ONLY #############################
-      # if((!is.null(true_clusters) & !is.na(true_clusters)) & k>1){
-      #   all_perms=allPerms(1:k)
-      #   all_clusts=list()
-      #   temp_clust<-rep(0,times=n)
-      #
-      #   for(iii in 1:nrow(all_perms)){
-      #     for(ii in 1:n){
-      #       temp_clust[ii]<-all_perms[iii,all_init_cls[ii,i]]
-      #     }
-      #     all_clusts[[iii]]<-temp_clust
-      #   }
-      #
-      #   all_clusts[[nrow(all_perms)+1]]<-all_init_cls[,i]     # contains all permutations of cluster indices
-      #   match_index<-rep(0,times=nrow(all_perms)+1)
-      #
-      #   for(ii in 1:(nrow(all_perms)+1)){
-      #     match_index[ii]<-mean(true_clusters==all_clusts[[ii]])     # compares each permutation to true --> % of match
-      #   }
-      #
-      #   all_init_cls[,i]<-all_clusts[[which.max(match_index)]]
-      # }
-      ########################## SIMULATION ONLY #############################
-  
-      # if(CEM){
-      #   for(t in 1:length(Tau_vals)){
-      #     fit = EM_run(y,k,lambda1,lambda2,tau,size_factors,norm_y,true_clusters,true_disc,
-      #                  init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-      #                  cls_init=all_init_cls[,i], CEM=CEM,init_Tau=Tau_vals[t] ,SEM=SEM, maxit_EM=10)
-      #     if(all(fit$wts < 0.999 & fit$wts > 0.001)){
-      #       break
-      #     }
-      #   }
-      #
-      #   cat(paste("Init Tau:",Tau_vals[t],"\n"))
-      #   init_cls_Tau[i] <- Tau_vals[t]
-      # }
-  
-      cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
-      
-      fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
-                                init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                                cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=15)
-      all_fits [[i]] = fit
-      init_cls_BIC[i] <- fit$BIC
-    }
-  
-    fit_id = which.min(init_cls_BIC)
-    
-    cat("FINAL INITIALIZATION:\n")
-    cat(paste(colnames(all_init_cls)[fit_id],"\n"))
-    init_cls = all_init_cls[,fit_id[1]]
-    cat("FINAL TAU VALUE:\n")
-    cat(paste(init_Tau,"\n"))
-  }
-  
-  results=EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
-                 init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                 cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,SEM=SEM, maxit_EM=100)
-  
-  sink()
-  return(results)
-}
-
 predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=rep(0,ncol(y))){
-  ############# NEED TO INCORPORATE PURITY IN LL ########################
+  # X: Output of EM
+  # newdata: Data to perform prediction on
+  # new_sizefactors: SF's of new data
+  # purity: Custom purity values can be input and adjusted for (NOT AVAILABLE YET)
+  # offsets: Additional offsets per sample can be incorporated
+  
   # X is the output object from the EM() function
   init_coefs=X$coefs
   init_phi=X$phi
@@ -836,28 +630,7 @@ predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=
   init_alpha=X$alpha
   
   
-  cl_phi=!is.null(dim(X$phi))  # dimension of phi is null when gene-wise
-  
-  ##### EXPORT THIS?? #####
-  # library(DESeq2)
-  # row_names<-paste("gene",seq(nrow(newdata)))
-  # col_names<-paste("subj",seq(ncol(newdata)))
-  # cts<-as.matrix(newdata)
-  # rownames(cts)<-row_names
-  # colnames(cts)<-col_names
-  # coldata<-data.frame(matrix(paste("cl"),nrow=ncol(newdata)))
-  # rownames(coldata)<-colnames(cts)
-  # colnames(coldata)<-"cluster"
-  # dds<-DESeqDataSetFromMatrix(countData = cts,
-  #                             colData = coldata,
-  #                             design = ~ 1)
-  # DESeq_dds<-DESeq(dds)
-  # init_size_factors<-sizeFactors(DESeq_dds)
-  # init_norm_y<-counts(DESeq_dds,normalized=TRUE)
-  ##########################
-  
-  # results = EM(newdata,ncol(init_coefs),init_lambda1,init_lambda2,init_tau,init_size_factors,init_norm_y,
-  #              true_clusters=NA,init_parms=TRUE,init_coefs=init_coefs,init_phi=init_phi)
+  cl_phi=!is.null(dim(init$phi))  # dimension of phi is null when gene-wise (vector)
   
   init_size_factors = new_sizefactors
   offset=log2(init_size_factors) + offsets
@@ -894,5 +667,4 @@ predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=
   
   return(list(final_clusters=final_clusters,wts=wts))
 }
-
-
+  
