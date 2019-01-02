@@ -97,13 +97,29 @@ collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.
       tab[ii,28]<-X$ARI_vsd_MC
       tab[ii,29]<-X$K_rld_MC
       tab[ii,30]<-X$ARI_rld_MC
-      tab[ii,31]<-mean(X$K_iClust == true_k[i])
-      tab[ii,32]<-mean(X$K_HC == true_k[i])
-      tab[ii,33]<-mean(X$K_KM == true_k[i])
-      tab[ii,34]<-mean(X$K_NBMB == true_k[i])
-      tab[ii,35]<-mean(X$K_log_MC == true_k[i])
-      tab[ii,36]<-mean(X$K_vsd_MC == true_k[i])
-      tab[ii,37]<-mean(X$K_rld_MC == true_k[i])
+      Ks_iClust=rep(NA,length(X$all_Ks))
+      Ks_HC=rep(NA,length(X$all_Ks))
+      Ks_KM=rep(NA,length(X$all_Ks))
+      Ks_NBMB=rep(NA,length(X$all_Ks))
+      Ks_logMC=rep(NA,length(X$all_Ks))
+      Ks_vsdMC=rep(NA,length(X$all_Ks))
+      Ks_rldMC=rep(NA,length(X$all_Ks))
+      for(id in 1:length(X$all_Ks)){
+        Ks_iClust[id] = X$all_Ks[[id]]["iClust"]
+        Ks_HC[id] = X$all_Ks[[id]]["HC"]
+        Ks_KM[id] = X$all_Ks[[id]]["KM"]
+        Ks_NBMB[id] = X$all_Ks[[id]]["NBMB"]
+        Ks_logMC[id] = X$all_Ks[[id]]["logMC"]
+        Ks_vsdMC[id] = X$all_Ks[[id]]["vsdMC"]
+        Ks_rldMC[id] = X$all_Ks[[id]]["rldMC"]
+      }
+      tab[ii,31]<-mean(Ks_iClust == true_k[i])
+      tab[ii,32]<-mean(Ks_HC == true_k[i])
+      tab[ii,33]<-mean(Ks_KM == true_k[i])
+      tab[ii,34]<-mean(Ks_NBMB == true_k[i])
+      tab[ii,35]<-mean(Ks_logMC == true_k[i])
+      tab[ii,36]<-mean(Ks_vsdMC == true_k[i])
+      tab[ii,37]<-mean(Ks_rldMC == true_k[i])
       ii=ii+1
   }}}}}
   if(fixed_parms=="F"){

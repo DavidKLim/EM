@@ -925,10 +925,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
                 
                 K_iClust=K_iClust, K_HC=K_HC, K_KM=K_KM, K_NBMB=K_NBMB, K_log_MC=K_log_MC, K_vsd_MC=K_vsd_MC, K_rld_MC=K_rld_MC,
                 ARI_iClust=ARI_iClust, ARI_HC=ARI_HC, ARI_KM=ARI_KM, ARI_NBMB=ARI_NBMB, ARI_log_MC=ARI_log_MC, ARI_vsd_MC=ARI_vsd_MC, ARI_rld_MC=ARI_rld_MC,
-              
+                
                 filt_sens=filt_sens,filt_falsepos=filt_falsepos,
                 all_filt_sens=temp_filt_sens,
-                all_filt_falsepos=temp_filt_falsepos
+                all_filt_falsepos=temp_filt_falsepos,
+                
+                all_K_iClust=temp_K_iClust,all_K_HC=temp_K_hc,all_K_KM=temp_K_med,all_K_NBMB=temp_K_NBMB,all_K_log_MC=temp_K_log_mclust,all_K_vsd_MC=temp_K_vsd_mclust,all_K_rld_MC=temp_K_rld_mclust,
+                all_ARI_iClust=temp_ARI_iClust,all_ARI_HC=temp_ARI_hc,all_ARI_KM=temp_ARI_med,all_ARI_NBMB=temp_ARI_NBMB,all_ARI_log_MC=temp_ARI_log_mclust,all_ARI_vsd_MC=temp_ARI_vsd_mclust,all_ARI_rld_MC=temp_ARI_rld_mclust
+                
                 )
   
   return(results)
