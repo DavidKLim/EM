@@ -264,14 +264,17 @@ Sys.setenv(TEXINPUTS=getwd(),
 RNA-seq is a recent platform for gene expression data based upon high-throughput sequencing. It has been shown to overcome some of the biases and limitations that are inherent in working with microarray \citep{Zhao2014}, and gives less background noise and provides a greater dynamic range for detection \citep{Hrdlickova2016}. Furthermore, there have been studies to show a strong correlation of results based on RNA-seq and microarray data, suggesting the reproducibility of the utilities of microarray analyses in RNA-seq \citep{Chen2017}.
 
 %CLUSTERING METHODS MICROARRAY%
-One area of key interest in cancer genomics is in clustering samples based on subject-specific gene expression profiles. This can provide valuable insight into possible relatedness of cancer samples by grouping similarly expressed samples together. Based on this relatedness, one may be able to make inferences on samples' subtypes of cancer. Subtype discovery has become a field of significant interest because studies have shown that the subtype of a patient's tumor not only affects the prognosis of the disease (Blows et al., 2010), but also the effectiveness of commonly-used treatments like chemotherapy \citep{Carey2011,Mao2017}. Being able to identify the subtype of cancer samples based on gene expression may potentially unlock the door to targeted therapy regimes, in which employed treatments can be more specific to the biology of the particular subtype, and thus more efficient and effective.
+One area of key interest in cancer genomics is in clustering samples based on subject-specific gene expression profiles. This can provide valuable insight into possible relatedness of cancer samples by grouping similarly expressed samples together. Based on this relatedness, one may be able to make inferences on samples' subtypes of cancer. Subtype discovery has become a field of significant interest because studies have shown that the subtype of a patient's tumor not only affects the prognosis of the disease (Blows et al 2010, Koboldt et al 2012, Robertson et al 2017), but also the effectiveness of commonly-used treatments like chemotherapy \citep{Carey2011,Mao2017}. Being able to identify the subtype of cancer samples based on gene expression may potentially unlock the door to targeted therapy regimes, in which employed treatments can be more specific to the biology of the particular subtype, and thus more efficient and effective.
 
 While there are numerous methods that have been developed to cluster microarray gene expression data \citep{Xie2007,Monti2003,Kluger2003,Cho2008}, few are able to cluster RNA-seq gene expression. Due to the discrete nature of RNA-seq, the standard Gaussian model cannot be assumed of the underlying distribution, as can be done on microarray by methods like mclust \citep{Yeung2001}. Some current methods get around this by approximating RNA-seq with the normal distribution using some type of transformation \citep{Zwiener2014}. These transformations typically make the data 'more normal' to utilize existing methods for microarray, but there is not one transformation that is superior \citep{Noel-MacDonnell2018}. Thus, analyses using transformed count data would be dependent on the type of transformation used, which raises the question of reproducibility. Also, the few methods that have been developed for clustering raw RNA-seq data have been designed specifically to cluster genes rather than samples \citep{Si2013}.
 
 %POINTS TO ADDRESS IN RNASEQ (normalization,count data,variable selection/prefiltering)%
 Biases and artifacts inherent in RNA-seq data also need to be accounted for during clustering. This is typically done using one of an array of normalization steps \citep{Li2015}, although none have been shown to be uniformly superior. Also, the high dimensionality of a genetic dataset necessitates a dimension reduction scheme that can pinpoint genes that may be most likely to be informative in clustering, as a majority of genes may be uninformative and vary due to noise. Thus, many methods use some criterion to pre-filter genes that are nondiscriminatory in nature \citep{Ritter2015}. A widely-used method of pre-filtering is done by ranking and thresholding genes based on its median absolute deviation (MAD) \citep{Chung2008} (\textbf{Alternatives to discuss?}). Noise and other forms of technical variation also intermingles with biological variation, confounding the effects of biological differences. There have been many discussions regarding the irreproducibility of microarray analyses due to noise and batch effects \citep{Scherer2009}, and many attempts have been made to account for these technical variations in RNA-seq, especially in the single cell RNA-seq setting \citep{Brennecke2013,Ding2015}. Sequencing depth is another form of technical variation that describes the dependence of a gene's quantification on its length \citep{Tarazona2011}. This can alter expression profiles dramatically, causing significant findings to be confounded by its sequencing depth.
 
-Additionally, dealing with count data requires different distributional assumptions for model-based methods. The most naive model-based assumption with untransformed count data is the Poisson distribution, which is used alongside a penalized likelihood scheme by a very popular integrative method called iCluster+ \citep{Mo2013}. We believe, however, that such a model also has its limitations, as it does not account for extra-Poisson variation. There are also some non-model-based methods that have been shown to be efficacious with RNA-seq data, such as the average-linkage hierarchical clustering (HC) and K-medoids clustering (K-med) methods \citep{Jaskowiak2018}. HC works by iteratively fusing the two closest clusters together, starting with $n$ clusters and going down in number of clusters. The closeness is determined by a distance matrix and a linkage scheme. Typically, a 1-spearman or 1-pearson correlation is most commonly used, and Jaskowiak proposes that the average-linkage scheme provides the best results with RNA-seq. K-med is very similar in procedure to the widely-known K-means algorithm, but rather than assigning the means as the centroids, K-med assigns datapoints as centroids (medoids). K-med works similarly to K-means by minimizing the distance between cluster members and their corresponding centroid, but is more robust and can better handle count data. Although these do not have a mode of variable selection, they may be useful in clustering nonetheless after some pre-filtering scheme.
+Dealing with count data requires different distributional assumptions for model-based (MB) methods. Because there are well-established MB methods available for continuous data, the easiest way to account for count RNA-seq data is by transforming the discrete data to be approximately normal, and then inputting the transformed data into existing Gaussian assumption frameworks. One such framework that is widely used is called mclust \citep{Scrucca2016}. Mclust can be used after a log (logMC), variance stabilizing (vsdMC), or rlog (rldMC) transformation, as these transformations make count data becomes more approximately Gaussian. 
+iCluster+ is an integrative method that assumes a naive Poisson distribution on untransformed count data. This is used alongside a penalized likelihood scheme to perform clustering \citep{Mo2013}. We believe, however, that such a model also has its limitations, as it does not account for extra-Poisson variation. A very recent method (NBMB) includes a framework assuming the negative binomial distribution to account for this extra variation \citep{Li2018}, but it does not contain any mode for feature selection of genes that may be of interest, and does not mitigate the possibility of overfitting.
+
+There are also some non-model-based methods that have been shown to be efficacious with RNA-seq data, such as the average-linkage hierarchical clustering (HC) and K-medoids clustering (KM) methods \citep{Jaskowiak2018}. HC works by iteratively fusing the two closest clusters together, starting with $n$ clusters and going down in number of clusters. The closeness is determined by a distance matrix and a linkage scheme. Typically, a 1-spearman or 1-pearson correlation is most commonly used, and Jaskowiak proposes that the average-linkage scheme provides the best results with RNA-seq. K-med is very similar in procedure to the widely-known K-means algorithm, but rather than assigning the means as the centroids, K-med assigns datapoints as centroids (medoids). K-med works similarly to K-means by minimizing the distance between cluster members and their corresponding centroid, but is more robust and can better handle count data. Although these do not have a mode of variable selection, they may be useful in clustering nonetheless after some pre-filtering scheme.
 
 %OUR APPROACH%
 In this paper, we introduce FSCseq (Feature Selection and Clustering of RNA-seq), in which we propose a finite mixture Negative Binomial model, incorporating a combination of the L2 and SCAD penalties \citep{Fan2001}. By applying this hybrid penalty on the difference in estimated log means, we are able to shrink the cluster parameter estimates closer together, while selecting out genes whose difference in expression across clusters is sufficiently low. The adaptive nature of the SCAD penalty does not introduce as much bias as a classic L1 penalty, while maintaining the thresholding aspect of the lasso. The model is set in a regression scheme to allow for offsetting by normalization factors to adjust for sequencing, and to potentially allow for adjustments for confounders. The estimation is done using an Expectation Maximization (EM) algorithm. The E step weights are passed into the maximization (M step) to allow for cluster-specific estimation, and these weights also provide a very intuitive interpretation as the posterior probabilities of samples being in any particular cluster.
@@ -291,7 +294,7 @@ The main goal of our FSCseq is two-fold: 1. to determine discriminatory genes ba
 
 %%% 2.1 Obj fx %%%
 \subsection{Likelihood Model}
-Raw RNA-seq is count data, so we assume the negative binomial distribution in our regression model. For $Y~NB(\mu,\phi)$, the probability mass function of Y is given by the "NB2" model described by \citet{Hilbe2009}:
+Raw RNA-seq is count data, so we assume the negative binomial distribution in our regression model. For $Y \sim\ NB(\mu,\phi)$, the probability mass function of Y is given by the "NB2" model described by \citet{Hilbe2009}:
 \begin{equation}
 f(y;\mu,\phi) = \binom{y_i+\phi^{-1}-1}{\phi^{-1}-1} \left[\dfrac{1}{1+\phi\mu_i}\right]^{\frac{1}{\alpha}}\left[\dfrac{\phi\mu_i}{1+\phi\mu_i}\right]^{y_i}
 \end{equation}
@@ -371,9 +374,9 @@ Therefore, we have $w_{ik}=\sqrt{\dfrac{\hat{z}^{(m)}_{ik} g'(\eta)^2}{V(\mu)}}$
 \begin{split}
 \hat{\beta}_k^{(m+1)}&=\dfrac{\frac{1}{n}\sum_{i=1}^{n}w_{ik}\tilde{y}_{ik}+\lambda(1-\alpha)[\sum_{l>k}(\hat{\beta}_l^{(m)}+\hat{\theta}_{kl}^{(m)})+\sum_{l<k}(\hat{\beta}_l^{(m+1)}-\hat{\theta}_{lk}^{(m)})]}{\lambda(1-\alpha)(K-1)+\frac{1}{n}\sum_{i=1}^{n}w_{ik}} \\
 \hat{\theta}_{kl}^{(m+1)}&=\begin{dcases} 
-      sgn(\hat{\theta}_{kl}^{(m)})(\norm{\hat{\theta}_{kl}^{(m+1)}}-\frac{\alpha}{1-\alpha}) & , \norm{\hat{\theta}_{kl}^{(m)}} \leq \frac{2\alpha}{1-\alpha} \\
-      \frac{(a-1)\hat{\theta}_{kl}^{(m)} - sgn(\hat{\theta}_{kl}^{(m)})a\frac{\alpha}{1-\alpha}}{a-2} & , \frac{2\alpha}{1-\alpha} < \norm{\hat{\theta}_{kl}^{(m)}} \leq \frac{a\alpha}{1-\alpha} \\
-      \hat{\theta}_{kl}^{(m)} & , \norm{\hat{\theta}_{kl}^{(m)}} > \frac{a\alpha}{1-\alpha}
+      sgn(\hat{\theta}_{kl}^{(m)})(\norm{\hat{\theta}_{kl}^{(m)}}-\frac{\alpha}{1-\alpha}) & , \norm{\hat{\theta}_{kl}^{(m)}} \leq \lambda\alpha \\
+      \frac{(a-1)\hat{\theta}_{kl}^{(m)} - sgn(\hat{\theta}_{kl}^{(m)})a\frac{\alpha}{1-\alpha}}{a-1-\frac{1}{\lambda(1-\alpha)}} & , \lambda\alpha < \norm{\hat{\theta}_{kl}^{(m)}} \leq a\lambda\alpha \\
+      \hat{\theta}_{kl}^{(m)} & , \norm{\hat{\theta}_{kl}^{(m)}} > a\lambda\alpha
    \end{dcases}
 \end{split}
 \end{equation}
@@ -428,44 +431,75 @@ This framework is not without its drawbacks. For one, the corrections for sequen
 
 It is well-known that a majority of the genes in a typical dataset is nondiscriminatory across subtypes. In order to cluster subtypes accurately, it is important to filter out genes that are obviously nondiscriminatory in nature. One common way to do this is by filtering out genes whose median absolute deviation is low \citep{Chung2008}. We utilize this, along with a subsequent wrapper \citep{Ritter2015} in our method to perform pre-filtering and variable selection on the dataset.
 
-We simulated 24 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change ($LFC$), number of clusters ($K$), and number of samples per cluster ($n_k$). For the purposes of the simulations, we fixed the number of genes ($g$), and the proportion of discriminatory genes ($p_{disc}$) in the dataset. We searched over $LFC=(1, 1.5)$, $K=(1, 2, ..., 7)$, and $n_k=(25, 50)$. We also simulate differences in sequencing depth by taking the size factors estimated from the TCGA Breast Cancer dataset, and incorporating them in our simulations. We then pass them into the FSCseq algorithm as offsets in the IRLS maximization scheme.
+We simulated 24 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change ($LFC$), number of clusters ($K$), sample size ($n$), and the proportion of discriminatory genes ($p_{disc}$) in the dataset. We found that in simulations, the number of genes did not have a big effect on performance. So we fixed the number of genes ($g=2000$). We searched over $LFC=(1, 1.5)$, $K=(1, 2, ..., 7)$, and $n=(100, 200)$. We also simulate differences in sequencing depth by taking the size factors estimated from the TCGA Breast Cancer dataset, and incorporating them in our simulations. We then pass them into the FSCseq algorithm as offsets in the IRLS maximization scheme.
 
 To explore the behaviors in various realistic settings, we simulated low and moderate baseline log mean expressions and low, medium, high, and very high noise values based on the initial estimates of expression and dispersion on the TCGA Breast Cancer dataset. These values were $\beta=(3.75,6.5)$ and $\phi=(0.15,0.35,0.50,1.00)$, respectively. We explored simulation cases in the log (not log2) scale in our simulations.
 
 We imposed pre-filtering on the simulated datasets, keeping just the features with the top 20\% of MAD scores. We applied FSCseq on each dataset and assessed the performance statistics under varying levels of baseline expression and noise, and across all combinations of variables ($LFC$, $K$, $n_k$). We measured clustering accuracy by the standard Adjusted Rand Index (ARI), which measures the agreement of derived clusters with the simulated clusters. We measured the feature selection performance by sensitivity (sens), or the proportion of discriminatory genes that were correctly determined to be discriminatory, and false positive rate (FPR), or the proportion of nondiscriminatory genes that were incorrectly determined to be discriminatory. We also analyzed the prediction portion of our algorithm by simulating a new dataset with the same number of features and simulated parameters, but with a smaller sample size $n_{pred}=\floor{0.1n}$. We show the full results in Tables \ref{tab:1} \ref{tab:2}.
 
-<<xtable12, results=tex, echo=FALSE>>==
+<<xtable1234, results=tex, echo=FALSE>>==
 library(xtable)
 #load("C:/Users/limdd/Documents/Research/Simulations/gene_fixed_mad25_icluster_and_pred/second/sim_res_tab1.RData")
 #load("C:/Users/limdd/Documents/Research/Simulations/filtmad20/sim_res.RData")
 load("C:/Users/limdd/Documents/Research/Simulations/elasticSCAD/24sims/sim_res.RData")
 
 #head(table1)
-colnames(table1) = c("$\\beta$","$\\phi$","LFC","$n_{k}$","K","$\\hat{K}$","OA","$p_{disc}$","$\\hat{p_{disc}}$","ARI","sens","FPR","MADsens","MADFPR","PA","iK","iARI","hcK","hcARI","kmK","kmARI")
+colnames(table1) = c("$\\beta$","$\\phi$","LFC","n","K","$K_{FSC}$","$OA_{FSC}$","$p_{disc}$","$\\hat{p}_{disc}$","$ARI_{FSC}$","sens","FPR","$sens_{pre}$","$FPR_{pre}$","PA","$K_{iCl}$","$OA_{iCl}$","$ARI_{iCl}$","$K_{HC}$","$OA_{HC}$","$ARI_{HC}$","$K_{KM}$","$OA_{KM}$","$ARI_{KM}$","$K_{NBMB}$","$OA_{NBMB}$","$ARI_{NBMB}$","$K_{lMC}$","$OA_{lMC}$","$ARI_{lMC}$","$K_{vMC}$","$OA_{vMC}$","$ARI_{vMC}$","$K_{rMC}$","$OA_{rMC}$","$ARI_{rMC}$")
 
-table1_EM_low=table1[c(1:16,33:48),c(1:13,15)]
-table1_EM_hi=table1[c(17:32,49:64),c(1:13,15)]
-table1_other_low=table1[c(1:16,33:48),c(1:6,16,18,20,10,17,19,21)]
-table1_other_hi=table1[c(17:32,49:64),c(1:6,16,18,20,10,17,19,21)]
+table1_EM_15=table1[c(1:24,97:120),c(1:13,15)][,-2]
+table1_EM_35=table1[c(25:48,121:144),c(1:13,15)][,-2]
+table1_EM_50=table1[c(49:72,145:168),c(1:13,15)][,-2]
+table1_EM_100=table1[c(73:96,169:192),c(1:13,15)][,-2]
 
-rws <- rep(c(1:4),times=4)+rep(c(4,12,20,28),each=4)-1
+table2 = table1[table1[,"$p_{disc}$"]==0.05,]
+
+table2_other_order_15=table2[c(1:12,49:60),c(1:6,16,19,22,25,28,31,34)][,-2]
+table2_other_order_35=table2[c(13:24,61:72),c(1:6,16,19,22,25,28,31,34)][,-2]
+table2_other_order_50=table2[c(25:36,73:84),c(1:6,16,19,22,25,28,31,34)][,-2]
+table2_other_order_100=table2[c(37:48,85:96),c(1:6,16,19,22,25,28,31,34)][,-2]
+
+table2_other_OA_15=table2[c(1:12,49:60),c(1:5,7,17,20,23,26,29,32,35)][,-2]
+table2_other_OA_35=table2[c(13:24,61:72),c(1:5,7,17,20,23,26,29,32,35)][,-2]
+table2_other_OA_50=table2[c(25:36,73:84),c(1:5,7,17,20,23,26,29,32,35)][,-2]
+table2_other_OA_100=table2[c(37:48,85:96),c(1:5,7,17,20,23,26,29,32,35)][,-2]
+
+table2_other_ARI_15=table2[c(1:12,49:60),c(1:5,10,18,21,24,27,30,33,36)][,-2]
+table2_other_ARI_35=table2[c(13:24,61:72),c(1:5,10,18,21,24,27,30,33,36)][,-2]
+table2_other_ARI_50=table2[c(25:36,73:84),c(1:5,10,18,21,24,27,30,33,36)][,-2]
+table2_other_ARI_100=table2[c(37:48,85:96),c(1:5,10,18,21,24,27,30,33,36)][,-2]
+
+rws <- rep(c(1:4),times=6)+rep(c(4,12,20,28,36,44),each=4)-1
 col <- rep("\\rowcolor[gray]{0.95}", length(rws))
 
-tab1 = xtable(table1_EM_low,
+tab1 = xtable(table1_EM_15,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50 $) with low and medium noise ($\\phi = 0.15 and 0.35$) in simulated datasets on performance. Each row is based on 24 simulated datasets. Order Accuracy (OA) is the proportion of datasets that correctly selected the true K (order), and prediction accuracy (PA) is the proportion of new simulated subjects that were correctly clustered. PA takes into account only runs that correctly selected order, and missing values denote no dataset correctly selected the true K.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50 $) with low noise ($\\phi = 0.15$) in simulated datasets on performance. Each row is based on 24 simulated datasets. Order Accuracy (OA) is the proportion of datasets that correctly selected the true K (order), and prediction accuracy (PA) is the proportion of new simulated subjects that were correctly clustered.",
               label = "tab:1",na.print="")      # K=3, n=50, g=1000
 print(tab1,include.rownames=F, sanitize.text.function=identity,
-              floating.environment = "sidewaystable",add.to.row=list(pos=as.list(rws),command=col))
+              #floating.environment = "sidewaystable",
+      add.to.row=list(pos=as.list(rws),command=col))
 
-tab2 = xtable(table1_EM_hi,
+tab2 = xtable(table1_EM_35,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75 and 6.50$) with high and very high noise ($\\phi = 0.50$ and $1.00$) in simulated datasets on performance.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance.",
               label = "tab:2",na.print="")      # K=3, n=50, g=1000
-print(tab2,include.rownames=F, sanitize.text.function=identity,
-              floating.environment = "sidewaystable",add.to.row=list(pos=as.list(rws),command=col))
+print(tab2,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab3 = xtable(table1_EM_50,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance.",
+              label = "tab:3",na.print="")      # K=3, n=50, g=1000
+print(tab3,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab4 = xtable(table1_EM_100,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance.",
+              label = "tab:4",na.print="")      # K=3, n=50, g=1000
+print(tab4,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
 
 @
 
@@ -485,27 +519,144 @@ Order selection for iCluster+ was difficult to automatize. The iCluster+ paper a
 
 \ref{tab:3} and \ref{tab:4} show side-by-side comparisons of order selection and clustering performances for the FSCSeq, iCluster+, HC, and KM.
 
-<<xtable34, results=tex, echo=FALSE>>=
-tab3 = xtable(table1_other_low,
+<<xtable5678, results=tex, echo=FALSE>>=
+
+rws <- rep(c(1:4),times=3)+rep(c(4,12,20),each=4)-1
+col <- rep("\\rowcolor[gray]{0.95}", length(rws))
+
+# ORDER
+
+tab5 = xtable(table2_other_order_15,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low and medium noise ($\\phi = 0.15$ and $0.35$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM).",
-              label = "tab:3",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low and medium noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM). Fixed $p_{disc}$ = 0.05",
+              label = "tab:5",na.print="")      # K=3, n=50, g=1000
 
-print(tab3,include.rownames=F, sanitize.text.function=identity,
-              floating.environment = "sidewaystable",add.to.row=list(pos=as.list(rws),command=col))
+print(tab5,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
 
-tab4 = xtable(table1_other_hi,
+tab6 = xtable(table2_other_order_35,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$ and $1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
-              label = "tab:4",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:6",na.print="")      # K=3, n=50, g=1000
 
-print(tab4,include.rownames=F, sanitize.text.function=identity,
-              floating.environment = "sidewaystable",add.to.row=list(pos=as.list(rws),command=col))
+print(tab6,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab7 = xtable(table2_other_order_50,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:7",na.print="")      # K=3, n=50, g=1000
+
+print(tab7,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab8 = xtable(table2_other_order_100,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:8",na.print="")      # K=3, n=50, g=1000
+
+print(tab8,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+
+# OA
+
+tab5 = xtable(table2_other_OA_15,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low and medium noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM).",
+              label = "tab:5",na.print="")      # K=3, n=50, g=1000
+
+print(tab5,include.rownames=F, floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab6 = xtable(table2_other_OA_35,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:6",na.print="")      # K=3, n=50, g=1000
+
+print(tab6,include.rownames=F, floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab7 = xtable(table2_other_OA_50,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:7",na.print="")      # K=3, n=50, g=1000
+
+print(tab7,include.rownames=F, floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab8 = xtable(table2_other_OA_100,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:8",na.print="")      # K=3, n=50, g=1000
+
+print(tab8,include.rownames=F, floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+
+# ARI 
+
+tab5 = xtable(table2_other_ARI_15,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low and medium noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM).",
+              label = "tab:5",na.print="")      # K=3, n=50, g=1000
+
+print(tab5,include.rownames=F, floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab6 = xtable(table2_other_ARI_35,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:6",na.print="")      # K=3, n=50, g=1000
+
+print(tab6,include.rownames=F,floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab7 = xtable(table2_other_ARI_50,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:7",na.print="")      # K=3, n=50, g=1000
+
+print(tab7,include.rownames=F, floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
+tab8 = xtable(table2_other_ARI_100,
+              digits=2,
+              table.placement="!h",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:8",na.print="")      # K=3, n=50, g=1000
+
+print(tab8,include.rownames=F, floating.environment = "sidewaystable",
+      sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
+
 @
 
-We immediately notice the sporadic nature of the iCluster+ order selection (iK). It chooses anywhere from the range of orders searched ($K=2-7$). It is impossible to assess where the issue is originating from. Since the order selection threshold is arbitrary, it may be that this threshold should be better adapted to the dimensions of the data. It may also be that the Poisson assumption on the count data is not sufficient to account for the added noise. In any case, it is clear that order selection for iCluster+ is faulty. In fact, at correctly selected orders, iCluster+ seems to be relatively accurate in clustering. However, FSCseq still yields higher ARI values across all conditions, except when FSCseq chooses $K=1$ (since iCluster+ cannot take $K=1$ as input, it cannot be evaluated).
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=170mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/sim_bplots_ARI.png}
+\end{center}
+\caption{"Boxplots of ARI of competing methodsacross simulations at low ($\phi=0.15$, top-left), moderate ($\phi=0.35$, top-right), high ($\phi=0.50$, bottom-left), and very high ($\phi=1.00$, bottom-right) noise.}
+\label{fig:bplots}
+\end{figure}
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=170mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/select_sim_bplots_ARI.png}
+\end{center}
+\caption{"Boxplots of ARI at fixed case of $K=6$, $\beta=6.5$, $LFC=1$, $n=100$, and $p_{disc}=0.05$ of competing methods at low ($\phi=0.15$, top-left), moderate ($\phi=0.35$, top-right), high ($\phi=0.50$, bottom-left), and very high ($\phi=1.00$, bottom-right) noise.}
+\label{fig:bplots2}
+\end{figure}
+
+
+We immediately notice the sporadic nature of the iCluster+ order selection (iK). It chooses anywhere from the range of orders searched ($K=2,...,7$). It is impossible to assess where the issue is originating from. Since the order selection threshold is arbitrary, it may be that this threshold should be better adapted to the dimensions of the data. It may also be that the Poisson assumption on the count data is not sufficient to account for the added noise. In any case, it is clear that order selection for iCluster+ is faulty. In fact, at correctly selected orders, iCluster+ seems to be relatively accurate in clustering. However, FSCseq still yields higher ARI values across all conditions, except when FSCseq chooses $K=1$ (since iCluster+ cannot take $K=1$ as input, it cannot be evaluated).
 
 HC and KM both seem to select close to $K=2$. This is especially problematic for KM, since $K=1$ was not even searched for that method. Without an underlying distribution to explain the simulated LFC's and noise, neither HC nor KM distinguish between clusters well. It is important to note that the many methods used to select the order with HC often did not agree. We choose the order that the majority of the methods selected, but we found that many datasets yielded a wide range of values for the order. It seems that most of the methods used in NbClust do not handle noise very well.
 
@@ -516,15 +667,15 @@ Next, we introduce some variants of our method. For one, we have so far restrict
 
 Secondly, prior work has shown that the EM algorithm tends to converge to the local maximum, rather than the global maximum. Thus, this may result in the algorithm being "stuck" at less than ideal conditions. One way to prevent this is to replace the current E step with the classification E step. This variant of the E step introduces some randomness by drawing the posterior probabilities closer together, causing the algorithm to overcome local maxima through small perturbations of the clustering index. We use a simulated annealing method \citep{Rose1998,Si2013} to slowly wean off the noise-adding effects of the CEM, and revert to the original EM. \ref{tab:2} shows the results of these variants under simulated gene-specific and cluster-specific dispersions, respectively, as well as the analogous iCluster+ results. Results are based on 24 simulated datasets for each case.
 
-<<xtable5,results=tex,echo=FALSE>>==
+<<xtable9,results=tex,echo=FALSE>>==
 load("C:/Users/limdd/Documents/Research/Simulations/elasticSCAD/24sims_gvcl_EMvCEM/sim_res_gvcl_EMvCEM.RData")
 
-tab5 = xtable(table2,
+tab9 = xtable(table2,
               digits=2,
               table.placement="!h",
               caption="Clustering, discovery, and prediction performance of variants of EM, as well as iCluster+ (iClust), average-linkage hierarchical clustering (HC), and K-medoids (KM). Each row represents the average across 24 different simulated datasets with true order $K=3$, $n_k=50$, 2000 genes, and 5\\% discriminatory genes with log2 fold change of 1.",
-              label = "tab:5",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
-print(tab5,include.rownames=T, sanitize.text.function=identity)
+              label = "tab:9",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
+print(tab9,include.rownames=T, sanitize.text.function=identity)
 
 @
 
@@ -552,13 +703,13 @@ We performed clustering and feature selection on the resultant dataset of 124 sa
 
 We also compared our method (EM) with iCluster+, HC, and KM. Results are given in Table \cref{tab:6}
 
-<<xtable6,results=tex,echo=F>>=
+<<xtable10,results=tex,echo=F>>=
 load("C:/Users/limdd/Documents/Research/Real Data/TCGA BRCA/BRCA_compare_res.RData")
 
-tab6 = xtable(summary_table[,1:6],digits=3,caption="ARI, average silhouette values (sil) and p-values from Log-Rank survival test with Chi-square approximation (LRpval) and with permutation-based empirical test (emppval), and the p-value of the Fisher's Exact test on the contingency table of survival events and cluster labels (fisherpval) of analyses performed on TCGA Breast Cancer dataset by FSCseq (EM), iCluster+ (iClust), HC, and KM, compared to the annotated (anno).",
-              label="tab:6",table.placement="H",na.print="",
+tab10 = xtable(summary_table[,1:6],digits=3,caption="ARI, average silhouette values (sil) and p-values from Log-Rank survival test with Chi-square approximation (LRpval) and with permutation-based empirical test (emppval), and the p-value of the Fisher's Exact test on the contingency table of survival events and cluster labels (fisherpval) of analyses performed on TCGA Breast Cancer dataset by FSCseq (EM), iCluster+ (iClust), HC, and KM, compared to the annotated (anno).",
+              label="tab:10",table.placement="H",na.print="",
               floating.environment = "table*")
-print(tab6,sanitize.text.function=identity)
+print(tab10,sanitize.text.function=identity)
 
 @
 
@@ -598,18 +749,18 @@ The three PAM50 genes that were excluded by MAD pre-filtering were 'GRB7', 'MDM2
 
 \subsubsection{TCGA Bladder Cancer Dataset}
 
-We also performed similar analyses on the TCGA Bladder Cancer dataset. This dataset contained 427 samples and 21022 genes, with annotated subtypes based on a study done by Robertson et al (Robertson et al, 2017). Because of the smaller sample size (compared to the BRCA dataset), we included in our analysis samples whose estimated tumor purity was greater 0.8. This yielded 104 samples with 5 subtypes: 80 Luminal-papillary, 11 Neuronal, 8 Basal-squamous, 4 Luminal, and 1 Luminal-infiltrated. Due to the extremely low incidence of the Luminal and Luminal-infiltrated subtypes, we excluded them in our analysis, leaving us with 99 samples of 3 distinct subtypes. As before, we filtered just the genes with the top 50 quantile MAD scores, leaving 8874 genes in the analysis.
+We also performed similar analyses on the TCGA Bladder Cancer dataset. This dataset contained 427 samples and 21022 genes, with annotated subtypes based on a study done by Robertson et al. Because of the smaller sample size (compared to the BRCA dataset), we included in our analysis samples whose estimated tumor purity was greater 0.8. This yielded 104 samples with 5 subtypes: 80 Luminal-papillary, 11 Neuronal, 8 Basal-squamous, 4 Luminal, and 1 Luminal-infiltrated. Due to the extremely low incidence of the Luminal and Luminal-infiltrated subtypes, we excluded them in our analysis, leaving us with 99 samples of 3 distinct subtypes. As before, we filtered just the genes with the top 50 quantile MAD scores, leaving 8874 genes in the analysis.
 
-Robertson et al mentions the lower purity levels of the luminal-infiltrated and basal-squamous subtypes, and the higher purity levels of the luminal-papillary subtype. This was evident in our pre-filtering procedure, as 85 of the 86 annotated samples with luminal-infiltrated subtype and 139 out of 147 basal-squamous samples with basal-squamous subtype fell short of our purity threshold of 0.8, while 80 of the 144 annotated samples with luminal-papillary subtype had purity estimates greater than our threshold.
+Robertson mentions the lower purity levels of the luminal-infiltrated and basal-squamous subtypes, and the higher purity levels of the luminal-papillary subtype. This was evident in our pre-filtering procedure, as 85 of the 86 annotated samples with luminal-infiltrated subtype and 139 out of 147 basal-squamous samples with basal-squamous subtype fell short of our purity threshold of 0.8, while 80 of the 144 annotated samples with luminal-papillary subtype had purity estimates greater than our threshold.
 
 % REGENERATE WITH iCLUSTER+ %
-<<xtable7,results=tex,echo=F>>=
+<<xtable11,results=tex,echo=F>>=
 load("C:/Users/limdd/Documents/Research/Real Data/TCGA BLCA/BLCA_compare_res.RData")
 
-tab7 = xtable(summary_table[,1:6],digits=3,caption="ARI, average silhouette values (sil) and p-values from Log-Rank survival test with Chi-square approximation (LRpval) and with permutation-based empirical test (emppval), and the p-value of the Fisher's Exact test on the contingency table of survival events and cluster labels (fisherpval) of analyses performed on TCGA Bladder Cancer (BLCA) dataset by FSCseq (EM), iCluster+, HC, and KM.",
-              label="tab:7",table.placement="H",na.print="",
+tab11 = xtable(summary_table[,1:6],digits=3,caption="ARI, average silhouette values (sil) and p-values from Log-Rank survival test with Chi-square approximation (LRpval) and with permutation-based empirical test (emppval), and the p-value of the Fisher's Exact test on the contingency table of survival events and cluster labels (fisherpval) of analyses performed on TCGA Bladder Cancer (BLCA) dataset by FSCseq (EM), iCluster+, HC, and KM.",
+              label="tab:11",table.placement="H",na.print="",
               floating.environment = "table*")
-print(tab7,sanitize.text.function=identity)
+print(tab11,sanitize.text.function=identity)
 
 @
 
