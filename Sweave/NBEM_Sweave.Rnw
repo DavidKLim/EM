@@ -431,11 +431,13 @@ This framework is not without its drawbacks. For one, the corrections for sequen
 
 It is well-known that a majority of the genes in a typical dataset is nondiscriminatory across subtypes. In order to cluster subtypes accurately, it is important to filter out genes that are obviously nondiscriminatory in nature. One common way to do this is by filtering out genes whose median absolute deviation is low \citep{Chung2008}. We utilize this, along with a subsequent wrapper \citep{Ritter2015} in our method to perform pre-filtering and variable selection on the dataset.
 
-We simulated 24 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change ($LFC$), number of clusters ($K$), sample size ($n$), and the proportion of discriminatory genes ($p_{disc}$) in the dataset. We found that in simulations, the number of genes did not have a big effect on performance. So we fixed the number of genes ($g=2000$). We searched over $LFC=(1, 1.5)$, $K=(1, 2, ..., 7)$, and $n=(100, 200)$. We also simulate differences in sequencing depth by taking the size factors estimated from the TCGA Breast Cancer dataset, and incorporating them in our simulations. We then pass them into the FSCseq algorithm as offsets in the IRLS maximization scheme.
+We simulated 24 datasets per condition, and spanned an extensive set of conditions. Variable conditions included log fold change ($LFC$), number of clusters ($K$), sample size ($n$), and the proportion of discriminatory genes ($p_{disc}$) in the dataset. We found that in simulations, the number of genes did not have a big effect on performance, so we fixed the number to 2000 genes ($g=2000$). We ran 24 simulations for each combination of conditions: $LFC=(1, 1.5)$, $K=(2, 4, 6)$, and $n=(100, 200)$, $p_{disc}=(0.05,0.10)$. We also simulated differences in sequencing depth by taking the size factors estimated from the TCGA Breast Cancer dataset, and incorporating them in our simulations. We then pass them into the FSCseq algorithm as offsets in the IRLS maximization scheme.
 
-To explore the behaviors in various realistic settings, we simulated low and moderate baseline log mean expressions and low, medium, high, and very high noise values based on the initial estimates of expression and dispersion on the TCGA Breast Cancer dataset. These values were $\beta=(3.75,6.5)$ and $\phi=(0.15,0.35,0.50,1.00)$, respectively. We explored simulation cases in the log (not log2) scale in our simulations.
+To explore the behaviors in various realistic settings, we simulated low and high baseline log2 mean expressions and low, moderate, moderately high, and very high noise values based on the initial estimates of expression and dispersion on the TCGA Breast Cancer dataset. These values were $\beta=(3.75,6.5)$ and $\phi=(0.15,0.35,0.50,1.00)$, respectively.
 
-We imposed pre-filtering on the simulated datasets, keeping just the features with the top 20\% of MAD scores. We applied FSCseq on each dataset and assessed the performance statistics under varying levels of baseline expression and noise, and across all combinations of variables ($LFC$, $K$, $n_k$). We measured clustering accuracy by the standard Adjusted Rand Index (ARI), which measures the agreement of derived clusters with the simulated clusters. We measured the feature selection performance by sensitivity (sens), or the proportion of discriminatory genes that were correctly determined to be discriminatory, and false positive rate (FPR), or the proportion of nondiscriminatory genes that were incorrectly determined to be discriminatory. We also analyzed the prediction portion of our algorithm by simulating a new dataset with the same number of features and simulated parameters, but with a smaller sample size $n_{pred}=\floor{0.1n}$. We show the full results in Tables \ref{tab:1} \ref{tab:2}.
+We imposed pre-filtering on all simulated datasets, keeping just the features with the top 20\% of MAD scores. We applied FSCseq on each dataset and assessed the performance statistics under varying levels of baseline expression and noise, and across all combinations of variables ($LFC$, $K$, $n_k$). We measured clustering accuracy by the Adjusted Rand Index (ARI), which measures the agreement of derived clusters with the simulated clusters. We measured the feature selection performance by sensitivity (sens), or the proportion of discriminatory genes that were correctly determined to be discriminatory, and false positive rate (FPR), or the proportion of nondiscriminatory genes that were incorrectly determined to be discriminatory. We also analyzed the prediction portion of our algorithm by simulating a new dataset with the same number of features and simulated parameters, but with a smaller sample size $n_{pred}=\floor{0.1n}$. We show the full results in Tables \ref{tab:1} \ref{tab:2}.
+
+We searched a range of $K=1,...,7$ in our order selection step, and searched over a grid of $\lambda=(0.1,0.25,0.5,...,3.5)$ and $\alpha=(0,0.05,...,0.5)$ in our penalty parameter search step.
 
 <<xtable1234, results=tex, echo=FALSE>>==
 library(xtable)
@@ -483,21 +485,21 @@ print(tab1,include.rownames=F, sanitize.text.function=identity,
 tab2 = xtable(table1_EM_35,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderate noise ($\\phi = 0.35$) in simulated datasets on performance.",
               label = "tab:2",na.print="")      # K=3, n=50, g=1000
 print(tab2,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
 
 tab3 = xtable(table1_EM_50,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderately high noise ($\\phi = 0.50$) in simulated datasets on performance.",
               label = "tab:3",na.print="")      # K=3, n=50, g=1000
 print(tab3,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
 
 tab4 = xtable(table1_EM_100,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with very high noise ($\\phi = 1.00$) in simulated datasets on performance.",
               label = "tab:4",na.print="")      # K=3, n=50, g=1000
 print(tab4,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
 
@@ -529,7 +531,7 @@ col <- rep("\\rowcolor[gray]{0.95}", length(rws))
 tab5 = xtable(table2_other_order_15,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low and medium noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM). Fixed $p_{disc}$ = 0.05",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM). Fixed $p_{disc}$ = 0.05",
               label = "tab:5",na.print="")      # K=3, n=50, g=1000
 
 print(tab5,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -537,7 +539,7 @@ print(tab5,include.rownames=F, sanitize.text.function=identity,add.to.row=list(p
 tab6 = xtable(table2_other_order_35,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderate noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
               label = "tab:6",na.print="")      # K=3, n=50, g=1000
 
 print(tab6,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -545,7 +547,7 @@ print(tab6,include.rownames=F, sanitize.text.function=identity,add.to.row=list(p
 tab7 = xtable(table2_other_order_50,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderately high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
               label = "tab:7",na.print="")      # K=3, n=50, g=1000
 
 print(tab7,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -553,7 +555,7 @@ print(tab7,include.rownames=F, sanitize.text.function=identity,add.to.row=list(p
 tab8 = xtable(table2_other_order_100,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
               label = "tab:8",na.print="")      # K=3, n=50, g=1000
 
 print(tab8,include.rownames=F, sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -564,8 +566,8 @@ print(tab8,include.rownames=F, sanitize.text.function=identity,add.to.row=list(p
 tab5 = xtable(table2_other_OA_15,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low and medium noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM).",
-              label = "tab:5",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM).",
+              label = "tab:9",na.print="")      # K=3, n=50, g=1000
 
 print(tab5,include.rownames=F, floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -573,8 +575,8 @@ print(tab5,include.rownames=F, floating.environment = "sidewaystable",
 tab6 = xtable(table2_other_OA_35,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
-              label = "tab:6",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderate noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:10",na.print="")      # K=3, n=50, g=1000
 
 print(tab6,include.rownames=F, floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -582,8 +584,8 @@ print(tab6,include.rownames=F, floating.environment = "sidewaystable",
 tab7 = xtable(table2_other_OA_50,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
-              label = "tab:7",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderately high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:11",na.print="")      # K=3, n=50, g=1000
 
 print(tab7,include.rownames=F, floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -591,8 +593,8 @@ print(tab7,include.rownames=F, floating.environment = "sidewaystable",
 tab8 = xtable(table2_other_OA_100,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
-              label = "tab:8",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:12",na.print="")      # K=3, n=50, g=1000
 
 print(tab8,include.rownames=F, floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -603,8 +605,8 @@ print(tab8,include.rownames=F, floating.environment = "sidewaystable",
 tab5 = xtable(table2_other_ARI_15,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low and medium noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM).",
-              label = "tab:5",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with low noise ($\\phi = 0.15$) in simulated datasets on performance, compared to competing methods iCluster+, average-linkage hierarchical clustering (HC) and K-medoids (KM).",
+              label = "tab:13",na.print="")      # K=3, n=50, g=1000
 
 print(tab5,include.rownames=F, floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -612,8 +614,8 @@ print(tab5,include.rownames=F, floating.environment = "sidewaystable",
 tab6 = xtable(table2_other_ARI_35,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
-              label = "tab:6",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderate noise ($\\phi = 0.35$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:14",na.print="")      # K=3, n=50, g=1000
 
 print(tab6,include.rownames=F,floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -621,8 +623,8 @@ print(tab6,include.rownames=F,floating.environment = "sidewaystable",
 tab7 = xtable(table2_other_ARI_50,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
-              label = "tab:7",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with moderately high noise ($\\phi = 0.50$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:15",na.print="")      # K=3, n=50, g=1000
 
 print(tab7,include.rownames=F, floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -630,8 +632,8 @@ print(tab7,include.rownames=F, floating.environment = "sidewaystable",
 tab8 = xtable(table2_other_ARI_100,
               digits=2,
               table.placement="!h",
-              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with high and very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
-              label = "tab:8",na.print="")      # K=3, n=50, g=1000
+              caption="Effects of high/low simulated log means ($\\beta = 3.75$ and $6.50$) with very high noise ($\\phi = 1.00$) in simulated datasets on performance, compared to competing methods HC and KM.",
+              label = "tab:16",na.print="")      # K=3, n=50, g=1000
 
 print(tab8,include.rownames=F, floating.environment = "sidewaystable",
       sanitize.text.function=identity,add.to.row=list(pos=as.list(rws),command=col))
@@ -643,7 +645,7 @@ print(tab8,include.rownames=F, floating.environment = "sidewaystable",
 \begin{center}
 \includegraphics[width=170mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/sim_bplots_ARI.png}
 \end{center}
-\caption{"Boxplots of ARI of competing methodsacross simulations at low ($\phi=0.15$, top-left), moderate ($\phi=0.35$, top-right), high ($\phi=0.50$, bottom-left), and very high ($\phi=1.00$, bottom-right) noise.}
+\caption{"Boxplots of ARI of competing methodsacross simulations at low ($\phi=0.15$, top-left), moderate ($\phi=0.35$, top-right), moderately high ($\phi=0.50$, bottom-left), and very high ($\phi=1.00$, bottom-right) noise.}
 \label{fig:bplots}
 \end{figure}
 
@@ -651,7 +653,7 @@ print(tab8,include.rownames=F, floating.environment = "sidewaystable",
 \begin{center}
 \includegraphics[width=170mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/select_sim_bplots_ARI.png}
 \end{center}
-\caption{"Boxplots of ARI at fixed case of $K=6$, $\beta=6.5$, $LFC=1$, $n=100$, and $p_{disc}=0.05$ of competing methods at low ($\phi=0.15$, top-left), moderate ($\phi=0.35$, top-right), high ($\phi=0.50$, bottom-left), and very high ($\phi=1.00$, bottom-right) noise.}
+\caption{"Boxplots of ARI at fixed case of $K=6$, $\beta=6.5$, $LFC=1$, $n=100$, and $p_{disc}=0.05$ of competing methods at low ($\phi=0.15$, top-left), moderate ($\phi=0.35$, top-right), moderately high ($\phi=0.50$, bottom-left), and very high ($\phi=1.00$, bottom-right) noise.}
 \label{fig:bplots2}
 \end{figure}
 
@@ -674,7 +676,9 @@ tab9 = xtable(table2,
               digits=2,
               table.placement="!h",
               caption="Clustering, discovery, and prediction performance of variants of EM, as well as iCluster+ (iClust), average-linkage hierarchical clustering (HC), and K-medoids (KM). Each row represents the average across 24 different simulated datasets with true order $K=3$, $n_k=50$, 2000 genes, and 5\\% discriminatory genes with log2 fold change of 1.",
-              label = "tab:9",na.print="",floating.environment = "table*")      # K=3, n=50, g=1000jo
+              label = "tab:17",na.print=""
+              #,floating.environment = "table*"
+              )      # K=3, n=50, g=1000
 print(tab9,include.rownames=T, sanitize.text.function=identity)
 
 @
@@ -706,9 +710,12 @@ We also compared our method (EM) with iCluster+, HC, and KM. Results are given i
 <<xtable10,results=tex,echo=F>>=
 load("C:/Users/limdd/Documents/Research/Real Data/TCGA BRCA/BRCA_compare_res.RData")
 
-tab10 = xtable(summary_table[,1:6],digits=3,caption="ARI, average silhouette values (sil) and p-values from Log-Rank survival test with Chi-square approximation (LRpval) and with permutation-based empirical test (emppval), and the p-value of the Fisher's Exact test on the contingency table of survival events and cluster labels (fisherpval) of analyses performed on TCGA Breast Cancer dataset by FSCseq (EM), iCluster+ (iClust), HC, and KM, compared to the annotated (anno).",
-              label="tab:10",table.placement="H",na.print="",
-              floating.environment = "table*")
+tab10 = xtable(summary_table[,1:6],digits=3,caption="ARI, average silhouette values (sil) and p-values from Log-Rank survival test with Chi-square approximation (LRpval) and with permutation-based empirical test (emppval), and the p-value of the Fisher's Exact test on the contingency table of survival events and cluster labels (fisherpval) of analyses performed on TCGA Breast Cancer dataset by FSCseq (EM) and competing methods compared to the annotated (anno).",
+              label="tab:18",
+              #table.placement="H",
+              na.print=""
+              #,floating.environment = "table*"
+              )
 print(tab10,sanitize.text.function=identity)
 
 @
@@ -753,19 +760,21 @@ We also performed similar analyses on the TCGA Bladder Cancer dataset. This data
 
 Robertson mentions the lower purity levels of the luminal-infiltrated and basal-squamous subtypes, and the higher purity levels of the luminal-papillary subtype. This was evident in our pre-filtering procedure, as 85 of the 86 annotated samples with luminal-infiltrated subtype and 139 out of 147 basal-squamous samples with basal-squamous subtype fell short of our purity threshold of 0.8, while 80 of the 144 annotated samples with luminal-papillary subtype had purity estimates greater than our threshold.
 
-% REGENERATE WITH iCLUSTER+ %
 <<xtable11,results=tex,echo=F>>=
 load("C:/Users/limdd/Documents/Research/Real Data/TCGA BLCA/BLCA_compare_res.RData")
 
 tab11 = xtable(summary_table[,1:6],digits=3,caption="ARI, average silhouette values (sil) and p-values from Log-Rank survival test with Chi-square approximation (LRpval) and with permutation-based empirical test (emppval), and the p-value of the Fisher's Exact test on the contingency table of survival events and cluster labels (fisherpval) of analyses performed on TCGA Bladder Cancer (BLCA) dataset by FSCseq (EM), iCluster+, HC, and KM.",
-              label="tab:11",table.placement="H",na.print="",
-              floating.environment = "table*")
+              label="tab:19",
+              #table.placement="H",
+              na.print=""
+              #,floating.environment = "table*"
+              )
 print(tab11,sanitize.text.function=identity)
 
 @
 
 % EDIT FROM HERE %
-The FSCseq EM order selection step yielded $K=4$: one extra cluster than the annotated. This over-estimation of the order is due to the lower purity threshold on the BLCA samples, as compared to the BRCA samples. Regardless of the order misspecification, the Chi-square approximation logrank p-value of the EM clusters was $0.067$, which was significantly lower than the annotated clusters' p-value of $0.567$. iCluster+ overspecified the order further as $K=5$ and showed a logrank p-value of $0.126$, which was better than the annotations, but worse than FSCseq. The empirical p-value was able to be derived only in FSCseq and iCluster+ clusters, and FSCseq outperformed iCluster+. Although HC and KM both chose $K=2$ again, as in the BRCA dataset, the KM clusters actually yielded a smaller p-value than the annotated clusters. Also, although the HC yielded the highest average silhouette value, we found that the clustering was extremely uneven, with 96 samples in Cluster 1 and just three samples in Cluster 2. Additionally, the logrank test yielded the highest p-value for the HC clusters. This highlights the limitations of the silhouette value in groups with very small sample size, as the silhouette value will be highly variable and dependent on a few data points.
+The FSCseq order selection step yielded $K=4$: one extra cluster than the annotated. This over-estimation of the order is due to the lower purity threshold on the BLCA samples, as compared to the BRCA samples. Regardless of the order misspecification, the Chi-square approximation logrank p-value of the EM clusters was $0.067$, which was significantly lower than the annotated clusters' p-value of $0.567$. iCluster+ overspecified the order further as $K=5$ and showed a logrank p-value of $0.126$, which was better than the annotations, but worse than FSCseq. The empirical p-value was able to be derived only in FSCseq and iCluster+ clusters, and FSCseq outperformed iCluster+. Although HC and KM both chose $K=2$ again, as in the BRCA dataset, the KM clusters actually yielded a smaller p-value than the annotated clusters. Also, although the HC yielded the highest average silhouette value, we found that the clustering was extremely uneven, with 96 samples in Cluster 1 and just three samples in Cluster 2. Additionally, the logrank test yielded the highest p-value for the HC clusters. This highlights the limitations of the silhouette value in groups with very small sample size, as the silhouette value will be highly variable and dependent on a few data points.
 
 Our method determined a total of 7726 genes to be discriminatory. \ref{fig:5} shows a heatmap of these genes, ordered by the derived clusters. 
 
