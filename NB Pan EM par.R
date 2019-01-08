@@ -322,6 +322,7 @@ EM_run <- function(y, k,
         phi[j,] <- par_X[[j]]$phi_j
       } else if(cl_phi==0){
         phi_g[j] <- (par_X[[j]]$phi_j)[1]
+        phi[j,] = rep(phi_g[j],k)
       }
       
       # Ad hoc averaging of cluster log means when nondiscriminatory
@@ -343,13 +344,18 @@ EM_run <- function(y, k,
       phi_list[[a]] <- phi_g
     }
     
-    if(a>5){
+    if(a>6){
       for(j in 1:g){
         if(cl_phi==1){
           diff_phi[a,j]=mean(abs(phi_list[[a]][j,]-phi_list[[a-5]][j,])/phi_list[[a-5]][j,])
         } else if(cl_phi==0){
           diff_phi[a,j]=abs(phi_list[[a]][j]-phi_list[[a-5]][j])/phi_list[[a-5]][j]
         }
+        
+        if(is.infinite(diff_phi[a,j]) | is.na(diff_phi[a,j])){
+          diff_phi[a,j]=1
+        }
+        
         if(diff_phi[a,j]<0.01){
           est_phi[j]=0
         } else{
@@ -630,7 +636,7 @@ predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=
   init_alpha=X$alpha
   
   
-  cl_phi=!is.null(dim(init$phi))  # dimension of phi is null when gene-wise (vector)
+  cl_phi=!is.null(dim(init_phi))  # dimension of phi is null when gene-wise (vector)
   
   init_size_factors = new_sizefactors
   offset=log2(init_size_factors) + offsets

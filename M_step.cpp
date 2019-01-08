@@ -446,14 +446,14 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             }
         }
         
-        if(i>0){
+        if(i>1){
             double SSE_beta=0;
             double SSE_phi=0;
             for(int cc=0; cc<k; cc++){
               SSE_beta += pow(temp_beta(i,cc)-temp_beta(i-1,cc),2);
               SSE_phi += pow(temp_phi(i,cc)-temp_phi(i-1,cc),2);
             }
-            Rprintf("SSE beta: %f, SSE phi: %f\n",SSE_beta,SSE_phi);
+            /* Rprintf("SSE beta: %f, SSE phi: %f\n",SSE_beta,SSE_phi); */
             if(SSE_beta<IRLS_tol){
               continue_beta=0;
             }
