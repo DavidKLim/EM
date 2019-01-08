@@ -434,7 +434,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       pref = sprintf("order%d",ii)
       start=as.numeric(Sys.time())
       X<-EM(y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,
-            true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # alpha = 1: all L1. No penalty here
+            true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # alpha = 0: all L1. No penalty here
       end=as.numeric(Sys.time())
       list_BIC[aa,2]<-X$BIC
       if(list_BIC[aa,1]==true.K){
@@ -590,6 +590,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       X_pred = X
     
       n_pred = floor(0.1*n)           # simulate data for 10% of original n
+      #n_pred = 10                     # FIXED number of samples to predict
       SF_pred = size_factors[1:n_pred]
       
       if(disp=="cluster"){    # check for whether init_phi is of dimension 1
