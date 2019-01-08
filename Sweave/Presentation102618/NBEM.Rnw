@@ -4,6 +4,8 @@
 \usepackage{amsmath}
 \usepackage{mathtools}
 \usepackage{graphicx}
+\usepackage{caption}
+\captionsetup{font=footnotesize}
 
 \DeclarePairedDelimiter\abs{\lvert}{\rvert}%
 \DeclarePairedDelimiter\norm{\lVert}{\rVert}%
@@ -81,7 +83,6 @@
   \item Less noise and greater dynamic range of detection than microarray (Zhao 2014, Hrdlickova 2016)
   \item Independent of any normal-approximating transformation: not one uniformly superior (Noel-MacDonnell 2018)
   \end{itemize}
-\item No true method designed specifically for this data
 \item Normalization step to adjust for sequencing depth
   \begin{itemize}
   \item Most normalization methods (edgeR, DESeq2) are model-based
@@ -98,6 +99,8 @@
   \item Assumes Poisson distribution of count data
   \end{itemize}
 \item Hierarchical clustering and K-medoids (Jaskowiak 2018)
+\item NB.MClust (Li 2018)
+\item mclust (Scrucca 2016) on transformed data
 \end{itemize}
 \end{frame}
 
@@ -126,7 +129,7 @@
 \item Simultaneous sample clustering and feature selection
 \item Model-based framework consistent with widely-used normalization methods
 \item Cluster prediction of new samples based on fitted model
-\item Can easily adjust for effects of known biases into existing algorithm
+\item Can potentially adjust for effects of known biases into existing algorithm
   \begin{itemize}
   \item Batch effects, gender, age, etc.
   \end{itemize}
@@ -230,21 +233,23 @@ plot(list_BIC,ylab="BIC",xlab="K",main="Plot of BIC vs. order",type='l')
 %%% 3. Simulations %%%
 \section{Simulations}
 \begin{frame}{Set-up}
-Fixed: $g=2000, p_{disc}=0.05$ \\~\\
+Fixed: $g=2000$ \\~\\
 Variable:\\
 $\beta=(3.75, 6.5)$ \\
-$\phi=(0.15, 0.35)$  \\
-$K=(2,4)$ \\
-$n_{per}=(25,50)$ \\
-$LFC=(1,2)$ \\~\\
+$\phi=(0.15, 0.35, 0.50, 1.00)$  \\
+$K=(2, 4, 6)$ \\
+$n=(100, 200)$ \\
+$p_{disc}=0.05$ \\
+$LFC=(1, 2)$ \\~\\
 \end{frame}
 
 <<echo=FALSE,print=FALSE>>=
 library(xtable)
-load("C:/Users/limdd/Documents/Research/Simulations/elasticSCAD/24sims/sim_res.RData")
+  load("C:/Users/limdd/Documents/Research/Simulations/elasticSCAD/24sims/sim_res.RData")
 
+table1[,9] = table1[,9]*2000       # number of disc genes g_{disc}
 #head(table1)
-colnames(table1) = c("$\\beta$","$\\phi$","LFC","n","K","$K_{FSC}$","$OA_{FSC}$","$p_{disc}$","$\\hat{p}_{disc}$","$ARI_{FSC}$","sens","FPR","$sens_{pre}$","$FPR_{pre}$","PA","$K_{iCl}$","$OA_{iCl}$","$ARI_{iCl}$","$K_{HC}$","$OA_{HC}$","$ARI_{HC}$","$K_{KM}$","$OA_{KM}$","$ARI_{KM}$","$K_{NBMB}$","$OA_{NBMB}$","$ARI_{NBMB}$","$K_{lMC}$","$OA_{lMC}$","$ARI_{lMC}$","$K_{vMC}$","$OA_{vMC}$","$ARI_{vMC}$","$K_{rMC}$","$OA_{rMC}$","$ARI_{rMC}$")
+colnames(table1) = c("$\\beta$","$\\phi$","LFC","n","K","$K_{FSC}$","$OA_{FSC}$","$p_{disc}$","$g_{disc}$","$ARI_{FSC}$","sens","FPR","$sens_{pre}$","$FPR_{pre}$","PA","$K_{iCl}$","$OA_{iCl}$","$ARI_{iCl}$","$K_{HC}$","$OA_{HC}$","$ARI_{HC}$","$K_{KM}$","$OA_{KM}$","$ARI_{KM}$","$K_{NBMB}$","$OA_{NBMB}$","$ARI_{NBMB}$","$K_{lMC}$","$OA_{lMC}$","$ARI_{lMC}$","$K_{vMC}$","$OA_{vMC}$","$ARI_{vMC}$","$K_{rMC}$","$OA_{rMC}$","$ARI_{rMC}$")
 
 table1_EM_15=table1[c(1:24,97:120),c(1:13,15)][,-2]
 table1_EM_35=table1[c(25:48,121:144),c(1:13,15)][,-2]
@@ -276,20 +281,24 @@ table4_high_phi = table_high_phi[table_high_phi$K==4,]
 @
 
 \begin{frame}{MAD Pre-filtering}
+\begin{fig}
 \begin{center}
-<<echo=FALSE,fig=TRUE,height=4,width=8>>=
-x1=table1$'$sens_{pre}$'[table1[,2]==0.15]
-x2=table1$'$sens_{pre}$'[table1[,2]==0.35]
-x3=table1$'$sens_{pre}$'[table1[,2]==0.50]
-x4=table1$'$sens_{pre}$'[table1[,2]==1.00]
-colors = table1$K[table1[,2]==0.15]
+<<echo=FALSE,fig=TRUE,height=4.8,width=8>>=
+x1=table1$'$sens_{pre}$'[table1[,2]==0.15 & table1$K==2]
+x2=table1$'$sens_{pre}$'[table1[,2]==0.35 & table1$K==2]
+x3=table1$'$sens_{pre}$'[table1[,2]==0.50 & table1$K==2]
+x4=table1$'$sens_{pre}$'[table1[,2]==1.00 & table1$K==2]
+
+colors = 1:5
+
+select = c(2,3,5,9)
 
 plot(x=c(0.15,0.35,0.5,1),y=c(x1[1],x2[1],x3[1],x4[1]),type='b',col=colors[1],xlab=expression(phi),ylab="Sensitivity",
-     ylim=c(.2,1),main=expression(paste("Plot of Sensitivity vs. ", phi," of Top 20% MAD Pre-filtering of Genes")))
-for(i in 2:length(x1)){
-  points(x=c(0.15,0.35,0.5,1),y=c(x1[i],x2[i],x3[i],x4[i]),type='b',col=colors[i])
+     ylim=c(.25,1),main=expression(paste("Plot of Sensitivity vs. ", phi," of Top 20% MAD Pre-filtering of Genes")))
+for(i in 1:length(select)){
+  points(x=c(0.15,0.35,0.5,1),y=c(x1[select[i]],x2[select[i]],x3[select[i]],x4[select[i]]),type='b',col=colors[i+1])
 }
-legend("bottomleft",col=c("red","blue"),legend=c("K=2","K=4"),lty=1)
+legend("bottomleft",col=1:5,legend=c("base","n=200",expression(paste(p[disc],"=0.1")),"LFC=2",expression(paste(beta,"=6.5"))),lty=1)
 
 # boxplot(table1$Filt_sens[table1[,2]==0.15],
 #         table1$Filt_sens[table1[,2]==0.35],
@@ -298,93 +307,70 @@ legend("bottomleft",col=c("red","blue"),legend=c("K=2","K=4"),lty=1)
 #         names=c("0.15","0.35","0.50","1.00"),xlab="Phi",ylab="Sensitivity",main="Boxplot of Sensitivity of Top 20\\% MAD Pre-filtering of Genes")
 @
 \end{center}
+\end{figure}
+Plot of MAD pre-filtering sensitivity of discovering discriminatory genes vs noise at $K=2$. Base case (base) is $\beta=3.75$, $n=100$, $p_{disc}=0.05$, $LFC=1$.
 \end{frame}
 
-\begin{frame}{Low noise = great clustering performance}
-<<xtable1, results=tex, echo=FALSE>>=
-tab1=xtable(rbind(table2[,c("$\\beta$","$\\phi$","K","OA","ARI")][c(1,5,17,21),],
-                  table4[,c("$\\beta$","$\\phi$","K","OA","ARI")][c(1,5,17,21),]),
-            digits=3,
-            table.placement="!h",
-            caption="Performance metrics at low to moderate noise. Performance is perfect through all simulated datasets",
-            label = "tab:1",na.print="")
-print(tab1,include.rownames=F, sanitize.text.function=identity)
-@
-Perfect order selection and ARI. $n_{K}=25$, $LFC=1$
-\end{frame}
-
-\begin{frame}{Increasing n improves Order Selection}
+\begin{frame}{Increasing n improves Clustering Performance}
 <<xtable2, results=tex, echo=FALSE>>=
-tab2=xtable(table4_high_phi[5:8,c("LFC","$n_{K}$","K","OA","ARI")],
+tab1=xtable(table4_high_phi[1:4,c("n","$p_{disc}$","$K_{FSC}$","$OA_{FSC}$","$ARI_{FSC}$")],
             digits=3,
             table.placement="!h",
             caption="Effect of increasing n: better order accuracy and ARI",
+            label = "tab:1",na.print="")
+print(tab1,include.rownames=F, sanitize.text.function=identity)
+@
+$\beta=3.75, \phi=1, K=4, LFC=1$
+\end{frame}
+
+\begin{frame}{Gene discovery = better with higher $\beta$}
+<<xtable3, results=tex, echo=FALSE>>=
+# table1[rep(1:96,each=2)+rep(c(0,96),times=96),c("$\\beta$","$\\phi$","n","$p_{disc}$","sens","FPR")]   # effect of increase in beta
+table_FS = table1[rep(c(25:28,49:52),each=2)+rep(c(0,96),times=8),c("$\\beta$","$\\phi$","n","$p_{disc}$","sens","$sens_{pre}$","FPR")]
+tab2=xtable(table_FS[table_FS$n==200,-3],
+            digits=3,
+            table.placement="!h",
+            caption="Sensitivity and FPR both generally improve as LFC increases, especially in noisier datasets.",
             label = "tab:2",na.print="")
 print(tab2,include.rownames=F, sanitize.text.function=identity)
 @
-$true.K=4, \beta=3.75, \phi=1$ (high noise)
+$K=2, n=200, LFC=1$ \\
+Gene discovery performance highly dependent on pre-filtering performance.
 \end{frame}
 
-\begin{frame}{Gene discovery with high noise = better with higher $\beta$}
+\begin{frame}{Gene discovery = better with higher $n$}
 <<xtable3, results=tex, echo=FALSE>>=
-tab3=xtable(table1[c(9,41,10,42,17,49,18,50),c("$\\beta$","$\\phi$","$n_{K}$","$p_{disc}$","sens","false.pos")],
+# table1[rep(1:96,each=2)+rep(c(0,96),times=96),c("$\\beta$","$\\phi$","n","$p_{disc}$","sens","FPR")]   # effect of increase in beta
+tab3=xtable(table_FS[table_FS$'$\\beta$'==6.5,-1],
             digits=3,
             table.placement="!h",
-            caption="Sensitivity and FPR both generally improve as LFC increases, especially in noisier datasets. Higher K => more samples => better gene discovery performance",
+            caption="Sensitivity and FPR both generally improve as n increases.",
             label = "tab:3",na.print="")
 print(tab3,include.rownames=F, sanitize.text.function=identity)
 @
-$true.K=2, LFC=1$
+$\beta=6.5, K=2, LFC=1$
 \end{frame}
 
-\begin{frame}{Increasing K or LFC = better gene discovery}
-<<xtable4, results=tex, echo=FALSE>>=
-tab4=xtable(table1[c(17,19,18,20,21,23,22,24),c("true.K","$n_{K}$","$p_{disc}$","sens","false.pos")],
-            digits=3,
-            table.placement="!h",
-            caption="Sensitivity and FPR both generally improve as LFC increases, especially in the higher noise setting ($\\phi=0.5$) ",
-            label = "tab:4",na.print="")
-print(tab4,include.rownames=F, sanitize.text.function=identity)
-@
-$\beta=3.75, \phi=0.5$
-\end{frame}
-
-\begin{frame}{Increasing $\phi$ decreases sensitivity of gene discovery}
+\begin{frame}{Increasing $\phi$ decreases clustering and gene selection performance}
 <<xtable5, results=tex, echo=FALSE>>=
-tablephi1=table1[rep(1:8,each=4)+rep(c(0,8,16,24),times=8),c("$\\beta$","$\\phi$","LFC","$n_{K}$","true.K","K","OA","ARI","$p_{disc}$","sens","false.pos")]
-tablephi2=table1[rep(1:8,each=4)+rep(c(0,8,16,24)+32,times=8),c("$\\beta$","$\\phi$","LFC","$n_{K}$","true.K","K","OA","ARI","$p_{disc}$","sens","false.pos")]
-tab5=xtable(tablephi1[5:8,c("$\\phi$","$p_{disc}$","sens","false.pos")],
+tablephi1=table1[rep(1:24,each=4)+rep(c(0,24,48,72),times=24),c("$\\beta$","$\\phi$","LFC","n","K","$K_{FSC}$","$OA_{FSC}$","$ARI_{FSC}$","$p_{disc}$","sens","FPR","$g_{disc}$")]
+tablephi2=table1[rep(1:24,each=4)+rep(c(0,24,48,72)+96,times=24),c("$\\beta$","$\\phi$","LFC","n","K","$K_{FSC}$","$OA_{FSC}$","$ARI_{FSC}$","$p_{disc}$","sens","FPR","$g_{disc}$")]
+tab5=xtable(tablephi1[37:40,c("$\\phi$","$K_{FSC}$","$OA_{FSC}$","$ARI_{FSC}$","sens","FPR","$g_{disc}$")],
             digits=3,
             table.placement="!h",
             caption="Effect of increased simulated noise on gene discovery. Performance decreases, as it is harder to distinguish differences between clusters in noisier datasets",
             label = "tab:5",na.print="")
 print(tab5,include.rownames=F, sanitize.text.function=identity)
 @
-$n_K=50, LFC=1, true.K=2, \beta=3.75$
-\end{frame}
-
-\begin{frame}{Increasing $\phi$ decreases clustering performance}
-<<xtable6, results=tex, echo=FALSE>>=
-tab6=xtable(tablephi1[c(21:24),c("$\\phi$","K","OA","ARI","sens","false.pos")],
-            digits=3,
-            table.placement="!h",
-            caption="Effect of increased simulated noise on clustering performance. Clustering performance was generally very good, and began to show inaccuracies only at very high simulated noise ($\phi=1.00$)",
-            label = "tab:6",na.print="")
-print(tab6,include.rownames=F, sanitize.text.function=identity)
-@
-$n_K=50, LFC=1, true.K=4, \beta=3.75$
+$\beta=3.75, K=4, n=200, p_{disc}=0.05, LFC=1$
 \end{frame}
 
 \begin{frame}{Order Selection = very important!}
-<<xtable7, results=tex, echo=FALSE>>=
-tab7=xtable(table1[table1[,"ARI"]==table1[,"OA"] & table1[,"OA"]!=1,c("$\\beta$","$\\phi$","LFC","$n_{K}$","K","OA","ARI","sens")],
-            digits=3,
-            table.placement="!h",
-            caption="Performance of clustering and gene discovery are highly dependent on the order being selected correctly. Many cases where performance is perfect when order is correctly selected, while very bad performance if order is incorrectly selected.",
-            label = "tab:7",na.print="")
-print(tab7,include.rownames=F, sanitize.text.function=identity)
+Correlation between OA and ARI:\\
+<<results=tex,echo=FALSE>>=
+cor(table1$'$ARI_{FSC}$',table1$'$OA_{FSC}$')
 @
-$true.K=2$
+\\
 \end{frame}
 
 \begin{frame}{Cluster Prediction Performance}     % Prediction accuracy was 100% for correctly selected orders, no matter what other params?!
@@ -393,47 +379,59 @@ $true.K=2$
 \item Predictions performed just on simulation runs that correctly selected the order
 \item Clustering on newly simulated samples, based on fitting parameter estimates
   \begin{itemize}
-  \item $100\%$ accuracy of subtype prediction when order was correctly selected
+  \item Average of $99.9\%$ accuracy of subtype prediction (across all conditions) when order was correctly selected
   \end{itemize}
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Order Selection of Other Methods}
+\small\addtolength{\tabcolsep}{-3pt}
 <<xtable8, results=tex, echo=FALSE>>=
-tab8 = xtable(table1[c(61:64),c("LFC","$n_{K}$","K","iK","$K_{hc}$","$K_{med}$")],
+tab8 = xtable(table1[c(61:64),c("LFC","n","$K_{FSC}$","$K_{iCl}$","$K_{HC}$","$K_{KM}$","$K_{NBMB}$","$K_{lMC}$","$K_{vMC}$","$K_{rMC}$")],
             digits=3,
             table.placement="!h",
-            caption="Select examples of order selected by iCluster+, HC, and K-medoids. In general, order selection by BIC with EM seems to perform much better than other methods. Note: K-medoids could not search K=1.",
+            caption="Select examples of order selected by iCluster+ (iCl), hierarchical clustering (HC), K-medoids (KM), NB.MClust (NBMB), and mclust performed on log, variance-stabilizing, and rlog transformations (lMC, vMC, and rMC, respectively). Note: iCl, KM, and NBMB did not have an option to search K=1.",
             label = "tab:8",na.print="")
 print(tab8,include.rownames=F, sanitize.text.function=identity)
 @
-$\beta=6.50, \phi=1.00, true.K=4$
+$\beta=6.50, \phi=1.00, K=4$
 \end{frame}
 
 \begin{frame}{Clustering Performance of Other Methods}
+\small\addtolength{\tabcolsep}{-4pt}
 <<xtable9, results=tex, echo=FALSE>>=
-tab9 = xtable(table1[c(61:64),c("LFC","$n_{K}$","ARI","iARI","$ARI_{hc}$","$ARI_{med}$")],
+tab9 = xtable(table1[c(61:64),c("LFC","n","$ARI_{FSC}$","$ARI_{iCl}$","$ARI_{HC}$","$ARI_{KM}$","$ARI_{NBMB}$","$ARI_{lMC}$","$ARI_{vMC}$","$ARI_{rMC}$")],
             digits=3,
             table.placement="!h",
-            caption="Select examples of clustering performance by iCluster+, HC and K-medoids. iCluster+ acts sporadically because of a lack of a systemized way of selecting the order. EM generally seems to outperform the other methods in clustering performance.",
+            caption="Select examples of clustering performance by competing methods. At this high level of noise, iCl, HC, and KM on average significantly underselected $K=2$. Overall, out of the transformed mclust runs, lMC seems to perform best. FSCseq outperforms all other methods across the board.",
             label = "tab:9",na.print="")
 print(tab9,include.rownames=F, sanitize.text.function=identity)
 @
-$\beta=6.50, \phi=1.00, true.K=4$
+$\beta=6.50, \phi=1.00, K=4$
 \end{frame}
 
+\begin{frame}
+\begin{figure}
+\begin{center}
+\includegraphics[width=120mm]{C:/Users/limdd/Documents/Research/Sweave/Project1/select_sim_bplots_ARI.png}
+\end{center}
+\caption{"Boxplots of ARI at fixed case of $K=6$, $\beta=6.5$, $LFC=1$, $n=100$, and $p_{disc}=0.05$ of competing methods at low ($\phi=0.15$, top-left), moderate ($\phi=0.35$, top-right), moderately high ($\phi=0.50$, bottom-left), and very high ($\phi=1.00$, bottom-right) noise.}
+\label{fig:bplots2}
+\end{figure}
+\end{frame}
 %%% 4. Real Data %%%
 \section{Real Data}
 
 \begin{frame}{TCGA BRCA}
 \begin{itemize}
-\item Excluded Normal-like subtype ($n=8$)
-\item Pre-filtered low count genes, and selected top 10\%, top 1000 median absolute deviation (MAD) genes
+\item Excluded Normal-like ($n=3$) and Her2 ($n=6$) subtypes
+\item Pre-filtered low purity ($purity < 0.9$) samples
+\item Pre-filtered low count genes, and selected top 50\% MAD genes
   \begin{itemize}
-  \item Only 30 of 50 PAM50 genes were in the top 25\% MAD
+  \item 47 of 50 PAM50 genes were in the top 50\% MAD
   \end{itemize}
-\item 4 subtypes, $n=513$, $g=1969$
-\item Clinical survival: 62 OS (overall survival) events used as survival event. Nonmissing survival times from 79 subjects. NOTE: Using vital status (79) gave very different pvalues (all non-significant)
+\item 3 subtypes, $n=123$, $g=9062$
+\item Clinical survival: Nonmissing survival times from 21 of 123 subjects.
   \begin{itemize}
   \item Not many survival endpoints to analyze.
   \end{itemize}
@@ -454,10 +452,11 @@ $\beta=6.50, \phi=1.00, true.K=4$
 
 \begin{frame}{TCGA BRCA Results}
 <<xtable10,results=tex,echo=F>>=
-load("C:/Users/limdd/Documents/Research/Sweave/Presentation102618/Results/BRCA_table.RData")
-BRCA_tab = summary_table[,c(9,1:5)]
-BRCA_tab[1,2]=NA
-tab10 = xtable(BRCA_tab,digits=3,caption="Cluster analyses and clinical analyses in clustering derived by CSEM, iCluster, HC, Kmed using top 10\\% and top 1000 MAD genes. Empirical pvalue unavailable for clustering with more than 95\\% of samples in the same cluster due to sampling issues.",
+#load("C:/Users/limdd/Documents/Research/Sweave/Presentation102618/Results/BRCA_table.RData")
+load("C:/Users/limdd/Documents/Research/Real Data/TCGA BRCA/BRCA_compare_res.RData")
+BRCA_tab = summary_table[,1:6]      # Exclude Hazards Ratios 
+BRCA_tab = BRCA_tab[,-3]            # exclude silhouette values
+tab10 = xtable(BRCA_tab,digits=3,caption="Cluster analyses and clinical analyses in clustering derived by FSCseq and competing methods, compared to the annotated cluster labels (anno).",
               label="tab:10",table.placement="H",na.print="",
               floating.environment = "table")
 print(tab10,sanitize.text.function=identity,table.placement="H")
@@ -466,19 +465,21 @@ print(tab10,sanitize.text.function=identity,table.placement="H")
 
 \begin{frame}{TCGA BLCA}
 \begin{itemize}
-\item Included less frequent subtypes Neuronal ($n=20$) and Luminal ($n=26$)
-\item Pre-filtered low count genes, and selected top 10\% median absolute deviation (MAD) genes
-\item 5 subtypes, $n=408$, $g=1967$
-\item Clinical survival: 180 survival events of 408 samples, nonmissing survival times from 178 of these events.
+\item Excluded Luminal-infiltrated ($n=1$) and Luminal ($n=4$) subtypes
+\item Pre-filtered low purity ($purity < 0.8$) samples
+\item Pre-filtered low count genes, and selected top 50\% MAD genes
+\item 3 subtypes, $n=99$, $g=8874$
+\item Clinical survival: Nonmissing survival times from 29 of 99 subjects.
 \end{itemize}
 \end{frame}
 
 \begin{frame}{TCGA BLCA Results}
 <<xtable11,results=tex,echo=F>>=
-load("C:/Users/limdd/Documents/Research/Sweave/Presentation102618/Results/BLCA_table.RData")
-BLCA_tab = summary_table[,c(10,1:5)]
-BLCA_tab[1,2]=NA
-tab11 = xtable(BLCA_tab,digits=3,caption="Cluster analyses and clinical analyses in clustering derived by CSEM, iCluster, HC, Kmed using top 10\\% and top 1000 MAD genes. Empirical pvalue unavailable for clustering with more than 95\\% of samples in the same cluster due to sampling issues.",
+#load("C:/Users/limdd/Documents/Research/Sweave/Presentation102618/Results/BLCA_table.RData")
+load("C:/Users/limdd/Documents/Research/Real Data/TCGA BLCA/BLCA_compare_res.RData")
+BLCA_tab = summary_table[,1:6]      # Exclude Hazards Ratios
+BLCA_tab = BLCA_tab[,-3]            # Exclude silhouette values
+tab11 = xtable(BLCA_tab,digits=3,caption="Cluster analyses and clinical analyses in clustering derived by FSCseq and competing methods, compared to the annotated cluster labels (anno).",
               label="tab:11",table.placement="H",na.print="",
               floating.environment = "table")
 print(tab11,sanitize.text.function=identity,table.placement="H")
@@ -489,17 +490,17 @@ print(tab11,sanitize.text.function=identity,table.placement="H")
 \section{Discussion}
 \begin{frame}{Conclusions}
 \begin{itemize}
-\item CSEM outperforms competitors in clustering RNA-seq in simulations, and challenges methods already used in real data
-\item Gene discovery performance dependent on cluster separation (LFC)
+\item FSCseq outperforms competitors in clustering RNAseq in simulations, and challenges methods already used in real data
+\item Gene discovery performance highly dependent on cluster separation (LFC)
 \item Order selection problem difficult but very significant
-\item It may be better to simulate cluster separation (LFC) adaptive to the cluster log mean
-\item As amount of samples ($n$) increases, clustering performance will increase
+\item As number of samples ($n$) increases, clustering performance will increase
 \item Chi-square approximation Log-rank test used to measure efficacy of clustering needs to be questioned
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Future Directions}
 \begin{itemize}
+\item Pre-filtering by MAD can be limiting factor in gene discovery
 \item Adjust for purity and other known biases
 \item Incorporate gene-to-gene correlation
 \item Extend to integrative analysis of multiple omics
