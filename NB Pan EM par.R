@@ -128,7 +128,10 @@ EM<-function(y, k,
   cat("True clusters:\n")
   write.table(true_clusters,quote=F,col.names=F)
   
-  init_Tau=sqrt(g)
+  init_Tau=1
+  if(CEM){
+    init_Tau=sqrt(g)
+  }
   if(k==1){
     init_cls=rep(1,n)
   }
@@ -178,8 +181,10 @@ EM<-function(y, k,
     cat("FINAL INITIALIZATION:\n")
     cat(paste(colnames(all_init_cls)[fit_id],"\n"))
     init_cls = all_init_cls[,fit_id[1]]
-    cat("FINAL TAU VALUE:\n")
-    cat(paste(init_Tau,"\n"))
+    if(CEM){
+      cat("FINAL TAU VALUE:\n")
+      cat(paste(init_Tau,"\n"))
+    }
   }
   
   results=EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
@@ -254,7 +259,7 @@ EM_run <- function(y, k,
   
   # For use in CEM in E step #
   Tau = init_Tau
-  cat(paste("Tau =",Tau,"\n"))
+  if(CEM){cat(paste("Tau =",Tau,"\n"))}
   
   phi_g = rep(0,times=g)
   DNC=0
