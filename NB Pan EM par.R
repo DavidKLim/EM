@@ -81,7 +81,7 @@ EM<-function(y, k,
              init_parms=FALSE,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
              init_phi=matrix(0,nrow=nrow(y),ncol=k),
-             init_cls=NA,
+             init_cls=NA, n_rinits=50,
              disp=c("gene","cluster"),
              method=c("EM","CEM"),
              prefix="", dir="NA"){
@@ -97,8 +97,8 @@ EM<-function(y, k,
   # init_parms: TRUE if initial coefficient estimates/dispersion estimates are input
   # init_coefs & init_phi: Initial estimates, if applicable
   # disp = c(gene, cluster), depending on whether dispersions are gene-specific or cluster-specific
-  # cls_init: Initial clustering
-  # init_Tau: only applicable when CEM = TRUE
+  # init_cls: Initial clustering
+  # n_rinits: Number of initial clusterings searched with maxit=15. More initializations = more chance to attain global max
   
   if(alpha==1){
     stop("alpha must be less than 1; choose a smaller number instead")
@@ -144,7 +144,7 @@ EM<-function(y, k,
     
     #TESTING RANDOM CLUSTERING
     
-    r_it=25
+    r_it=n_rinits
     rand_inits = matrix(0,nrow=n,ncol=r_it)
     
     for(r in 1:r_it){
