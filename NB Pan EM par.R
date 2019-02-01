@@ -81,7 +81,7 @@ EM<-function(y, k,
              init_parms=FALSE,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
              init_phi=matrix(0,nrow=nrow(y),ncol=k),
-             init_cls=NA, n_rinits=50,
+             init_cls=NA, n_rinits=50, maxit_inits=15,
              disp=c("gene","cluster"),
              method=c("EM","CEM"),
              prefix="", dir="NA"){
@@ -171,7 +171,7 @@ EM<-function(y, k,
       
       fit = EM_run(y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
                    init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                   cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,maxit_EM=15)
+                   cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,maxit_EM=maxit_inits)
       all_fits [[i]] = fit
       init_cls_BIC[i] <- fit$BIC
     }
@@ -243,6 +243,8 @@ EM_run <- function(y, k,
   theta_list <- list()            # temporary to hold all K x K theta matrices across EM iterations
   temp_list <- list()             # store temp to see progression of IRLS
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
+  coefs_list <- list()
+  LFCs = matrix(0,nrow=g,ncol=maxit_EM)
   
   offset=log2(size_factors) + offsets
   #offset=rep(0,times=n)            # no offsets
@@ -263,6 +265,8 @@ EM_run <- function(y, k,
   
   phi_g = rep(0,times=g)
   DNC=0
+  
+  disc_ids_list = list()
   disc_ids=rep(T,g)
   
   diff_phi=matrix(0,nrow=maxit_EM,ncol=g)
@@ -307,7 +311,7 @@ EM_run <- function(y, k,
     
     Mstart=as.numeric(Sys.time())
     for(j in 1:g){
-      if((Tau<=1 & a>=5 & all(theta_list[[j]]==0))){next}
+      if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
       y_j = as.integer(y[j,])
       par_X[[j]] <- M_step(j=j, a=a, y_j=y_j, all_wts=wts, offset=offset,
                            k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],
@@ -319,7 +323,7 @@ EM_run <- function(y, k,
     
     
     for(j in 1:g){
-      if((Tau<=1 & a>=5 & all(theta_list[[j]]==0))){next}
+      if(Tau<=1 & a>5){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
@@ -342,6 +346,7 @@ EM_run <- function(y, k,
     for(j in 1:g){
       disc_ids[j]=any(theta_list[[j]]!=0)
     }
+    disc_ids_list[[a]] = disc_ids
     
     if(cl_phi==1){
       phi_list[[a]] <- phi
@@ -369,6 +374,10 @@ EM_run <- function(y, k,
       }
       cat(paste("Avg % diff in phi est (across 5 its) gene 1 = ",diff_phi[a,1],"\n"))
     }
+    
+    coefs_list[[a]] = coefs
+    LFCs[,a] = (rowMax(coefs)-rowMin(coefs))/(k-1)
+    
     
     
     # update on pi_hat, and UB & LB on pi
@@ -622,7 +631,7 @@ EM_run <- function(y, k,
                lambda=lambda,
                alpha=alpha,
                size_factors=size_factors,
-               norm_y=norm_y,DNC=DNC)
+               norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list)
   return(result)
   
 }
