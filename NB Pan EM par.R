@@ -12,6 +12,7 @@ library(Rcpp)
 library(RcppArmadillo)
 library(pryr)
 library(mclust)
+library(Biobase)
 
 sourceCpp("M_step.cpp")
 
@@ -76,7 +77,7 @@ EM<-function(y, k,
              lambda=0,alpha=0,
              size_factors=rep(1,times=ncol(y)),
              norm_y=y,
-             purity=rep(1,ncol(y)),offsets=0,              # Offsets: effect of log(covariate) on count #
+             purity=rep(1,ncol(y)),offsets=rep(0,ncol(y)),              # Offsets: effect of log(covariate) on count #
              true_clusters=NA, true_disc=NA,
              init_parms=FALSE,
              init_coefs=matrix(0,nrow=nrow(y),ncol=k),
@@ -309,6 +310,7 @@ EM_run <- function(y, k,
     
     par_X=rep(list(list()),g)
     
+    #sourceCpp("M_step2.cpp")         # TESTING THE NEW M_step FUNCTION
     Mstart=as.numeric(Sys.time())
     for(j in 1:g){
       if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
@@ -323,7 +325,7 @@ EM_run <- function(y, k,
     
     
     for(j in 1:g){
-      if(Tau<=1 & a>5){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
+      if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
       temp_list[[j]] <- par_X[[j]]$temp_j
@@ -346,6 +348,7 @@ EM_run <- function(y, k,
     for(j in 1:g){
       disc_ids[j]=any(theta_list[[j]]!=0)
     }
+    cat(paste("Disc genes:",sum(disc_ids),"of",g,"genes.\n"))
     disc_ids_list[[a]] = disc_ids
     
     if(cl_phi==1){
@@ -636,7 +639,7 @@ EM_run <- function(y, k,
   
 }
 
-predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(y)),offsets=rep(0,ncol(y))){
+predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),offsets=rep(0,ncol(newdata))){
   # X: Output of EM
   # newdata: Data to perform prediction on
   # new_sizefactors: SF's of new data
