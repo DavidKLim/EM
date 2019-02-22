@@ -163,11 +163,27 @@ FSCseq<-function(X=NA, y, k,
     r_it=n_rinits
     rand_inits = matrix(0,nrow=n,ncol=r_it)
     
+    cls_cov_collinear = function(cls,X){
+      p=ncol(X)
+      collinear = rep(NA,p)
+      for(l in 1:p){
+        tab = table(cls,X[,l])
+        rowZeroes = rowSums(tab==0)
+        if(all(rowZeroes==ncol(tab)-1)){          # If all categorical variables are same for each respective cluster
+          collinear[l]=TRUE
+        } else{collinear[l]=FALSE}
+      }
+      
+      if(sum(collinear)==0){
+        return(FALSE)
+        } else{return(TRUE)}
+    }
+    
     for(r in 1:r_it){
       set.seed(r)
       rand_inits[,r] = sample(1:k,n,replace=TRUE)
-      while(sum(1:k %in% rand_inits[,r]) < k){
-        rand_inits[,r] = sample(1:k,n,replace=TRUE)
+      while(sum(1:k %in% rand_inits[,r]) < k | cls_cov_collinear(rand_inits[,r],X)){        # If no sample in one cluster OR covariate and clustering
+        rand_inits[,r] = sample(1:k,n,replace=TRUE)                                         # are completely collinear, then resample
       }
     }
     colnames(rand_inits) = paste("rand",c(1:r_it),sep="")
@@ -180,7 +196,7 @@ FSCseq<-function(X=NA, y, k,
     
     for(i in 1:ncol(all_init_cls)){
       if(!is.na(X)){
-        if(abs(cor(all_init_cls[,i],X))==1){
+        if(cls_cov_collinear(all_init_cls[,i],X)){
         init_cls_BIC[i] = .Machine$double.xmax
         next
         }
@@ -307,6 +323,9 @@ EM_run <- function(X=NA, y, k,
   diff_phi=matrix(0,nrow=maxit_EM,ncol=g)
   est_phi=rep(1,g)                          # 1 for true, 0 for false
   
+  all_temp_list = list()
+  all_theta_list = list()
+  
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
     EMstart= as.numeric(Sys.time())
@@ -377,6 +396,10 @@ EM_run <- function(X=NA, y, k,
         coefs[j,ids[[c]]] = rep(sum(n_k[ids[[c]]]*coefs[j,ids[[c]]])/sum(n_k[ids[[c]]]),times=length(ids[[c]]))               # weighted (by # in each cl) average
       }
     }
+    
+    all_temp_list[[a]] = temp_list
+    all_theta_list[[a]] = theta_list
+    
     # Marker of all nondisc genes (T for disc, F for nondisc)
     for(j in 1:g){
       disc_ids[j]=any(theta_list[[j]]!=0)
@@ -412,7 +435,9 @@ EM_run <- function(X=NA, y, k,
     }
     
     coefs_list[[a]] = coefs
-    LFCs[,a] = (rowMax(coefs)-rowMin(coefs))/(k-1)
+    if(k>1){
+      LFCs[,a] = (rowMax(matrix(coefs[,1:k],ncol=k))-rowMin(matrix(coefs[,1:k],ncol=k)))/(k-1)
+    } else{LFCs[,a]=rep(0,g)}
     
     
     
@@ -435,13 +460,13 @@ EM_run <- function(X=NA, y, k,
       for(c in 1:k){
         if(covars){
           covar_coefs = matrix(coefs[,-(1:k)],ncol=p)
-          cov_eff = apply(covar_coefs,1,sum)
-        } else {cov_eff=rep(0,g)}
+          cov_eff = X %*% t(covar_coefs)         # n x g matrix of covariate effects
+        } else {cov_eff=matrix(0,nrow=n,ncol=g)}
         
         if(cl_phi==1){
-          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=2^(coefs[,c] + cov_eff + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
         } else if(cl_phi==0){
-          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi_g,mu=2^(coefs[,c] + cov_eff + offset[i]),log=TRUE))
+          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi_g,mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))
         }
       }    # subtract out 0.1 that was added earlier
     }
@@ -615,8 +640,10 @@ EM_run <- function(X=NA, y, k,
   num_est_coefs = sum(m)
   num_est_params = 
     if(cl_phi==1){
-      2*sum(m)+(k-1)+p*g
-      } else{ sum(m)+(k-1)+g+p*g }
+      2*sum(m)+(k-1)+p*g                      # p*g for covariates
+      } else{ sum(m)+(k-1)+g+p*g }            # 2*sum(m) for coef/phi for each discriminatory clusters (cl_phi=1). sum(m) >= g
+                                              # sum(m)+g for coef/phi (cl_phi=0)
+                                              # (k-1) for mixture proportions
   
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
   BIC = -2*log_L + log(n)*num_est_params
@@ -672,12 +699,13 @@ EM_run <- function(X=NA, y, k,
                lambda=lambda,
                alpha=alpha,
                size_factors=size_factors,
-               norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list)
+               norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list,
+               all_temp_list=all_temp_list,all_theta_list=all_theta_list)
   return(result)
   
 }
 
-predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),offsets=rep(0,ncol(newdata))){
+predictions <- function(fit,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),offsets=rep(0,ncol(newdata))){
   # X: Output of EM
   # newdata: Data to perform prediction on
   # new_sizefactors: SF's of new data
@@ -685,10 +713,10 @@ predictions <- function(X,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),of
   # offsets: Additional offsets per sample can be incorporated
   
   # X is the output object from the EM() function
-  init_coefs=X$coefs
-  init_phi=X$phi
-  init_lambda=X$lambda
-  init_alpha=X$alpha
+  init_coefs=fit$coefs
+  init_phi=fit$phi
+  init_lambda=fit$lambda
+  init_alpha=fit$alpha
   
   
   cl_phi=!is.null(dim(init_phi))  # dimension of phi is null when gene-wise (vector)

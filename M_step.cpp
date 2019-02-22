@@ -306,6 +306,11 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
     
     
     int n = y_j.size();
+	arma::vec n_k(k);
+	for(int c=0; c<k; c++){
+		n_k(c) = sum(all_wts.row(c));
+	}
+	
     arma::mat eta(n,k), mu(n,k);
     eta.zeros();
     mu.zeros();
@@ -392,7 +397,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             arma::vec all_prod_w_trans_y(n);
     
             for(int ii=0; ii<n; ii++){
-                all_trans_y(ii) = ( eta(ii,c)-offset(ii) ) + (y_j(ii)-mu(ii,c))/mu(ii, c);
+                all_trans_y(ii) = ( eta(ii,c)-offset(ii) ) + (y_j(ii)-mu(ii,c))/(mu(ii, c)*log(2));
                 all_w(ii) = sqrt(wts_c(ii)*mu(ii,c)*mu(ii,c)/(mu(ii,c)+mu(ii,c)*mu(ii,c)*phi_j(c)));
                 all_prod_w_trans_y(ii) = all_trans_y(ii)*all_w(ii);
             }
@@ -407,7 +412,7 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
             /* Update beta */
             if(continue_beta==1){
               if((1-alpha)*lambda != 0){                    /* MLE update w/ SCAD*/
-                  beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n )  / ((1-alpha)*lambda*(k-1) + accu(w)/n );
+                  beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n_k(c) )  / ((1-alpha)*lambda*(k-1) + accu(w)/n_k(c) );
               } else {
                   beta(c) = accu(prod_w_trans_y)/accu(w);
               }

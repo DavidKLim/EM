@@ -306,6 +306,11 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
     
     
     int n = y_j.size();
+	arma::vec n_k(k);
+	for(int c=0; c<k; c++){
+		n_k(c) = sum(all_wts.row(c));
+	}
+	
 	int index=0;
 	
 	arma::vec y_tilde(n*k);
@@ -342,20 +347,19 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		for(int c=0; c<k; c++){
 			for(int ii=0; ii<n; ii++){
 				index=ii+(n*c);
-				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/mu(index);
-				mat_mu(ii,c) = mu(index);
+				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/(mu(index)*log(2));      /* link function: log_2(mu) = eta */
+				mat_mu(ii,c) = mu(index);                                                                 /* d(log2(mu))/d(mu) = 1/(mu*ln(2)) */
 			}
 		}		
+		/* Calculate W matrix */
+		for(int cc=0; cc<k; cc++){
+			for(int ii=0; ii<n; ii++){
+				index=ii+(n*cc);
+				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
+				vec_W(index)=mat_W(index,index);
+			}
+		}
         
-        if(est_phi==1 && cl_phi==0 && continue_phi==1){
-          phi_g = phi_ml_g(y_j,mat_mu,all_wts,10,0);
-		  /*if(phi_g>5){
-			  phi_g=5;
-		  }*/
-          for(int c=0; c<k; c++){
-            phi_j(c) = phi_g;
-          }
-        }
 		/*Rprintf("IRLS iter %d\n phi: %f\n",i,phi_g);*/
         
         /* Initiate temp matrix to track IRLS */
@@ -375,32 +379,6 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
           temp_phi(i,c) = phi_j(c);
         }
 		
-		for(int cc=0; cc<k; cc++){
-			for(int ii=0; ii<n; ii++){
-				index=ii+(n*cc);
-				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
-				vec_W(index)=mat_W(index,index);
-			}
-		}
-		
-		/* WLS. Alternate: hard-coding covariate updates */
-			MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
-			for(int pp=k; pp<(p+k); pp++){
-				beta(pp)=MLE_beta(pp);
-			}
-		
-		/* */
-		/* Hard coded covar_beta: */
-			/*for(int pp=k; pp<(p+k); pp++){
-				arma::mat Xpp=X;
-				arma::vec betapp=beta;
-				Xpp.shed_col(pp);
-				betapp.shed_row(pp);			
-				resid=y_tilde-Xpp*betapp;
-				
-				beta(pp) = accu(vec_W % X.col(p) % resid)/accu(vec_W % pow(X.col(p),2));
-			}*/
-		
         /* CDA */
         for(int c=0; c<k; c++){
             
@@ -415,7 +393,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             /* Update beta */
             if(continue_beta==1){
               if((1-alpha)*lambda != 0){                    /* MLE update w/ SCAD*/
-                  beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W % X.col(c) % resid)/(n*k) )  / ((1-alpha)*lambda*(k-1) + accu(vec_W % pow(X.col(c),2)/(n*k) ));
+                  beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W % X.col(c) % resid)/(n_k(c)) )  / ((1-alpha)*lambda*(k-1) + accu(vec_W % pow(X.col(c),2)/(n_k(c)) ));
               } else {
 				  beta(c) = accu(vec_W % X.col(c) % resid)/accu(vec_W % pow(X.col(c),2));
 				  /*Rprintf("cl %d::\n",c);
@@ -450,7 +428,56 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             /* phi_j(c) = 10; */
             
         }
+		
+		/* Calculate working response y_tilde and mat_mu */
+		for(int c=0; c<k; c++){
+			for(int ii=0; ii<n; ii++){
+				index=ii+(n*c);
+				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/mu(index);
+				mat_mu(ii,c) = mu(index);
+			}
+		}		
+		/* Calculate W matrix */
+		for(int cc=0; cc<k; cc++){
+			for(int ii=0; ii<n; ii++){
+				index=ii+(n*cc);
+				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
+				vec_W(index)=mat_W(index,index);
+			}
+		}
+		
+		
+		
+				/* WLS. Alternate: hard-coding covariate updates */
+		
+		MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
+		for(int pp=k; pp<(p+k); pp++){
+			beta(pp)=MLE_beta(pp);
+		}
+		
+		/* */
+		/* Hard coded covar_beta (something is wrong here): */
+			/*for(int pp=k; pp<(p+k); pp++){
+				arma::mat Xpp=X;
+				arma::vec betapp=beta;
+				Xpp.shed_col(pp);
+				betapp.shed_row(pp);			
+				resid=y_tilde-Xpp*betapp;
+				
+				beta(pp) = accu(vec_W % X.col(p) % resid)/accu(vec_W % pow(X.col(p),2));
+			}*/
+			
     
+		/* Estimating phi */
+        if(est_phi==1 && cl_phi==0 && continue_phi==1){
+          phi_g = phi_ml_g(y_j,mat_mu,all_wts,10,0);
+		  /*if(phi_g>5){
+			  phi_g=5;
+		  }*/
+          for(int c=0; c<k; c++){
+            phi_j(c) = phi_g;
+          }
+        }
     
         /* Update theta matrix */
         for(int cc=0; cc<k; cc++){
