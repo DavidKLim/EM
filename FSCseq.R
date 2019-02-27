@@ -28,7 +28,7 @@ logsumexpc=function(v){
   lse 
 }
 
-soft_thresholding=function(theta,lambda,alpha){
+SCAD_soft_thresholding=function(theta,lambda,alpha){
   a=3.7
   if(abs(theta)<=2*lambda*alpha){
     if(abs(theta)<=lambda*alpha){
@@ -37,9 +37,22 @@ soft_thresholding=function(theta,lambda,alpha){
       return(sign(theta)*(abs(theta)-alpha/(1-alpha)))
     }
   }else if(abs(theta)>2*lambda*alpha & abs(theta)<=a*lambda*alpha){
-    return(((a-1)*theta - sign(theta)*a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha))))
+    mid_term = ((a-1)*theta - a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha)))
+    if(mid_term > 0){
+      return(sign(((a-1)*theta)/(a-1-1/(lambda*(1-alpha))))*mid_term)
+    } else{
+      return(0)
+    }
   }else{
     return(theta)
+  }
+}
+
+lasso_soft_thresholding=function(lambda,alpha){
+  if(abs(alpha)-lambda<0){
+    return(0)
+  } else{
+    return(sign(alpha)*(abs(alpha)-lambda))
   }
 }
  
@@ -113,14 +126,14 @@ FSCseq<-function(X=NA, y, k,
   if (any(is.na(y)) | any(is.na(X))) stop("Missing data (NA's) detected.  Take actions (e.g., removing cases, removing features, imputation) to eliminate missing data before passing X and y")
     }
   
-  if(alpha==1){
-    stop("alpha must be less than 1; choose a smaller number instead")
-  } else if(alpha < 0 | alpha > 1){
-    stop("alpha not within range [0,1)")
-  }
-  if(lambda<0){
-    stop("lambda must be greater than 0")
-  }
+  # if(alpha==1){
+  #   stop("alpha must be less than 1; choose a smaller number instead")
+  # } else if(alpha < 0 | alpha > 1){
+  #   stop("alpha not within range [0,1)")
+  # }
+  # if(lambda<0){
+  #   stop("lambda must be greater than 0")
+  # }
   
   if(method=="EM"){
     CEM=F
@@ -164,6 +177,9 @@ FSCseq<-function(X=NA, y, k,
     rand_inits = matrix(0,nrow=n,ncol=r_it)
     
     cls_cov_collinear = function(cls,X){
+      if(is.na(X)){
+        return(FALSE)
+      }
       p=ncol(X)
       collinear = rep(NA,p)
       for(l in 1:p){
@@ -321,7 +337,14 @@ EM_run <- function(X=NA, y, k,
   disc_ids=rep(T,g)
   
   diff_phi=matrix(0,nrow=maxit_EM,ncol=g)
+  
   est_phi=rep(1,g)                          # 1 for true, 0 for false
+  est_covar = rep(1,g)
+  
+  # if(init_parms){
+  #   est_phi=rep(0,g)                          # if initial phi is input, then no need to estimate phi
+  #   est_covar = rep(0,g)                      # if initial covariate estimate is input, then no need to estimate covariate again (cause bias when introducing penalization)
+  # }
   
   all_temp_list = list()
   all_theta_list = list()
@@ -335,6 +358,7 @@ EM_run <- function(X=NA, y, k,
         coefs=init_coefs
         if(cl_phi==0){
           phi_g=init_phi
+          phi = matrix(rep(phi_g,k),ncol=k)
         } else{
           phi=init_phi
         }
@@ -353,7 +377,8 @@ EM_run <- function(X=NA, y, k,
         theta<-matrix(rep(0,times=k^2),nrow=k)
         for(c in 1:k){
           for(cc in 1:k){
-            theta[c,cc]<-soft_thresholding(beta[c]-beta[cc],lambda,alpha)
+            theta[c,cc]<-SCAD_soft_thresholding(beta[c]-beta[cc],lambda,alpha)
+            #theta[c,cc]<-lasso_soft_thresholding(beta[c]-beta[cc],lambda*alpha)
           }
         }
         theta_list[[j]] <- theta
@@ -368,9 +393,9 @@ EM_run <- function(X=NA, y, k,
       if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
       y_j = as.integer(y[j,])
       par_X[[j]] <- M_step(X=XX, p=p, j=j, a=a, y_j=y_j, all_wts=wts, offset=rep(offset,k),
-                           k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],
+                           k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],est_covar=est_covar[j],
                            lambda=lambda,alpha=alpha,
-                           IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
+                           IRLS_tol=IRLS_tol,maxit_IRLS=200 #,fixed_phi = phis
                            )
     }
     Mend=as.numeric(Sys.time())
@@ -699,20 +724,28 @@ EM_run <- function(X=NA, y, k,
                lambda=lambda,
                alpha=alpha,
                size_factors=size_factors,
-               norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list,
-               all_temp_list=all_temp_list,all_theta_list=all_theta_list)
+               norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list
+               #,all_temp_list=all_temp_list,all_theta_list=all_theta_list
+               )
   return(result)
   
 }
 
-predictions <- function(fit,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),offsets=rep(0,ncol(newdata))){
-  # X: Output of EM
+predictions <- function(X,fit,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),offsets=rep(0,ncol(newdata))){
+  # fit: Output of EM
   # newdata: Data to perform prediction on
   # new_sizefactors: SF's of new data
   # purity: Custom purity values can be input and adjusted for (NOT AVAILABLE YET)
   # offsets: Additional offsets per sample can be incorporated
   
-  # X is the output object from the EM() function
+  covars = !is.na(X)
+  if(covars){
+    p=ncol(X)
+  } else{
+    p=0
+  }
+  
+  # fit is the output object from the EM() function
   init_coefs=fit$coefs
   init_phi=fit$phi
   init_lambda=fit$lambda
@@ -724,22 +757,28 @@ predictions <- function(fit,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),
   init_size_factors = new_sizefactors
   offset=log2(init_size_factors) + offsets
   n=ncol(newdata)
-  k=ncol(init_coefs)
+  g=nrow(newdata)
+  k=fit$k
   
   
   # nb log(f_k(y_i))
   l<-matrix(0,nrow=k,ncol=n)
   for(i in 1:n){
     for(c in 1:k){
+      if(covars){
+        covar_coefs = matrix(init_coefs[,-(1:k)],ncol=p)
+        cov_eff = X %*% t(covar_coefs)         # n x g matrix of covariate effects
+      } else {cov_eff=matrix(0,nrow=n,ncol=g)}
+      
       if(cl_phi){
-        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=2^(init_coefs[,c] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi[,c],mu=2^(init_coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
       } else if(!cl_phi){
-        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi,mu=2^(init_coefs[,c] + offset[i]),log=TRUE))
+        l[c,i]<-sum(dnbinom(newdata[,i],size=1/init_phi,mu=2^(init_coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))
       }
     }    # subtract out 0.1 that was added earlier
   }
   
-  pi=X$pi
+  pi=fit$pi
   
   # E step
   # Estimate weights

@@ -172,7 +172,7 @@ int sign(double x) {
     return (x > 0) - (x < 0);
 }
 
-double soft_thresh(double theta, double lambda, double alpha){ /* ST of SCAD penalty */
+double SCAD_soft_thresh(double theta, double lambda, double alpha){ /* ST of SCAD penalty */
   double STval;
 	double a=3.7;
 	
@@ -183,11 +183,26 @@ double soft_thresh(double theta, double lambda, double alpha){ /* ST of SCAD pen
   			STval = sign(theta)*(fabs(theta)-alpha/(1-alpha));
   		}
     } else if(fabs(theta)>2*lambda*alpha && fabs(theta)<=a*lambda*alpha){
-        STval = ((a-1)*theta - sign(theta)*a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha)));
+		double mid_term = ((a-1)*theta - a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha)));
+		if(mid_term > 0){
+			STval = sign( ((a-1)*theta)/(a-1-1/(lambda*(1-alpha))) )*mid_term;
+		} else{
+			STval=0;
+		}
     } else{
 		STval = theta;
 	}
     return(STval);
+}
+
+double lasso_soft_thresh(double alpha, double lambda){
+	double STval;
+	if(fabs(alpha)-lambda<0){
+        STval = 0;
+    } else {
+        STval = sign(alpha) * (fabs(alpha)-lambda);
+    }
+	return(STval);
 }
 
 double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace){
@@ -294,7 +309,7 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
 
 
 // [[Rcpp::export]]
-List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, int est_phi, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
+List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, int est_phi, int est_covar, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
 
     arma::vec beta = coefs_j;
     arma::mat temp(maxit_IRLS, (2*k+p));
@@ -332,6 +347,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 	
 	/* Turn on this for WLS estimate of covariates */
 	arma::vec MLE_beta(p+k);
+	arma::vec beta_cls(k);
 	
 	
     /* IRLS */
@@ -351,6 +367,18 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 				mat_mu(ii,c) = mu(index);                                                                 /* d(log2(mu))/d(mu) = 1/(mu*ln(2)) */
 			}
 		}		
+		
+		/* Estimating phi */
+        if(est_phi==1 && cl_phi==0 && continue_phi==1){
+          phi_g = phi_ml_g(y_j,mat_mu,all_wts,10,0);
+		  /*if(phi_g>5){
+			  phi_g=5;
+		  }*/
+          for(int c=0; c<k; c++){
+            phi_j(c) = phi_g;
+          }
+        }
+		
 		/* Calculate W matrix */
 		for(int cc=0; cc<k; cc++){
 			for(int ii=0; ii<n; ii++){
@@ -361,6 +389,26 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		}
         
 		/*Rprintf("IRLS iter %d\n phi: %f\n",i,phi_g);*/
+		
+		/* WLS. Alternate: hard-coding covariate updates */
+		if(est_covar==1){
+			MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
+			for(int pp=k; pp<(p+k); pp++){
+				beta(pp)=MLE_beta(pp);
+			}
+		}
+		
+		/* */
+		/* Hard coded covar_beta (something is wrong here): */
+			/*for(int pp=k; pp<(p+k); pp++){
+				arma::mat Xpp=X;
+				arma::vec betapp=beta;
+				Xpp.shed_col(pp);
+				betapp.shed_row(pp);			
+				resid=y_tilde-Xpp*betapp;
+				
+				beta(pp) = accu(vec_W % X.col(p) % resid)/accu(vec_W % pow(X.col(p),2));
+		}*/
         
         /* Initiate temp matrix to track IRLS */
         int idx = 0;
@@ -378,6 +426,9 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
         for(int c=0; c<k; c++){
           temp_phi(i,c) = phi_j(c);
         }
+		for(int c=0; c<k; c++){
+			beta_cls(c) = beta(c);
+		}
 		
         /* CDA */
         for(int c=0; c<k; c++){
@@ -389,11 +440,16 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			Xc.shed_col(c);
 			betac.shed_row(c);
 			resid=y_tilde-Xc*betac;
+
+			beta_cls(c) = beta(c);
+			
+			
 			
             /* Update beta */
             if(continue_beta==1){
               if((1-alpha)*lambda != 0){                    /* MLE update w/ SCAD*/
-                  beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W % X.col(c) % resid)/(n_k(c)) )  / ((1-alpha)*lambda*(k-1) + accu(vec_W % pow(X.col(c),2)/(n_k(c)) ));
+                  beta(c) = ((1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W % X.col(c) % resid)/(n*k) )  /
+				  ((1-alpha)*lambda*(k-1) + accu(vec_W % pow(X.col(c),2)/(n*k) ));
               } else {
 				  beta(c) = accu(vec_W % X.col(c) % resid)/accu(vec_W % pow(X.col(c),2));
 				  /*Rprintf("cl %d::\n",c);
@@ -423,6 +479,14 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             if(cl_phi==1 && est_phi==1 && continue_phi==1){
               phi_j(c) = phi_ml(y_j,mat_mu.col(c),all_wts.row(c),10,0);
             }
+			
+			/* Update theta matrix */
+			for(int cc=0; cc<k; cc++){
+				for(int ccc=0; ccc<k; ccc++){
+					theta(cc,ccc) = SCAD_soft_thresh(beta(cc)-beta(ccc),lambda,alpha);
+					/*theta(cc,ccc) = lasso_soft_thresh(beta(cc)-beta(ccc),lambda*alpha);*/
+				}
+			}
             
             /* Testing fixing phi to be = 10 */
             /* phi_j(c) = 10; */
@@ -430,61 +494,26 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
         }
 		
 		/* Calculate working response y_tilde and mat_mu */
-		for(int c=0; c<k; c++){
+		/*for(int c=0; c<k; c++){
 			for(int ii=0; ii<n; ii++){
 				index=ii+(n*c);
 				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/mu(index);
 				mat_mu(ii,c) = mu(index);
 			}
-		}		
+		}		*/
 		/* Calculate W matrix */
-		for(int cc=0; cc<k; cc++){
+		/*for(int cc=0; cc<k; cc++){
 			for(int ii=0; ii<n; ii++){
 				index=ii+(n*cc);
 				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
 				vec_W(index)=mat_W(index,index);
 			}
-		}
+		}*/
 		
-		
-		
-				/* WLS. Alternate: hard-coding covariate updates */
-		
-		MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
-		for(int pp=k; pp<(p+k); pp++){
-			beta(pp)=MLE_beta(pp);
-		}
-		
-		/* */
-		/* Hard coded covar_beta (something is wrong here): */
-			/*for(int pp=k; pp<(p+k); pp++){
-				arma::mat Xpp=X;
-				arma::vec betapp=beta;
-				Xpp.shed_col(pp);
-				betapp.shed_row(pp);			
-				resid=y_tilde-Xpp*betapp;
-				
-				beta(pp) = accu(vec_W % X.col(p) % resid)/accu(vec_W % pow(X.col(p),2));
-			}*/
 			
-    
-		/* Estimating phi */
-        if(est_phi==1 && cl_phi==0 && continue_phi==1){
-          phi_g = phi_ml_g(y_j,mat_mu,all_wts,10,0);
-		  /*if(phi_g>5){
-			  phi_g=5;
-		  }*/
-          for(int c=0; c<k; c++){
-            phi_j(c) = phi_g;
-          }
-        }
-    
-        /* Update theta matrix */
-        for(int cc=0; cc<k; cc++){
-            for(int ccc=0; ccc<k; ccc++){
-                 theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),lambda,alpha);
-            }
-        }
+
+
+
         
         if(i>1){
             double SSE_beta=0;
