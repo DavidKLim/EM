@@ -30,18 +30,19 @@ logsumexpc=function(v){
 
 SCAD_soft_thresholding=function(theta,lambda,alpha){
   a=3.7
-  if(abs(theta)<=2*lambda*alpha){
-    if(abs(theta)<=lambda*alpha){
+  #if(abs(theta)<=2*lambda*alpha){
+  if(abs(theta)<=(alpha/(1-alpha))*(1+lambda*(1-alpha))){
+    if(abs(theta)<=alpha/(1-alpha)){
       return(0)
     } else{
       return(sign(theta)*(abs(theta)-alpha/(1-alpha)))
     }
-  }else if(abs(theta)>2*lambda*alpha & abs(theta)<=a*lambda*alpha){
-    mid_term = ((a-1)*theta - a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha)))
-    if(mid_term > 0){
-      return(sign(((a-1)*theta)/(a-1-1/(lambda*(1-alpha))))*mid_term)
-    } else{
+  }else if(abs(theta)>(alpha/(1-alpha))*(1+lambda*(1-alpha)) & abs(theta)<=a*lambda*alpha){
+    omega = ((a-1)*theta)/(a-1-1/(lambda*(1-alpha)))
+    if(abs(omega)-(a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha))) <= 0){
       return(0)
+    } else{
+      return(sign(omega)*(abs(omega)-(a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha)))) )
     }
   }else{
     return(theta)
@@ -285,8 +286,8 @@ EM_run <- function(X=NA, y, k,
     covars=T
   }
   
-  # adds 0.1 to all y
-  y = y+0.1
+  # # adds 0.1 to all y
+  # y = y+0.1
   
   #no_cores<-detectCores()-1   # for parallel computing
   
@@ -297,7 +298,7 @@ EM_run <- function(X=NA, y, k,
   }
   
   # Stopping Criteria
-  IRLS_tol = 1E-12     # for both phi and beta
+  IRLS_tol = 1E-6     # for phi/sum of beta/sum of covars
   maxit_IRLS = 50
   EM_tol = 1E-12
   
@@ -354,6 +355,7 @@ EM_run <- function(X=NA, y, k,
     EMstart= as.numeric(Sys.time())
     
     if(a==1){         # Initializations for 1st EM iteration
+      start=as.numeric(Sys.time())
       if(init_parms){
         coefs=init_coefs
         if(cl_phi==0){
@@ -365,8 +367,16 @@ EM_run <- function(X=NA, y, k,
       }
       for(j in 1:g){
         if(!init_parms){
-          fit = glm(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),family=poisson(),weights=c(t(wts)))
-          coefs[j,] = fit$coefficients
+            tryCatch({
+                fit=glm.nb(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),weights=c(t(wts)))
+                coefs[j,] = fit$coefficients
+                phi_g[j] = 1/fit$theta
+                phi[j,] = rep(phi_g[j],k)
+              },error= function(err){
+                cat("Gene",j,"not converging with glm.nb(). Initializing with glm() Poisson instead.\n")
+                fit=glm(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),family=poisson(),weights=c(t(wts)))
+                coefs[j,] = fit$coefficients         # phi_g and phi are initialized to 0
+              })
           if(covars){
             for(c in (k+1):(k+p)){
               if(is.na(coefs[j,c])){coefs[j,c]=0}
@@ -383,6 +393,8 @@ EM_run <- function(X=NA, y, k,
         }
         theta_list[[j]] <- theta
       }
+      end=as.numeric(Sys.time())
+      cat(paste("Parameter Estimates Initialization Time Elapsed:",end-start,"seconds.\n"))
     }
     
     par_X=rep(list(list()),g)
@@ -395,16 +407,17 @@ EM_run <- function(X=NA, y, k,
       par_X[[j]] <- M_step(X=XX, p=p, j=j, a=a, y_j=y_j, all_wts=wts, offset=rep(offset,k),
                            k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],est_covar=est_covar[j],
                            lambda=lambda,alpha=alpha,
-                           IRLS_tol=IRLS_tol,maxit_IRLS=200 #,fixed_phi = phis
+                           IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
                            )
     }
     Mend=as.numeric(Sys.time())
-    
+    cat(paste("M Step Time Elapsed:",Mend-Mstart,"seconds.\n"))
     
     for(j in 1:g){
       if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
       coefs[j,] <- par_X[[j]]$coefs_j
       theta_list[[j]] <- par_X[[j]]$theta_j
+      disc_ids[j]=any(theta_list[[j]]!=0)
       temp_list[[j]] <- par_X[[j]]$temp_j
       if(cl_phi==1){
         phi[j,] <- par_X[[j]]$phi_j
@@ -420,15 +433,40 @@ EM_run <- function(X=NA, y, k,
         ids[[c]]=which(theta_list[[j]][c,]==0)
         coefs[j,ids[[c]]] = rep(sum(n_k[ids[[c]]]*coefs[j,ids[[c]]])/sum(n_k[ids[[c]]]),times=length(ids[[c]]))               # weighted (by # in each cl) average
       }
+      
+      # IF any coefs/phi unstable --> missing after M step, set them to initialized values from glm()/glm.nb()/input init values
+      if(any(is.na(coefs[j,]))){
+        cat(paste("Coefs for gene",j,"didn't converge in M step. Setting them to initialized values.\n"))
+        coefs[j,]= temp_list[[j]][1,1:(k+p)]
+        for(c in 1:k){
+          for(cc in 1:k){
+            theta[c,cc]<-SCAD_soft_thresholding(beta[c]-beta[cc],lambda,alpha)
+            #theta[c,cc]<-lasso_soft_thresholding(beta[c]-beta[cc],lambda*alpha)
+          }
+        }
+        theta_list[[j]] <- theta
+        disc_ids[j]=any(theta_list[[j]]!=0)
+      }
+      if(any(is.na(phi[j,]))){
+        cat(paste("Phi for gene",j,"didn't converge in M step. Setting them to initialized values.\n"))
+        phi_g[j] = temp_list[[j]][1,k+p+1]
+        phi[j,] = rep(phi_g[j],k)
+      }
+      
+      if(k>1){
+        tryCatch({
+          LFCs[j,a] = (max(coefs[j,1:k])-min(coefs[j,1:k]))/(k-1)
+        }, error=function(err){
+          cat(paste("LFCs for gene",j,"could not be calculated?"))
+          LFCs[j,a] = NA
+        })
+      } else{LFCs[,a]=rep(0,g)}
     }
     
     all_temp_list[[a]] = temp_list
     all_theta_list[[a]] = theta_list
     
     # Marker of all nondisc genes (T for disc, F for nondisc)
-    for(j in 1:g){
-      disc_ids[j]=any(theta_list[[j]]!=0)
-    }
     cat(paste("Disc genes:",sum(disc_ids),"of",g,"genes.\n"))
     disc_ids_list[[a]] = disc_ids
     
@@ -460,9 +498,6 @@ EM_run <- function(X=NA, y, k,
     }
     
     coefs_list[[a]] = coefs
-    if(k>1){
-      LFCs[,a] = (rowMax(matrix(coefs[,1:k],ncol=k))-rowMin(matrix(coefs[,1:k],ncol=k)))/(k-1)
-    } else{LFCs[,a]=rep(0,g)}
     
     
     
@@ -489,9 +524,9 @@ EM_run <- function(X=NA, y, k,
         } else {cov_eff=matrix(0,nrow=n,ncol=g)}
         
         if(cl_phi==1){
-          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi[,c],mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+          l[c,i]<-sum(dnbinom(y[,i],size=1/phi[,c],mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
         } else if(cl_phi==0){
-          l[c,i]<-sum(dnbinom(y[,i]-0.1,size=1/phi_g,mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))
+          l[c,i]<-sum(dnbinom(y[,i],size=1/phi_g,mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))
         }
       }    # subtract out 0.1 that was added earlier
     }
@@ -519,7 +554,7 @@ EM_run <- function(X=NA, y, k,
     for(i in 1:n){
       prev_clusters[i]<-which.max(wts[,i])
     }
-    if(a==1 & !is.null(true_clusters) & !is.na(true_clusters)){
+    if(a==1 & !is.null(true_clusters) & !any(is.na(true_clusters))){
       cat(paste("Initial ARI:",adjustedRandIndex(prev_clusters,true_clusters),"\n"))
     }
     
@@ -596,7 +631,7 @@ EM_run <- function(X=NA, y, k,
     
     #print(current_clusters)
     cat(paste("EM iter",a,"% of cls unchanged (from previous):",sum(current_clusters==prev_clusters)/n,"\n"))
-    if(!is.null(true_clusters) & !is.na(true_clusters)){cat(paste("ARI =",adjustedRandIndex(true_clusters,current_clusters),"\n"))}
+    if(!is.null(true_clusters) & !any(is.na(true_clusters))){cat(paste("ARI =",adjustedRandIndex(true_clusters,current_clusters),"\n"))}
     cat(paste("Cluster proportions:",pi,"\n"))
     if(sum(is.na(true_disc))==0){
       if(sum(true_disc)==0){
@@ -632,7 +667,7 @@ EM_run <- function(X=NA, y, k,
     }
     cat(paste("Samp1: PP:",wts[,1],"\n"))
     EMend = as.numeric(Sys.time())
-    cat(paste("Time elapsed:",EMend-EMstart,"seconds\n"))
+    cat(paste("EM iter",a,"time elapsed:",EMend-EMstart,"seconds.\n"))
     cat("-------------------------------------\n")
     
   }
