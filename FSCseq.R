@@ -31,13 +31,13 @@ logsumexpc=function(v){
 SCAD_soft_thresholding=function(theta,lambda,alpha){
   a=3.7
   #if(abs(theta)<=2*lambda*alpha){
-  if(abs(theta)<=(alpha/(1-alpha))*(1+lambda*(1-alpha))){
+  if(abs(theta)<=(alpha/(1-alpha))+lambda*alpha ){
     if(abs(theta)<=alpha/(1-alpha)){
       return(0)
     } else{
       return(sign(theta)*(abs(theta)-alpha/(1-alpha)))
     }
-  }else if(abs(theta)>(alpha/(1-alpha))*(1+lambda*(1-alpha)) & abs(theta)<=a*lambda*alpha){
+  }else if(abs(theta)>(alpha/(1-alpha))+lambda*alpha & abs(theta)<=a*lambda*alpha){
     omega = ((a-1)*theta)/(a-1-1/(lambda*(1-alpha)))
     if(abs(omega)-(a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha))) <= 0){
       return(0)

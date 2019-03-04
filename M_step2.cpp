@@ -177,13 +177,13 @@ double SCAD_soft_thresh(double theta, double lambda, double alpha){ /* ST of SCA
 	double a=3.7;
 	
     /*if(fabs(theta)<=2*lambda*alpha){*/
-	if(fabs(theta)<=(alpha/(1-alpha))*(1+lambda*(1-alpha))){
+	if(fabs(theta)<=(alpha/(1-alpha))+lambda*alpha){
   		if(fabs(theta)<=alpha/(1-alpha)){
   			STval = 0;
   		} else{
   			STval = sign(theta)*(fabs(theta)-alpha/(1-alpha));
   		}
-    } else if(fabs(theta)>(alpha/(1-alpha))*(1+lambda*(1-alpha)) && fabs(theta)<=a*lambda*alpha){
+    } else if(fabs(theta)>(alpha/(1-alpha))+lambda*alpha && fabs(theta)<=a*lambda*alpha){
 		double omega = ((a-1)*theta)/(a-1-1/(lambda*(1-alpha)));
 		if(fabs(omega) - (a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha))) <= 0){
 			STval=0;
