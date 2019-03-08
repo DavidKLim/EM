@@ -56,7 +56,7 @@ lasso_soft_thresholding=function(lambda,alpha){
     return(sign(alpha)*(abs(alpha)-lambda))
   }
 }
- 
+
 # DESeq analysis
 normalizations <- function(dat){
   n=ncol(dat)
@@ -88,18 +88,18 @@ normalizations <- function(dat){
 
 
 FSCseq<-function(X=NA, y, k,
-             lambda=0,alpha=0,
-             size_factors=rep(1,times=ncol(y)),
-             norm_y=y,
-             purity=rep(1,ncol(y)),offsets=rep(0,ncol(y)),              # Offsets: effect of log(covariate) on count #
-             true_clusters=NA, true_disc=NA,
-             init_parms=FALSE,
-             init_coefs=matrix(0,nrow=nrow(y),ncol=k),
-             init_phi=matrix(0,nrow=nrow(y),ncol=k),
-             init_cls=NA, n_rinits=50, maxit_inits=15,
-             disp=c("gene","cluster"),
-             method=c("EM","CEM"),
-             prefix="", dir="NA"){
+                 lambda=0,alpha=0,
+                 size_factors=rep(1,times=ncol(y)),
+                 norm_y=y,
+                 purity=rep(1,ncol(y)),offsets=rep(0,ncol(y)),              # Offsets: effect of log(covariate) on count #
+                 true_clusters=NA, true_disc=NA,
+                 init_parms=FALSE,
+                 init_coefs=matrix(0,nrow=nrow(y),ncol=k),
+                 init_phi=matrix(0,nrow=nrow(y),ncol=k),
+                 init_cls=NA, n_rinits=50, maxit_inits=15,
+                 disp=c("gene","cluster"),
+                 method=c("EM","CEM"),
+                 prefix="", dir="NA"){
   
   # y: raw counts
   # k: #clusters
@@ -115,17 +115,17 @@ FSCseq<-function(X=NA, y, k,
   # init_cls: Initial clustering
   # n_rinits: Number of initial clusterings searched with maxit=15. More initializations = more chance to attain global max
   
-  if(is.na(X)){
+  if(all(is.na(X))){
     warning("No covariates specified. Running cluster-specific intercept-only model.")
-    } else{
-  if (class(X) != "matrix") {
-    tmp <- try(X <- model.matrix(~0+., data=X), silent=TRUE)
-    if (class(tmp)[1] == "try-error") stop("X must be a matrix or able to be coerced to a matrix")
-  }
-  if (storage.mode(X)=="integer") storage.mode(X) <- "double"
-  if (ncol(y) != nrow(X)) stop("X and y do not have the same number of observations")
-  if (any(is.na(y)) | any(is.na(X))) stop("Missing data (NA's) detected.  Take actions (e.g., removing cases, removing features, imputation) to eliminate missing data before passing X and y")
+  } else{
+    if (class(X) != "matrix") {
+      tmp <- try(X <- model.matrix(~0+., data=X), silent=TRUE)
+      if (class(tmp)[1] == "try-error") stop("X must be a matrix or able to be coerced to a matrix")
     }
+    if (storage.mode(X)=="integer") storage.mode(X) <- "double"
+    if (ncol(y) != nrow(X)) stop("X and y do not have the same number of observations")
+    if (any(is.na(y)) | any(is.na(X))) stop("Missing data (NA's) detected.  Take actions (e.g., removing cases, removing features, imputation) to eliminate missing data before passing X and y")
+  }
   
   # if(alpha==1){
   #   stop("alpha must be less than 1; choose a smaller number instead")
@@ -145,7 +145,11 @@ FSCseq<-function(X=NA, y, k,
   }
   
   diag_file = sprintf("Diagnostics/%s/%s_%s_%s_%d_%f_%f.txt",dir,method,disp,prefix,k,lambda,alpha)
-  dir.create(sprintf("Diagnostics/%s",dir))
+  
+  ifelse(!dir.exists(sprintf("Diagnostics/%s",dir)),
+         dir.create(sprintf("Diagnostics/%s",dir)),
+         FALSE)
+  
   sink(file=diag_file)
   
   n = ncol(y)
@@ -178,7 +182,7 @@ FSCseq<-function(X=NA, y, k,
     rand_inits = matrix(0,nrow=n,ncol=r_it)
     
     cls_cov_collinear = function(cls,X){
-      if(is.na(X)){
+      if(any(is.na(X))){
         return(FALSE)
       }
       p=ncol(X)
@@ -193,7 +197,7 @@ FSCseq<-function(X=NA, y, k,
       
       if(sum(collinear)==0){
         return(FALSE)
-        } else{return(TRUE)}
+      } else{return(TRUE)}
     }
     
     for(r in 1:r_it){
@@ -212,10 +216,10 @@ FSCseq<-function(X=NA, y, k,
     all_fits = list()
     
     for(i in 1:ncol(all_init_cls)){
-      if(!is.na(X)){
+      if(all(!is.na(X))){
         if(cls_cov_collinear(all_init_cls[,i],X)){
-        init_cls_BIC[i] = .Machine$double.xmax
-        next
+          init_cls_BIC[i] = .Machine$double.xmax
+          next
         }
       }
       
@@ -277,7 +281,7 @@ EM_run <- function(X=NA, y, k,
     cl_X[((i-1)*n+1):(i*n),] = matrix(rep(ident_k[i,],n),ncol=k,nrow=n,byrow=T)
   }
   
-  if(sum(is.na(X))>0){
+  if(any(is.na(X))){
     XX=cl_X
     covars=F
   } else{
@@ -320,7 +324,7 @@ EM_run <- function(X=NA, y, k,
   Q<-rep(0,times=maxit_EM)
   
   cls=cls_init
-
+  
   # Initialize weights
   wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
   for(c in 1:k){
@@ -340,7 +344,12 @@ EM_run <- function(X=NA, y, k,
   diff_phi=matrix(0,nrow=maxit_EM,ncol=g)
   
   est_phi=rep(1,g)                          # 1 for true, 0 for false
-  est_covar = rep(1,g)
+  est_covar = if(covars){rep(1,g)
+      } else{
+        rep(0,g)
+      }
+  
+  keep = matrix(1,nrow=k,ncol=n)
   
   # if(init_parms){
   #   est_phi=rep(0,g)                          # if initial phi is input, then no need to estimate phi
@@ -367,16 +376,16 @@ EM_run <- function(X=NA, y, k,
       }
       for(j in 1:g){
         if(!init_parms){
-            tryCatch({
-                fit=glm.nb(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),weights=c(t(wts)))
-                coefs[j,] = fit$coefficients
-                phi_g[j] = 1/fit$theta
-                phi[j,] = rep(phi_g[j],k)
-              },error= function(err){
-                cat("Gene",j,"not converging with glm.nb(). Initializing with glm() Poisson instead.\n")
-                fit=glm(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),family=poisson(),weights=c(t(wts)))
-                coefs[j,] = fit$coefficients         # phi_g and phi are initialized to 0
-              })
+          tryCatch({
+            fit=glm.nb(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),weights=c(t(wts)))
+            coefs[j,] = fit$coefficients
+            phi_g[j] = 1/fit$theta
+            phi[j,] = rep(phi_g[j],k)
+          },error= function(err){
+            cat("Gene",j,"not converging with glm.nb(). Initializing with glm() Poisson instead.\n")
+            fit=glm(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),family=poisson(),weights=c(t(wts)))
+            coefs[j,] = fit$coefficients         # phi_g and phi are initialized to 0
+          })
           if(covars){
             for(c in (k+1):(k+p)){
               if(is.na(coefs[j,c])){coefs[j,c]=0}
@@ -404,11 +413,11 @@ EM_run <- function(X=NA, y, k,
     for(j in 1:g){
       if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
       y_j = as.integer(y[j,])
-      par_X[[j]] <- M_step(X=XX, p=p, j=j, a=a, y_j=y_j, all_wts=wts, offset=rep(offset,k),
+      par_X[[j]] <- M_step(X=XX, p=p, j=j, a=a, y_j=y_j, all_wts=wts, keep=c(t(keep)), offset=rep(offset,k),
                            k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],est_covar=est_covar[j],
                            lambda=lambda,alpha=alpha,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
-                           )
+      )
     }
     Mend=as.numeric(Sys.time())
     cat(paste("M Step Time Elapsed:",Mend-Mstart,"seconds.\n"))
@@ -545,8 +554,8 @@ EM_run <- function(X=NA, y, k,
       finalwts<-wts
       warning("Reached max iterations.")
       DNC=1
-      }
-  
+    }
+    
     
     # E step
     
@@ -587,7 +596,7 @@ EM_run <- function(X=NA, y, k,
         }
       }
     }
-
+    
     if(CEM){
       # CEM
       draw_wts=wts                 # initialize
@@ -613,10 +622,14 @@ EM_run <- function(X=NA, y, k,
         if(seed_mult>250){
           draw_wts[,n]=rep(1/k,k)
           break
-          }
+        }
       }
       wts=draw_wts
     }          # Keep drawing until at least one in each cluster
+    
+    
+    # Input in M step only samples with PP's > 0.001
+    keep = (wts>0.001)^2      # matrix of 0's and 1's, dimensions k x n
     
     # # Weighting by purity : found that this makes no difference
     # for(i in 1:n){
@@ -637,7 +650,7 @@ EM_run <- function(X=NA, y, k,
       if(sum(true_disc)==0){
         disc_gene=1
         cat("No discriminatory genes. Printing Gene1 instead\n")
-        } else{ disc_gene = which(true_disc^2==1)[1] }
+      } else{ disc_gene = which(true_disc^2==1)[1] }
       if(sum(true_disc)==length(true_disc)){
         nondisc_gene=2
         cat("No nondiscriminatory genes. Printing Gene1 instead\n")
@@ -688,8 +701,8 @@ EM_run <- function(X=NA, y, k,
       m_row[c] <- sum(theta_list[[j]][c,]!=0) + 1         # of parameters estimated
     }
     m[j]=min(m_row)
-    if(sum(coefs[j,]==-30)>1){
-      m[j]=m[j]+(sum(coefs[j,]==-30)-1)
+    if(sum(coefs[j,]==-100)>1){
+      m[j]=m[j]+(sum(coefs[j,]==-100)-1)
     }
     if(m[j]==1){nondiscriminatory[j]=TRUE}
   }
@@ -701,9 +714,9 @@ EM_run <- function(X=NA, y, k,
   num_est_params = 
     if(cl_phi==1){
       2*sum(m)+(k-1)+p*g                      # p*g for covariates
-      } else{ sum(m)+(k-1)+g+p*g }            # 2*sum(m) for coef/phi for each discriminatory clusters (cl_phi=1). sum(m) >= g
-                                              # sum(m)+g for coef/phi (cl_phi=0)
-                                              # (k-1) for mixture proportions
+    } else{ sum(m)+(k-1)+g+p*g }            # 2*sum(m) for coef/phi for each discriminatory clusters (cl_phi=1). sum(m) >= g
+  # sum(m)+g for coef/phi (cl_phi=0)
+  # (k-1) for mixture proportions
   
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
   BIC = -2*log_L + log(n)*num_est_params
@@ -761,7 +774,7 @@ EM_run <- function(X=NA, y, k,
                size_factors=size_factors,
                norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list
                #,all_temp_list=all_temp_list,all_theta_list=all_theta_list
-               )
+  )
   return(result)
   
 }
@@ -772,11 +785,18 @@ predictions <- function(X,fit,newdata,new_sizefactors,purity=rep(1,ncol(newdata)
   # new_sizefactors: SF's of new data
   # purity: Custom purity values can be input and adjusted for (NOT AVAILABLE YET)
   # offsets: Additional offsets per sample can be incorporated
+  if(all(is.na(X))){
+    warning("No covariates specified. Predicting on cluster-specific intercept-only model.")
+  }else{
+    cat("Predicting, adjusting for input X...\n")
+    if (any(is.na(X))) {stop("Missing data (NA's) detected.  Take actions (e.g., removing cases, removing features, imputation) to eliminate missing data before passing X")}
+  }
   
-  covars = !is.na(X)
+  covars = all(!is.na(X))             # what should be done with missing values
   if(covars){
     p=ncol(X)
   } else{
+    cat("No covariates specified")
     p=0
   }
   
@@ -830,4 +850,3 @@ predictions <- function(X,fit,newdata,new_sizefactors,purity=rep(1,ncol(newdata)
   
   return(list(final_clusters=final_clusters,wts=wts))
 }
-  
