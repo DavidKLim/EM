@@ -318,6 +318,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 	arma::vec beta_cls(k);
 	
 	Timer timer;
+	int output_timer = 0;
 	
     /* IRLS */
     for(int i=0; i<maxit_IRLS; i++){
@@ -396,7 +397,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		/* Hard coded coordinate-wise covar_beta (something is wrong here): */
 		if(est_covar==1 && continue_gamma==1){
 			
-			/* IRLS. Alternate: coordinate-wise covariate updates */
+			/* WLS. Alternate: coordinate-wise covariate updates */
 			/*MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
 			for(int pp=k; pp<(p+k); pp++){
 				beta(pp)=MLE_beta(pp);
@@ -542,7 +543,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			timer.step("break conds");
 		}
 		
-		if(i==0){
+		if(i==0 && output_timer==1){
 			NumericVector res(timer);
 			Rcpp::print(res);
 		}
