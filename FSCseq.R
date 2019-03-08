@@ -14,7 +14,7 @@ library(pryr)
 library(mclust)
 library(Biobase)
 
-sourceCpp("M_step2.cpp")
+sourceCpp("M_step.cpp")
 
 
 logsumexpc=function(v){  
@@ -408,7 +408,7 @@ EM_run <- function(X=NA, y, k,
     
     par_X=rep(list(list()),g)
     
-    #sourceCpp("M_step2.cpp")         # TESTING THE NEW M_step FUNCTION
+    #sourceCpp("M_step.cpp")         # TESTING THE NEW M_step FUNCTION
     Mstart=as.numeric(Sys.time())
     for(j in 1:g){
       if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
