@@ -11,6 +11,7 @@
 #include <R.h>
 #include <Rmath.h>
 #include <math.h>
+#include <Rcpp/Benchmark/Timer.h>
 
 using namespace arma;
 using namespace Rcpp;
@@ -172,22 +173,38 @@ int sign(double x) {
     return (x > 0) - (x < 0);
 }
 
-double soft_thresh(double theta, double lambda, double alpha){ /* ST of SCAD penalty */
+double SCAD_soft_thresh(double theta, double lambda, double alpha){ /* ST of SCAD penalty */
   double STval;
 	double a=3.7;
 	
-    if(fabs(theta)<=2*lambda*alpha){
-  		if(fabs(theta)<=lambda*alpha){
+    /*if(fabs(theta)<=2*lambda*alpha){*/
+	if(fabs(theta)<=(alpha/(1-alpha))+lambda*alpha){
+  		if(fabs(theta)<=alpha/(1-alpha)){
   			STval = 0;
   		} else{
   			STval = sign(theta)*(fabs(theta)-alpha/(1-alpha));
   		}
-    } else if(fabs(theta)>2*lambda*alpha && fabs(theta)<=a*lambda*alpha){
-        STval = ((a-1)*theta - sign(theta)*a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha)));
+    } else if(fabs(theta)>(alpha/(1-alpha))+lambda*alpha && fabs(theta)<=a*lambda*alpha){
+		double omega = ((a-1)*theta)/(a-1-1/(lambda*(1-alpha)));
+		if(fabs(omega) - (a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha))) <= 0){
+			STval=0;
+		} else{
+			STval = sign(omega)*(fabs(omega)-(a*alpha/(1-alpha))/(a-1-1/(lambda*(1-alpha))));
+		}
     } else{
 		STval = theta;
 	}
     return(STval);
+}
+
+double lasso_soft_thresh(double alpha, double lambda){
+	double STval;
+	if(fabs(alpha)-lambda<0){
+        STval = 0;
+    } else {
+        STval = sign(alpha) * (fabs(alpha)-lambda);
+    }
+	return(STval);
 }
 
 double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace){
@@ -294,14 +311,15 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
 
 
 // [[Rcpp::export]]
-List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, int est_phi, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
+List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec keep, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, int est_phi, int est_covar, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
 
     arma::vec beta = coefs_j;
-    arma::mat temp(maxit_IRLS, (2*k));
-    arma::mat temp_beta(maxit_IRLS,k);
+    arma::mat temp(maxit_IRLS, (2*k+p));
+    arma::mat temp_beta(maxit_IRLS,k+p);
     arma::mat temp_phi(maxit_IRLS,k);
     int continue_beta = 1;       /* Continue estimating beta as long as it's 1 (set to 0 when under SSE IRLS tol level)*/
     int continue_phi = 1;
+	int continue_gamma = 1;
     temp.zeros();
     
     
@@ -311,157 +329,236 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
 		n_k(c) = sum(all_wts.row(c));
 	}
 	
-    arma::mat eta(n,k), mu(n,k);
-    eta.zeros();
-    mu.zeros();
-    
-    /*
-    arma::vec eta_g(n),mu_g(n);
-    eta_g.zeros();
-    mu_g.zeros();
-    
-    
-    double logmeany = log(mean(y_j));
-    
-    for(int ii=0;ii<n;ii++){
-        eta_g(ii) = logmeany + offset(ii);
-        mu_g(ii) = exp(eta_g(ii));
-        Rprintf("Sample %d: eta_g = %f, mu_g = %f",ii+1, eta_g(ii),mu_g(ii));
-    } */
-    
-    /*arma::rowvec n_ones(n);
-    n_ones.ones();
-    
-    if(cl_phi==0){
-        phi_g = phi_ml(y_j,mu_g,n_ones,10,0);
-        for(int c=0;c<k;c++){
-            phi_j(c) = phi_g(j-1);
-        }
-    } */ /* THIS IS WRONG */
-    
-    
+	int index=0;
+	
+	arma::vec y_tilde(n*k);
+	arma::vec eta(n*k), mu(n*k);
+	arma::mat mat_mu(n,k);
+	arma::mat mat_W(n*k,n*k);
+	mat_W.zeros();
+	arma::vec vec_W(n*k);
+	vec_W.zeros();
+	arma::vec resid(n*k);
+	
+	arma::vec vec_wts(n*k);
+	for(int i=0; i<n; i++){
+		for(int c=0; c<k; c++){
+			index=i+(n*c);
+			vec_wts(index) = all_wts(c,i);
+		}
+	}
+	
+	/* Turn on this for WLS estimate of covariates */
+	arma::vec MLE_beta(p+k);
+	arma::vec beta_cls(k);
+	
+	Timer timer;
+	
     /* IRLS */
     for(int i=0; i<maxit_IRLS; i++){
-        /* Initiate eta */
-        if(i==0) {
-            for(int ii=0; ii<n; ii++) {
-                for(int jj=0; jj<k; jj++) {
-                    if(a==1){
-                        eta(ii,jj) = beta(jj);
-                    } else {
-                        eta(ii,jj) = beta(jj) + offset(ii);
-                    }
-                    /*mu(ii,jj) = exp(eta(ii,jj));*/
-                    mu(ii,jj) = pow(2,eta(ii,jj));
-                }
-            }
-        }
-        
-        if(est_phi==1 && cl_phi==0 && continue_phi==1){
-          phi_g = phi_ml_g(y_j,mu,all_wts,10,0);
-          for(int c=0; c<k; c++){
-            phi_j(c) = phi_g;
-          }
-        }
-        
-        
+		if(i==0){
+			timer.step("start");
+		}
+		
+		/* Calculate eta and mu */
+		eta = X * beta + offset;
+		
+		if(i==0){
+			timer.step("eta");
+		}
+		
+		for(int ii=0; ii<(n*k); ii++){
+			mu(ii)=pow(2,eta(ii));
+			mat_mu(ii-n*floor(ii/n),floor(ii/n)) = mu(ii);
+		}
+		
+		if(i==0){
+			timer.step("mu/mat_mu");
+		}
+
         
         /* Initiate temp matrix to track IRLS */
         int idx = 0;
-        for(int ii=0; ii<k; ii++){
-            temp(i,idx) = beta(ii);
+        for(int c=0; c<k+p; c++){
+            temp(i,idx) = beta(c);
+			temp_beta(i,c) = beta(c);
             idx++;
         }
-        for(int ii=0; ii<k; ii++){
-            temp(i,idx) = phi_j(ii);
+        for(int c=0; c<k; c++){
+            temp(i,idx) = phi_j(c);
+			temp_phi(i,c) = phi_j(c);
+			beta_cls(c) = beta(c);
             idx++;
         }
-        
-        for(int ii=0; ii<k; ii++){
-          temp_beta(i,ii) = beta(ii);
-          temp_phi(i,ii) = phi_j(ii);
-        }
-    
+		
+		if(i==0){
+			timer.step("temp mats");
+		}
+		
+		/* Estimating phi */
+		if(phi_g == 0 || a>1 || i>0){              /* don't estimate phi if glm.nb() was fit to initialize phi */
+			if(est_phi==1 && cl_phi==0 && continue_phi==1){
+			  phi_g = phi_ml_g(y_j,mat_mu,all_wts,10,0);
+			  /*if(phi_g>5){
+				  phi_g=5;
+			  }*/
+			  for(int c=0; c<k; c++){
+				phi_j(c) = phi_g;
+			  }
+			}
+		}
+		
+		if(i==0){
+			timer.step("est phi_g");
+		}
+		
+		/*Rprintf("IRLS iter %d\n phi: %f\n",i,phi_g);*/
+		
+		/* Hard coded covar_beta (something is wrong here): */
+		/*for(int pp=k; pp<(p+k); pp++){
+			arma::mat Xpp=X;
+			arma::vec betapp=beta;
+			Xpp.shed_col(pp);
+			betapp.shed_row(pp);			
+			resid=y_tilde-Xpp*betapp;
+				
+			beta(pp) = accu(vec_W % X.col(p) % resid)/accu(vec_W % pow(X.col(p),2));
+		}*/
+		
+		/* Calculate y_tilde and W matrix */
+		for(int cc=0; cc<k; cc++){
+			for(int ii=0; ii<n; ii++){
+				index=ii+(n*cc);
+				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/(mu(index)*log(2));      /* link function: log_2(mu) = eta */
+				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
+				vec_W(index)=mat_W(index,index);
+			}
+		}
+		
+		if(i==0){
+			timer.step("calc y_tilde/mat_W/vec_W");
+		}
+		
+		/* WLS. Alternate: hard-coding covariate updates */
+		if(est_covar==1 && continue_gamma==1){
+			MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
+			for(int pp=k; pp<(p+k); pp++){
+				beta(pp)=MLE_beta(pp);
+			}
+		}
+		
+		if(i==0){
+			timer.step("cov ests");
+		}
+		
         /* CDA */
         for(int c=0; c<k; c++){
+			arma::uvec ids = find(X.col(c) % keep == 1);
             
             /* Testing gene-wise phi (ADD TO INPUT IN RCPP "arma::vec fixed_phi" AND FUNCTION & LogLike IN R AS WELL) */
             /* phi_j(c) = fixed_phi(j-1); */
-    
-            
-            arma::rowvec wts_c = all_wts.row(c);
-    
-            /* First calculate all trans_y, w, and products */
-            arma::vec all_trans_y(n);
-            arma::vec all_w(n);
-            arma::vec all_prod_w_trans_y(n);
-    
-            for(int ii=0; ii<n; ii++){
-                all_trans_y(ii) = ( eta(ii,c)-offset(ii) ) + (y_j(ii)-mu(ii,c))/(mu(ii, c)*log(2));
-                all_w(ii) = sqrt(wts_c(ii)*mu(ii,c)*mu(ii,c)/(mu(ii,c)+mu(ii,c)*mu(ii,c)*phi_j(c)));
-                all_prod_w_trans_y(ii) = all_trans_y(ii)*all_w(ii);
-            }
-    
-            /* Subset just the values of trans_y, w, and products where weight != 0 */
-            arma::uvec good_ids = find(wts_c != 0);
-    
-            arma::vec trans_y = all_trans_y.rows(good_ids);
-            arma::vec w = all_w.rows(good_ids);
-            arma::vec prod_w_trans_y = all_prod_w_trans_y.rows(good_ids);
-    
+			arma::mat Xc=X;
+			arma::vec betac=beta;
+			Xc.shed_col(c);
+			betac.shed_row(c);
+			resid=y_tilde-Xc*betac;
+
+			beta_cls(c) = beta(c);
+			
+			arma::vec vec_W_c = vec_W(ids);
+			arma::vec resid_c = resid(ids);
+			
+			
             /* Update beta */
             if(continue_beta==1){
-              if((1-alpha)*lambda != 0){                    /* MLE update w/ SCAD*/
-                  beta(c) = ((1-alpha)*lambda*((accu(beta)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(prod_w_trans_y)/n_k(c) )  / ((1-alpha)*lambda*(k-1) + accu(w)/n_k(c) );
+              /*if((1-alpha)*lambda != 0){
+                  beta(c) = ((1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W % X.col(c) % resid)/(n_k(c)) )  /
+				  ((1-alpha)*lambda*(k-1) + accu(vec_W % pow(X.col(c),2))/(n_k(c)) );
               } else {
-                  beta(c) = accu(prod_w_trans_y)/accu(w);
+				  beta(c) = accu(vec_W % X.col(c) % resid)/accu(vec_W % pow(X.col(c),2));
+              }*/
+			  if((1-alpha)*lambda != 0){
+                  beta(c) = ((1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W_c % resid_c)/(n_k(c)) )  /
+				  ((1-alpha)*lambda*(k-1) + accu(vec_W_c)/(n_k(c)) );
+              } else {
+				  beta(c) = accu(vec_W_c % resid_c)/accu(vec_W_c);
               }
     
-              if(beta(c) < (-30)){
-                  /* Rprintf("Cluster %d, gene %d truncated at -30",c+1,j); */
-                  beta(c) = -30;
-              } else if(beta(c)>30){
-                  /* Rprintf("Cluster %d, gene %d truncated at +30",c+1,j); */
-                  beta(c) = 30;
+              if(beta(c) < (-100)){
+                  /* Rprintf("Cluster %d, gene %d truncated at -100",c+1,j); */
+                  beta(c) = -100;
+              } else if(beta(c)>100){
+                  /* Rprintf("Cluster %d, gene %d truncated at +100",c+1,j); */
+                  beta(c) = 100;
               }
             }
-    
-            for(int ii=0; ii<n; ii++){
-                eta(ii,c) = beta(c) + offset(ii);
-                /*mu(ii,c) = exp(eta(ii,c));*/
-                mu(ii,c) = pow(2,eta(ii,c));
-            }
+
+			/*eta = X * beta + offset;
+            for(int ii=0; ii<(n*k); ii++){
+                mu(ii) = pow(2,eta(ii));
+            }*/
     
             /* Estimate phi */
             //Rprintf("phi.ml iter %d, cluster %d \n",i+1,c+1);
             if(cl_phi==1 && est_phi==1 && continue_phi==1){
-              phi_j(c) = phi_ml(y_j,mu.col(c),wts_c,10,0);
+              phi_j(c) = phi_ml(y_j,mat_mu.col(c),all_wts.row(c),10,0);
             }
-            
-            /* Testing fixing phi to be = 10 */
-            /* phi_j(c) = 10; */
+			
             
         }
-    
-    
-        /* Update theta matrix */
-        for(int cc=0; cc<k; cc++){
-            for(int ccc=0; ccc<k; ccc++){
-                 theta(cc,ccc) = soft_thresh(beta(cc)-beta(ccc),lambda,alpha);
-            }
-        }
+		
+		if(i==0){
+			timer.step("CDA on log2 baselines");
+		}
+		
+		/* Calculate working response y_tilde and mat_mu */
+		/*for(int c=0; c<k; c++){
+			for(int ii=0; ii<n; ii++){
+				index=ii+(n*c);
+				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/mu(index);
+				mat_mu(ii,c) = mu(index);
+			}
+		}		*/
+		/* Calculate W matrix */
+		/*for(int cc=0; cc<k; cc++){
+			for(int ii=0; ii<n; ii++){
+				index=ii+(n*cc);
+				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
+				vec_W(index)=mat_W(index,index);
+			}
+		}*/
+		
+			
+		/* Update theta matrix */
+		for(int cc=0; cc<k; cc++){
+			for(int ccc=0; ccc<k; ccc++){
+				theta(cc,ccc) = SCAD_soft_thresh(beta(cc)-beta(ccc),lambda,alpha);
+				/*theta(cc,ccc) = lasso_soft_thresh(beta(cc)-beta(ccc),lambda*alpha);*/
+			}
+		}
+
+		if(i==0){
+			timer.step("Theta");
+		}
         
         if(i>1){
             double SSE_beta=0;
+			double SSE_gamma=0;
             double SSE_phi=0;
             for(int cc=0; cc<k; cc++){
               SSE_beta += pow(temp_beta(i,cc)-temp_beta(i-1,cc),2);
               SSE_phi += pow(temp_phi(i,cc)-temp_phi(i-1,cc),2);
             }
+			for(int cc=k; cc<(k+p); cc++){
+				SSE_gamma += pow(temp_beta(i,cc)-temp_beta(i-1,cc),2);
+			}
             /* Rprintf("SSE beta: %f, SSE phi: %f\n",SSE_beta,SSE_phi); */
             if(SSE_beta<IRLS_tol){
               continue_beta=0;
             }
+			if(SSE_gamma<IRLS_tol){
+				continue_gamma=0;
+			}
             if(SSE_phi<IRLS_tol){
               continue_phi=0;
             }
@@ -470,9 +567,18 @@ List M_step(int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec offset, in
         if(i==maxit_IRLS-1){
           break;
         }
-        if(continue_beta==0 && continue_phi==0){
+        if(continue_beta==0 && continue_gamma==0 && continue_phi==0){
           break;
         }
+		
+		if(i==0){
+			timer.step("break conds");
+		}
+		
+		if(i==0){
+			NumericVector res(timer);
+			Rcpp::print(res);
+		}
     }
     
     
