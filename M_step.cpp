@@ -319,17 +319,18 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 	
 	Timer timer;
 	int output_timer = 0;
+	int TIME_ITER = 0;
 	
     /* IRLS */
     for(int i=0; i<maxit_IRLS; i++){
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("start");
 		}
 		
 		/* Calculate eta and mu */
 		eta = X * beta + offset;
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("eta");
 		}
 		
@@ -338,7 +339,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			mat_mu(ii-n*floor(ii/n),floor(ii/n)) = mu(ii);
 		}
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("mu/mat_mu");
 		}
 
@@ -357,7 +358,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             idx++;
         }
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("temp mats");
 		}
 		
@@ -374,7 +375,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			}
 		}
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("est phi_g");
 		}
 		
@@ -390,7 +391,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			}
 		}
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("calc y_tilde/mat_W/vec_W");
 		}
 		
@@ -415,7 +416,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			}
 		}
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("cov ests");
 		}
 		
@@ -475,7 +476,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             
         }
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("CDA on log2 baselines");
 		}
 		
@@ -505,7 +506,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			}
 		}
 
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("Theta");
 		}
         
@@ -539,11 +540,11 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
           break;
         }
 		
-		if(i==0){
+		if(i==TIME_ITER){
 			timer.step("break conds");
 		}
 		
-		if(i==0 && output_timer==1){
+		if(i==TIME_ITER && output_timer==1){
 			NumericVector res(timer);
 			Rcpp::print(res);
 		}
