@@ -26,6 +26,9 @@ List score_info_g(int N, double ph, arma::mat mu, arma::vec y, arma::mat wts){
     
     int n=y.size();
     int k = mu.n_cols;
+	
+	/*Timer timer2;
+	timer2.step("Initial");*/
     
     for(int i=0; i<n; i++){
         for(int c=0; c<k; c++){
@@ -34,9 +37,17 @@ List score_info_g(int N, double ph, arma::mat mu, arma::vec y, arma::mat wts){
             wtsci = wts(c,i);
             
             inv_phMuic = inv_ph + muic;
+			
+			/*if(i==0 && c==0){timer2.step("Start first it");}*/
             
             scoreic = wtsci * (R::digamma(inv_ph+yi) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_phMuic) - (yi+inv_ph)/(inv_phMuic));
             infoic = wtsci * (R::trigamma(inv_ph) + 2/(inv_phMuic) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/pow(inv_phMuic,2));
+			
+			/*if(i==0 && c==0){
+				timer2.step("scoreic/infoic calc");
+				NumericVector res2(timer2);
+				Rcpp::print(res2);
+			}*/
             
             score1 += scoreic;
             info1 += infoic;
@@ -78,7 +89,7 @@ double phi_ml_g(arma::vec y, arma::mat mu, arma::mat wts, int limit, int trace){
     if(trace==1){
         Rprintf("phi_ml: iter %d 'phi = %f' \n",it,p0);
     }
-    while(it < limit && fabs(del) > eps){
+    while(it < limit && fabs(del) > eps){		
         it += 1;
         p0 = fabs(p0);
         List scoreinfo = score_info_g(N,p0,mu,y,wts);
@@ -101,6 +112,7 @@ double phi_ml_g(arma::vec y, arma::mat mu, arma::mat wts, int limit, int trace){
     if(it == limit && trace==1){
         Rprintf("iteration limit reached \n");
     }
+	if(trace==1){Rprintf("phi_ml() converged after %d iterations\n",it);}
     
     return(p0);
 }
@@ -202,20 +214,20 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
     double sum_wtd_y = accu(wtd_y);
     for(int i=0; i<n; i++){
         if(wtd_y(i)==sum_wtd_y){
-            return(p0=0);
+            return(p0=0);		/* Case where there is only one non-zero sample in a cluster */
         }
         if(i<n-1){
             if(wtd_y(i) == wtd_y(i+1)){
-                equal++;
+                equal++;        /* Tracking how many samples have equal expression */
             }
         }
     }
     
     if(equal==(n-1)){
-        return(p0=0);
+        return(p0=0);           /* If all samples are equal in expression --> phi =0 */
     }
     if(accu(mu)<1e-13){
-        return(p0=0);
+        return(p0=0); 
     }
     
     for(int i=0; i<n; i++){
@@ -275,7 +287,6 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
     int continue_phi = 1;
 	int continue_gamma = 1;
     temp.zeros();
-    
     
     int n = y_j.size();
 	arma::vec n_k(k);
@@ -368,17 +379,6 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		
 		/*Rprintf("IRLS iter %d\n phi: %f\n",i,phi_g);*/
 		
-		/* Hard coded covar_beta (something is wrong here): */
-		/*for(int pp=k; pp<(p+k); pp++){
-			arma::mat Xpp=X;
-			arma::vec betapp=beta;
-			Xpp.shed_col(pp);
-			betapp.shed_row(pp);			
-			resid=y_tilde-Xpp*betapp;
-				
-			beta(pp) = accu(vec_W % X.col(p) % resid)/accu(vec_W % pow(X.col(p),2));
-		}*/
-		
 		/* Calculate y_tilde and W matrix */
 		for(int cc=0; cc<k; cc++){
 			for(int ii=0; ii<n; ii++){
@@ -393,11 +393,24 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			timer.step("calc y_tilde/mat_W/vec_W");
 		}
 		
-		/* WLS. Alternate: hard-coding covariate updates */
+		/* Hard coded coordinate-wise covar_beta (something is wrong here): */
 		if(est_covar==1 && continue_gamma==1){
-			MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
+			
+			/* IRLS. Alternate: coordinate-wise covariate updates */
+			/*MLE_beta = inv(X.t() * mat_W * X) * X.t() * mat_W * y_tilde;
 			for(int pp=k; pp<(p+k); pp++){
 				beta(pp)=MLE_beta(pp);
+			}*/
+			
+			/* Hard coded coordinate-wise covar_beta: */
+			for(int pp=k; pp<(p+k); pp++){
+				arma::mat Xpp=X;
+				arma::vec betapp=beta;
+				Xpp.shed_col(pp);
+				betapp.shed_row(pp);			
+				resid=y_tilde-Xpp*betapp;
+				
+				beta(pp) = accu(vec_W % X.col(pp) % resid)/accu(vec_W % pow(X.col(pp),2));
 			}
 		}
 		
