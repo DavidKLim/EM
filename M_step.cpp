@@ -57,34 +57,9 @@ double phi_ml_g(arma::vec y, arma::mat mu, arma::mat wts, int limit, int trace){
     int k = mu.n_cols;
     arma::mat wtd_y(n,k);
     
-    /*int equal=0;*/
     if(n==1){
         return(p0=0);
-    } /*else {
-       for(int i=0; i<n; i++){
-       for(int c=0; c<k; c++){
-       wtd_y(i,c)=y(i)*wts(i,c);
-       }
-       }
-       }
-       
-       double sum_wtd_y = accu(wtd_y);
-       for(int i=0; i<n; i++){
-       for(int c=0; c<k, c++){
-       if(wtd_y(i,c)==sum_wtd_y){
-       return(p0=0);
-       }
-       if(i<n-1){
-       if(wtd_y(i,c) == wtd_y(i+1,c)){
-       equal++;
-       }
-       }
-       }
-       }
-       
-       if(equal==(n-1)){
-       return(p0=0);
-       }  */ /* I DONT THINK THIS IS NECESSARY?? */
+    }
     if(accu(mu)<1e-13){
         return(p0=0);
     }
@@ -214,8 +189,6 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
     int n = y.size();
     arma::vec wtd_y(n);
     
-    /*arma::uvec wts_one_ids = find(wts == 1);
-    arma::vec y_one = y(wts_one_ids);*/
     
     int equal=0;
     if(n==1){
@@ -244,25 +217,6 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
     if(accu(mu)<1e-13){
         return(p0=0);
     }
-    
-    /*
-    int all_unequal=0;
-    if(y_one.size()==0){
-        all_unequal=1;
-    } else {
-        for(int i=0; i<y_one.size(); i++){
-            if(i > 0){
-                if(y_one(i)!=y_one(i-1)){
-                    all_unequal=1;
-                }
-            }
-        }
-    }
-    
-    if(all_unequal==0){
-        return(p0=0);
-    }
-    */
     
     for(int i=0; i<n; i++){
         double wtsi=wts(i), yi=y(i), mui=mu(i);
