@@ -11,150 +11,12 @@
 #include <R.h>
 #include <Rmath.h>
 #include <math.h>
+#include <Rcpp.h>
 #include <Rcpp/Benchmark/Timer.h>
 
 using namespace arma;
 using namespace Rcpp;
 using namespace std;
-
-List score_info_g(int N, double ph, arma::mat mu, arma::vec y, arma::mat wts){
-    double lambda = 1e-25;
-    double score1 = 0, info1 = 0;
-    double inv_ph = 1/ph + lambda;  // try adding lambda to stabilize (when phi very large)?
-    ph=ph/(1+ph*1e-25);
-    double muic, yi, wtsci, scoreic, infoic, inv_phMuic;
-    
-    int n=y.size();
-    int k = mu.n_cols;
-	
-	/*Timer timer2;
-	timer2.step("Initial");*/
-    
-    for(int i=0; i<n; i++){
-        for(int c=0; c<k; c++){
-            yi = y(i);
-            muic = mu(i,c);
-            wtsci = wts(c,i);
-            
-            inv_phMuic = inv_ph + muic;
-			
-			/*if(i==0 && c==0){timer2.step("Start first it");}*/
-            
-            scoreic = wtsci * (R::digamma(inv_ph+yi) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_phMuic) - (yi+inv_ph)/(inv_phMuic));
-            infoic = wtsci * (R::trigamma(inv_ph) + 2/(inv_phMuic) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/pow(inv_phMuic,2));
-			
-			/*if(i==0 && c==0){
-				timer2.step("scoreic/infoic calc");
-				NumericVector res2(timer2);
-				Rcpp::print(res2);
-			}*/
-            
-            score1 += scoreic;
-            info1 += infoic;
-        }
-    }
-    
-    double score = score1 * (-inv_ph*inv_ph) + 2*lambda*ph;
-    double info = info1 * pow(inv_ph,4) + 2*lambda;
-    
-    return List::create(score,info);
-}
-
-double phi_ml_g(arma::vec y, arma::mat mu, arma::mat wts, int limit, int trace){
-    double eps = 0.0001220703; /* from R */
-    double p0 = 0;
-    double N = accu(wts);
-    int n = y.size();
-    int k = mu.n_cols;
-    arma::mat wtd_y(n,k);
-    
-    if(n==1){
-        return(p0=0);
-    }
-    if(accu(mu)<1e-13){
-        return(p0=0);
-    }
-    
-    for(int i=0; i<n; i++){
-        for(int c=0; c<k; c++){
-            double wtsci=wts(c,i), yi=y(i), muic=mu(i,c);
-            p0 += wtsci * pow(yi/muic-1,2);
-        }
-    }
-    p0 = p0/N;
-    
-    int it=0;
-    double del=1;
-    
-    if(trace==1){
-        Rprintf("phi_ml: iter %d 'phi = %f' \n",it,p0);
-    }
-    while(it < limit && fabs(del) > eps){		
-        it += 1;
-        p0 = fabs(p0);
-        List scoreinfo = score_info_g(N,p0,mu,y,wts);
-        double score=scoreinfo[0], info=scoreinfo[1];
-        del = score/info;
-        p0 += del;
-        if(trace==1){
-            Rprintf("score: %f\n",score);
-            Rprintf("info: %f\n",info);
-            Rprintf("phi_ml: iter %d 'phi = %f' \n",it,p0);
-        }
-    }
-    
-    if(p0 < 0){
-        p0 = 0;
-        if(trace==1){
-            Rprintf("estimate truncated at zero \n");
-        }
-    }
-    if(it == limit && trace==1){
-        Rprintf("iteration limit reached \n");
-    }
-	if(trace==1){Rprintf("phi_ml() converged after %d iterations\n",it);}
-    
-    return(p0);
-}
-
-
-List score_info(int N, double ph, arma::vec mu, arma::vec y, arma::rowvec wts){
-    double lambda = 1e-25;
-    double score1 = 0, info1 = 0;
-    double inv_ph = 1/ph + lambda;  // try adding lambda to stabilize (when phi very large)?
-    ph=ph/(1+ph*1e-25);
-    double mui, yi, wtsi, scorei, infoi, inv_phMui;
-    
-    int n=y.size();
-    
-    for(int i=0; i<n; i++){
-        yi = y(i);
-        mui = mu(i);
-        wtsi = wts(i);
-        
-        inv_phMui = inv_ph + mui;
-        
-        scorei = wtsi * (R::digamma(inv_ph+yi) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_phMui) - (yi+inv_ph)/(inv_phMui));
-        infoi = wtsi * (R::trigamma(inv_ph) + 2/(inv_phMui) - R::trigamma(inv_ph+yi) - ph - (yi+inv_ph)/pow(inv_phMui,2));
-        
-        score1 += scorei;
-        info1 += infoi;
-        //Rprintf("Score samp %d: %f \n",i+1,scorei);
-        //Rprintf("Info samp %d: %f \n",i+1,infoi);
-        
-        /*Rprintf("Samp %d trigamma(inv_ph): %f\n",i+1,R::trigamma(inv_ph));
-        Rprintf("Samp %d 2/(inv_phMui): %f\n",i+1,2/(inv_phMui));
-        Rprintf("Samp %d trigamma(inv_ph+yi): %f\n",i+1,R::trigamma(inv_ph+yi));
-        Rprintf("Samp %d ph: %f\n",i+1,ph);
-        Rprintf("Samp %d (yi+inv_ph)/inv_phMui^2: %f\n",i+1,(yi+inv_ph)/pow(inv_phMui,2));
-        Rprintf("Samp %d inv_phMui^2: %f\n",i+1,pow(inv_phMui,2));*/
-    }
-    
-    double score = score1 * (-inv_ph*inv_ph) + 2*lambda*ph;
-    double info = info1 * pow(inv_ph,4) + 2*lambda;
-    
-    return List::create(score,info);
-}
 
 int sign(double x) {
     return (x > 0) - (x < 0);
@@ -192,6 +54,114 @@ double lasso_soft_thresh(double alpha, double lambda){
         STval = sign(alpha) * (fabs(alpha)-lambda);
     }
 	return(STval);
+}
+
+List score_info(int N, double ph, arma::vec mu, arma::vec y, arma::vec wts){
+    double lambda = 1e-25;
+    double score1 = 0, info1 = 0;
+    double inv_ph = 1/ph + lambda;  // try adding lambda to stabilize (when phi very large)?
+    ph=ph/(1+ph*1e-25);
+    double scorei, infoi;
+    
+    int n = y.size();
+	
+	/*Timer timer2;
+	timer2.step("Initial");*/
+	
+	/* Vectorizing and using Rcpp sugar digamma/trigamma functions: not really faster */
+	/*NumericVector scoreic(n*k),infoic(n*k),yic(n*k),muic(n*k),wtsic(n*k),inv_phic(n*k);
+	inv_phic.fill(inv_ph);
+	int index=0;
+	for(int i=0; i<n; i++){
+        for(int c=0; c<k; c++){
+			yic(index)=y(i);
+			muic(index)=mu(i,c);
+			wtsic(index)=wts(c,i);
+			index++;
+		}
+	}
+	timer2.step("Initialization");
+	
+	scoreic=wtsic * (digamma(inv_phic+yic) - digamma(inv_phic) + log(inv_phic) + 1 - log(inv_phic+muic)-(yic+inv_phic)/(inv_phic+muic));
+	infoic=wtsic * (trigamma(inv_phic) + 2/(inv_phic+muic) - trigamma(inv_phic+yic) - ph - (yic+inv_phic)/pow(inv_phic+muic,2));
+	
+	timer2.step("Score/info calculation");
+	score1=sum(scoreic);
+	info1=sum(infoic);
+	timer2.step("Summation");
+	NumericVector res2(timer2);
+	Rcpp::print(res2);*/
+	
+	for(int i=0; i<n; i++){			
+            
+        scorei = wts(i) * (R::digamma(inv_ph+y(i)) - R::digamma(inv_ph) + log(inv_ph) + 1 - log(inv_ph+mu(i)) - (y(i)+inv_ph)/(inv_ph+mu(i)));
+        infoi = wts(i) * (R::trigamma(inv_ph) + 2/(inv_ph+mu(i)) - R::trigamma(inv_ph+y(i)) - ph - (y(i)+inv_ph)/pow(inv_ph+mu(i),2));
+            
+        score1 += scorei;
+        info1 += infoi;
+	}
+	
+	/*timer2.step("scoreic/infoic calc");
+	NumericVector res2(timer2);
+	Rcpp::print(res2);*/
+	
+    
+    double score = score1 * (-inv_ph*inv_ph) + 2*lambda*ph;
+    double info = info1 * pow(inv_ph,4) + 2*lambda;
+    
+    return List::create(score,info);
+}
+
+double phi_ml_g(arma::vec y, arma::vec mu, arma::vec wts, int limit, int trace){
+    double eps = 0.0001220703; /* from R */
+    double p0 = 0;
+    double N = accu(wts);
+    int n = y.size();
+    
+    if(n==1){
+        return(p0=0);
+    }
+    if(accu(mu)<1e-13){
+        return(p0=0);
+    }
+    
+	for(int i=0; i<n; i++){
+		p0 += wts(i)*pow(y(i)/mu(i)-1,2);
+	}
+    p0 = p0/N;
+    
+    int it=0;
+    double del=1;
+    
+    if(trace==1){
+        Rprintf("phi_ml: iter %d 'phi = %f' \n",it,p0);
+    }
+    while(it < limit && fabs(del) > eps){		
+        it += 1;
+        p0 = fabs(p0);
+        List scoreinfo = score_info(N,p0,mu,y,wts);
+        double score=scoreinfo[0], info=scoreinfo[1];
+        del = score/info;
+        p0 += del;
+        if(trace==1){
+            Rprintf("score: %f\n",score);
+            Rprintf("info: %f\n",info);
+            Rprintf("phi_ml: iter %d 'phi = %f' \n",it,p0);
+        }
+    }
+    
+    if(p0 < 0){
+        p0 = 0;
+        if(trace==1){
+            Rprintf("estimate truncated at zero \n");
+        }
+    }
+    if(it == limit && trace==1){
+        Rprintf("iteration limit reached \n");
+    }
+	if(trace==1){Rprintf("phi_ml() converged after %d iterations\n",it);}
+    
+    return(p0);
 }
 
 double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace){
@@ -277,7 +247,7 @@ double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace)
 
 
 // [[Rcpp::export]]
-List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec keep, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, int est_phi, int est_covar, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
+List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, arma::vec vec_wts, arma::vec keep, arma::vec offset, int k, arma::mat theta, arma::vec coefs_j, arma::vec phi_j, int cl_phi, double phi_g, int est_phi, int est_covar, double lambda, double alpha, double IRLS_tol, int maxit_IRLS){
 
     arma::vec beta = coefs_j;
     arma::mat temp(maxit_IRLS, (2*k+p));
@@ -290,8 +260,12 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
     
     int n = y_j.size();
 	arma::vec n_k(k);
+	arma::vec rep_y_j(n*k);
 	for(int c=0; c<k; c++){
 		n_k(c) = sum(all_wts.row(c));
+		for(int i=0; i<n; i++){
+			rep_y_j(c*n+i) = y_j(i);
+		}
 	}
 	
 	int index=0;
@@ -299,19 +273,11 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 	arma::vec y_tilde(n*k);
 	arma::vec eta(n*k), mu(n*k);
 	arma::mat mat_mu(n,k);
-	arma::mat mat_W(n*k,n*k);
-	mat_W.zeros();
+	/*arma::mat mat_W(n*k,n*k);
+	mat_W.zeros();*/
 	arma::vec vec_W(n*k);
 	vec_W.zeros();
 	arma::vec resid(n*k);
-	
-	arma::vec vec_wts(n*k);
-	for(int i=0; i<n; i++){
-		for(int c=0; c<k; c++){
-			index=i+(n*c);
-			vec_wts(index) = all_wts(c,i);
-		}
-	}
 	
 	/* Turn on this for WLS estimate of covariates */
 	arma::vec MLE_beta(p+k);
@@ -320,6 +286,11 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 	Timer timer;
 	int output_timer = 0;
 	int TIME_ITER = 0;
+	
+	/* PP filtering ids, gene */
+	arma::uvec ids = find(keep == 1);
+	/*arma::uvec ids = find(keep >= 0);*/   /* test: keep all samples */
+
 	
     /* IRLS */
     for(int i=0; i<maxit_IRLS; i++){
@@ -365,7 +336,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		/* Estimating phi */
 		if(phi_g == 0 || a>1 || i>0){              /* don't estimate phi if glm.nb() was fit to initialize phi */
 			if(est_phi==1 && cl_phi==0 && continue_phi==1){
-			  phi_g = phi_ml_g(y_j,mat_mu,all_wts,10,0);
+			  phi_g = phi_ml_g(rep_y_j(ids),mu(ids),vec_wts(ids),10,0);
 			  /*if(phi_g>5){
 				  phi_g=5;
 			  }*/
@@ -386,13 +357,14 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			for(int ii=0; ii<n; ii++){
 				index=ii+(n*cc);
 				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/(mu(index)*log(2));      /* link function: log_2(mu) = eta */
-				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
-				vec_W(index)=mat_W(index,index);
+				double w_ii = sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
+				/*mat_W(index,index)=w_ii;*/    /* mat_W need not be calculated */
+				vec_W(index)=w_ii;
 			}
 		}
 		
 		if(i==TIME_ITER){
-			timer.step("calc y_tilde/mat_W/vec_W");
+			timer.step("calc y_tilde/vec_W");
 		}
 		
 		/* Hard coded coordinate-wise covar_beta (something is wrong here): */
@@ -422,7 +394,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		
         /* CDA */
         for(int c=0; c<k; c++){
-			arma::uvec ids = find(X.col(c) % keep == 1);
+			arma::uvec ids_c = find(X.col(c) % keep == 1);
             
             /* Testing gene-wise phi (ADD TO INPUT IN RCPP "arma::vec fixed_phi" AND FUNCTION & LogLike IN R AS WELL) */
             /* phi_j(c) = fixed_phi(j-1); */
@@ -434,8 +406,8 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 
 			beta_cls(c) = beta(c);
 			
-			arma::vec vec_W_c = vec_W(ids);
-			arma::vec resid_c = resid(ids);
+			arma::vec vec_W_c = vec_W(ids_c);
+			arma::vec resid_c = resid(ids_c);
 			
 			
             /* Update beta */
@@ -479,23 +451,6 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		if(i==TIME_ITER){
 			timer.step("CDA on log2 baselines");
 		}
-		
-		/* Calculate working response y_tilde and mat_mu */
-		/*for(int c=0; c<k; c++){
-			for(int ii=0; ii<n; ii++){
-				index=ii+(n*c);
-				y_tilde(index) = ( eta(index)-offset(ii) ) + (y_j(ii)-mu(index))/mu(index);
-				mat_mu(ii,c) = mu(index);
-			}
-		}		*/
-		/* Calculate W matrix */
-		/*for(int cc=0; cc<k; cc++){
-			for(int ii=0; ii<n; ii++){
-				index=ii+(n*cc);
-				mat_W(index,index)=sqrt(all_wts(cc,ii)*mu(index)*mu(index)/(mu(index)+mu(index)*mu(index)*phi_j(cc)));
-				vec_W(index)=mat_W(index,index);
-			}
-		}*/
 		
 			
 		/* Update theta matrix */
