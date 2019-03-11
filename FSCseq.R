@@ -304,7 +304,7 @@ EM_run <- function(X=NA, y, k,
   # Stopping Criteria
   IRLS_tol = 1E-6     # for phi/sum of beta/sum of covars
   maxit_IRLS = 50
-  EM_tol = 1E-12
+  EM_tol = 1E-8
   
   # Initialize parameters
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
@@ -349,7 +349,7 @@ EM_run <- function(X=NA, y, k,
         rep(0,g)
       }
   
-  keep = matrix(1,nrow=k,ncol=n)
+  keep = (wts>0.001)^2
   
   # if(init_parms){
   #   est_phi=rep(0,g)                          # if initial phi is input, then no need to estimate phi
@@ -374,16 +374,18 @@ EM_run <- function(X=NA, y, k,
           phi=init_phi
         }
       }
+      
+      ids = c(t(keep==1))  # PP filtering
       for(j in 1:g){
         if(!init_parms){
           tryCatch({
-            fit=glm.nb(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),weights=c(t(wts)))
+            fit=glm.nb(as.integer(rep(y[j,],k))[ids]~0+XX[ids,]+offset(rep(offset,k)[ids]),weights=c(t(wts))[ids])
             coefs[j,] = fit$coefficients
             phi_g[j] = 1/fit$theta
             phi[j,] = rep(phi_g[j],k)
           },error= function(err){
             cat("Gene",j,"not converging with glm.nb(). Initializing with glm() Poisson instead.\n")
-            fit=glm(as.integer(rep(y[j,],k))~0+XX+offset(rep(offset,k)),family=poisson(),weights=c(t(wts)))
+            fit=glm(as.integer(rep(y[j,],k))[ids]~0+XX[ids,]+offset(rep(offset,k)[ids]),family=poisson(),weights=c(t(wts))[ids])
             coefs[j,] = fit$coefficients         # phi_g and phi are initialized to 0
           })
           if(covars){
@@ -413,7 +415,7 @@ EM_run <- function(X=NA, y, k,
     for(j in 1:g){
       if(Tau<=1 & a>6){if(Reduce("+",disc_ids_list[(a-6):(a-1)])[j]==0){next}}
       y_j = as.integer(y[j,])
-      par_X[[j]] <- M_step(X=XX, p=p, j=j, a=a, y_j=y_j, all_wts=wts, keep=c(t(keep)), offset=rep(offset,k),
+      par_X[[j]] <- M_step(X=XX, p=p, j=j, a=a, y_j=y_j, all_wts=wts, vec_wts=c(t(wts)), keep=c(t(keep)), offset=rep(offset,k),
                            k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],est_covar=est_covar[j],
                            lambda=lambda,alpha=alpha,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
@@ -498,6 +500,9 @@ EM_run <- function(X=NA, y, k,
         }
         
         if(diff_phi[a,j]<0.01){
+          if(est_phi[j]==1){
+            cat(paste("Stopping phi estimation for gene",j,"at iter",a,"\n"))
+          }
           est_phi[j]=0
         } else{
           est_phi[j]=1
