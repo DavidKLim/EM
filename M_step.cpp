@@ -164,7 +164,7 @@ double phi_ml_g(arma::vec y, arma::vec mu, arma::vec wts, int limit, int trace){
     return(p0);
 }
 
-double phi_ml(arma::vec y, arma::vec mu, arma::rowvec wts, int limit, int trace){
+double phi_ml(arma::vec y, arma::vec mu, arma::vec wts, int limit, int trace){
     double eps = 0.0001220703; /* from R */
     double p0 = 0;
     double N = accu(wts);
@@ -395,20 +395,22 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
         /* CDA */
         for(int c=0; c<k; c++){
 			arma::uvec ids_c = find(X.col(c) % keep == 1);
+			arma::vec resid_c(ids_c.n_elem);
             
             /* Testing gene-wise phi (ADD TO INPUT IN RCPP "arma::vec fixed_phi" AND FUNCTION & LogLike IN R AS WELL) */
             /* phi_j(c) = fixed_phi(j-1); */
-			arma::mat Xc=X;
-			arma::vec betac=beta;
-			Xc.shed_col(c);
-			betac.shed_row(c);
-			resid=y_tilde-Xc*betac;
+			if(p==0){
+				resid_c=y_tilde(ids_c);       		/* if no covars: resid = y-Xb^(-1) = y */
+			} else{
+				arma::mat Xc=X.rows(ids_c);
+				arma::vec betac=beta;
+				Xc.shed_col(c);
+				betac.shed_row(c);
+				resid_c=y_tilde(ids_c)-Xc*betac;	
+			}
 
 			beta_cls(c) = beta(c);
-			
 			arma::vec vec_W_c = vec_W(ids_c);
-			arma::vec resid_c = resid(ids_c);
-			
 			
             /* Update beta */
             if(continue_beta==1){
@@ -440,9 +442,9 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             }*/
     
             /* Estimate phi */
-            //Rprintf("phi.ml iter %d, cluster %d \n",i+1,c+1);
+            /*Rprintf("phi.ml iter %d, cluster %d \n",i,c);*/
             if(cl_phi==1 && est_phi==1 && continue_phi==1){
-              phi_j(c) = phi_ml(y_j,mat_mu.col(c),all_wts.row(c),10,0);
+				phi_j(c) = phi_ml(rep_y_j(ids_c),mu(ids_c),vec_wts(ids_c),10,0);
             }
 			
             
@@ -477,11 +479,13 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 				SSE_gamma += pow(temp_beta(i,cc)-temp_beta(i-1,cc),2);
 			}
             /* Rprintf("SSE beta: %f, SSE phi: %f\n",SSE_beta,SSE_phi); */
-            if(SSE_beta<IRLS_tol){
+            if(SSE_beta/k<IRLS_tol){
               continue_beta=0;
             }
-			if(SSE_gamma<IRLS_tol){
-				continue_gamma=0;
+			if(p>0){
+				if(SSE_gamma/p<IRLS_tol){
+					continue_gamma=0;
+				}
 			}
             if(SSE_phi<IRLS_tol){
               continue_phi=0;
