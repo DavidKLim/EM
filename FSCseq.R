@@ -86,12 +86,99 @@ normalizations <- function(dat){
   return(res)
 }
 
+E_step<-function(X,pi,coefs,phi,cl_phi,CEM){
+  k=length(pi)
+  p=ncol(coefs)-k
+  
+  l<-matrix(rep(0,times=k*n),nrow=k)
+  for(i in 1:n){
+    for(c in 1:k){
+      if(covars){
+        covar_coefs = matrix(coefs[,-(1:k)],ncol=p)
+        cov_eff = X %*% t(covar_coefs)         # n x g matrix of covariate effects
+      } else {cov_eff=matrix(0,nrow=n,ncol=g)}
+      
+      if(cl_phi==1){
+        l[c,i]<-sum(dnbinom(y[,i],size=1/phi[,c],mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))    # posterior log like, include size_factor of subj
+      } else if(cl_phi==0){
+        l[c,i]<-sum(dnbinom(y[,i],size=1/phi_g,mu=2^(coefs[,c] + cov_eff[i,] + offset[i]),log=TRUE))
+      }
+    }    # subtract out 0.1 that was added earlier
+  }
+  
+  if(!CEM){
+    # update on weights
+    logdenom = apply(log(pi) + l, 2,logsumexpc)
+    for(c in 1:k){
+      wts[c,]<-exp(log(pi[c])+l[c,]-logdenom)
+    }
+  } else if(CEM){
+    # CEM update on weights
+    logdenom = apply((1/Tau)*(log(pi)+l),2,logsumexpc)
+    for(c in 1:k){
+      wts[c,]<-exp((1/Tau)*(log(pi[c])+l[c,])-logdenom)
+    }
+    if(Tau>1){
+      Tau = 0.9*Tau
+    } else{ Tau=1 }     # after Tau hits 1 --> fix at 1
+  }
+  
+  # UB and LB on weights
+  for(i in 1:n){
+    for(c in 1:k){
+      if(is.na(wts[c,i])){
+        wts[c,i]=1E-50
+      } else if(wts[c,i]<1E-50){
+        wts[c,i]=1E-50
+      } else if(wts[c,i]>(1-1E-50)){
+        wts[c,i]=1-1E-50
+      }
+    }
+  }
+  
+  if(CEM){
+    # CEM
+    draw_wts=wts                 # initialize
+    for(i in 1:n){
+      set.seed(i)
+      draw_wts[,i] = rmultinom(1,1,wts[,i])
+    }
+    seed_mult=1
+    while(any(rowSums(draw_wts)==0)){
+      cat("Drawing again",seed_mult,"\n")
+      for(i in 1:n){
+        set.seed(seed_mult*n+i)
+        for(c in 1:k){
+          if(wts[c,i]<=(1E-50*10^seed_mult) & seed_mult<=48){
+            wts[c,i]=1E-50*10^seed_mult
+          } else if(wts[c,i]>=(1-(1E-50*10^seed_mult)) & seed_mult<=48){
+            wts[c,i]=1-1E-50*10^seed_mult
+          }
+        }
+        draw_wts[,i] = rmultinom(1,1,wts[,i])
+      }
+      seed_mult=seed_mult+1
+      if(seed_mult>250){
+        draw_wts[,n]=rep(1/k,k)
+        break
+      }
+    }
+    wts=draw_wts
+  }          # Keep drawing until at least one in each cluster
+  
+  
+  # Input in M step only samples with PP's > 0.001
+  keep = (wts>0.001)^2      # matrix of 0's and 1's, dimensions k x n
+  
+  return(list(wts=wts,keep=keep))
+}
+
 
 FSCseq<-function(X=NA, y, k,
                  lambda=0,alpha=0,
                  size_factors=rep(1,times=ncol(y)),
                  norm_y=y,
-                 purity=rep(1,ncol(y)),offsets=rep(0,ncol(y)),              # Offsets: effect of log(covariate) on count #
+                 offsets=rep(0,ncol(y)),              # Offsets: effect of log(covariate) on count #
                  true_clusters=NA, true_disc=NA,
                  init_parms=FALSE,
                  init_coefs=matrix(0,nrow=nrow(y),ncol=k),
@@ -105,7 +192,6 @@ FSCseq<-function(X=NA, y, k,
   # k: #clusters
   # size_factors: SF's derived from DESeq2
   # norm_y: counts normalized for sequencing depth by DESeq2
-  # purity: input custom values to weight E step weights by purity (DISABLED)
   # offsets: option to include additional offsets. must be length n 
   # true_clusters: if applicable. For diagnostics tracking of ARI
   # true_disc: if applicable. For diagnostics tracking of disc/nondisc genes
@@ -225,7 +311,7 @@ FSCseq<-function(X=NA, y, k,
       
       cat(paste("INITIAL CLUSTERING:",colnames(all_init_cls)[i],"\n"))
       
-      fit = EM_run(X,y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
+      fit = EM_run(X,y,k,lambda,alpha,size_factors,norm_y,offsets,true_clusters,true_disc,
                    init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
                    cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,maxit_EM=maxit_inits)
       all_fits [[i]] = fit
@@ -243,7 +329,7 @@ FSCseq<-function(X=NA, y, k,
     }
   }
   
-  results=EM_run(X,y,k,lambda,alpha,size_factors,norm_y,purity,offsets,true_clusters,true_disc,
+  results=EM_run(X,y,k,lambda,alpha,size_factors,norm_y,offsets,true_clusters,true_disc,
                  init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
                  cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,maxit_EM=100)
   
@@ -259,7 +345,7 @@ EM_run <- function(X=NA, y, k,
                    lambda=0,alpha=0,
                    size_factors=rep(1,times=ncol(y)) ,
                    norm_y=y,
-                   purity=rep(1,ncol(y)),offsets=rep(0,ncol(y)),
+                   offsets=rep(0,ncol(y)),
                    true_clusters=NA, true_disc=NA,
                    init_parms=FALSE,
                    init_coefs=matrix(0,nrow=nrow(y),ncol=k),
@@ -316,6 +402,7 @@ EM_run <- function(X=NA, y, k,
   temp_list <- list()             # store temp to see progression of IRLS
   phi_list <- list()              # store each iteration of phi to see change with each iteration of EM
   coefs_list <- list()
+  MSE_coefs = rep(0,maxit_EM)
   LFCs = matrix(0,nrow=g,ncol=maxit_EM)
   
   offset=log2(size_factors) + offsets
@@ -500,18 +587,23 @@ EM_run <- function(X=NA, y, k,
         }
         
         if(diff_phi[a,j]<0.01){
-          if(est_phi[j]==1){
-            cat(paste("Stopping phi estimation for gene",j,"at iter",a,"\n"))
-          }
+          # if(est_phi[j]==1){
+          #   cat(paste("Stopping phi estimation for gene",j,"at iter",a,"\n"))
+          # }
           est_phi[j]=0
         } else{
           est_phi[j]=1
         }
       }
+      cat(paste("#genes to coninue est. phi next iter:",sum(est_phi),".\n"))
       cat(paste("Avg % diff in phi est (across 5 its) gene 1 = ",diff_phi[a,1],"\n"))
     }
     
     coefs_list[[a]] = coefs
+    if(a>1){
+      MSE_coefs[a]=sum(abs((coefs_list[[a]]-coefs_list[[a-1]])))/(ncol(coefs)*nrow(coefs))
+      cat(paste("MSE_coef:",MSE_coefs[a],"\n"))
+    }
     
     
     
@@ -636,10 +728,6 @@ EM_run <- function(X=NA, y, k,
     # Input in M step only samples with PP's > 0.001
     keep = (wts>0.001)^2      # matrix of 0's and 1's, dimensions k x n
     
-    # # Weighting by purity : found that this makes no difference
-    # for(i in 1:n){
-    #   wts[,i]=wts[,i]*purity[i]
-    # }      # default: purity = 1 --> wts stay the same.
     
     # Diagnostics Tracking
     current_clusters<-rep(0,times=n)
@@ -784,11 +872,10 @@ EM_run <- function(X=NA, y, k,
   
 }
 
-predictions <- function(X,fit,newdata,new_sizefactors,purity=rep(1,ncol(newdata)),offsets=rep(0,ncol(newdata))){
+predictions <- function(X,fit,newdata,new_sizefactors,offsets=rep(0,ncol(newdata))){
   # fit: Output of EM
   # newdata: Data to perform prediction on
   # new_sizefactors: SF's of new data
-  # purity: Custom purity values can be input and adjusted for (NOT AVAILABLE YET)
   # offsets: Additional offsets per sample can be incorporated
   if(all(is.na(X))){
     warning("No covariates specified. Predicting on cluster-specific intercept-only model.")
