@@ -8,7 +8,8 @@
 
 # BRCA
 load('sim_y.RData')
-init_y = y
+init_y = cbind(y,y,y)
+colnames(init_y) = 1:ncol(init_y)
 
 library("stats")
 library("data.table")
@@ -64,10 +65,13 @@ fit_DESeq_intercept=function(y,calc_vsd=F,calc_rld=F){
 
 # Function to simulate data
 simulate_data=function(n,k,g,init_pi,b,size_factors,distrib,phi=matrix(0,nrow=g,ncol=k),
-                       batch_coef=1,batch=rep(0,n)){      # batch of 0: no batch effect, batch of 1: yes effect
+                       batch_coef=1,batch=rep(0,n),batch_g=NA){      # batch of 0: no batch effect, batch of 1: yes effect
   batch_eff = batch_coef*batch
   y<-matrix(rep(0,times=g*n),nrow=g)
   z = rmultinom(n,1,init_pi)
+  if(all(is.na(batch_g))){
+    batch_g = sample(1:g, 0.5*g)   # Apply batch on 50% of genes
+  }
   if(ncol(b)!=k){
     warning("Wrong order selected. Simulating based on correct order")
     k=ncol(b)
@@ -79,26 +83,38 @@ simulate_data=function(n,k,g,init_pi,b,size_factors,distrib,phi=matrix(0,nrow=g,
   if(distrib=="poisson"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        if(j %in% batch_g){
+          y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        } else{
+          y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]]))
+        }
       }
     }
   } else if(distrib=="nb"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rnbinom( 1, size = 1/phi[j,cl[i]], mu = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        if(j %in% batch_g){
+          y[j,i] = rnbinom( 1, size = 1/phi[j,cl[i]], mu = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        } else{
+          y[j,i] = rnbinom( 1, size = 1/phi[j,cl[i]], mu = size_factors[i]*2^(b[j,cl[i]]))
+        }
       }
     }
   }
-  result<-list(y=y,z=z)
+  result<-list(y=y,z=z,batch_g=batch_g)
   return(result)
 }
 
 # Simulate data with gene-wise dispersion parameters
 simulate_data_g=function(n,k,g,init_pi,b,size_factors,distrib,phi=rep(0,times=g),
-                         batch_coef=1,batch=rep(0,n)){     # batch of 0: no batch effect, batch of 1: yes effect
+                         batch_coef=1,batch=rep(0,n),batch_g=NA){     # batch of 0: no batch effect, batch of 1: yes effect
   batch_eff = batch_coef*batch
   y<-matrix(rep(0,times=g*n),nrow=g)
   z = rmultinom(n,1,init_pi)
+  if(all(is.na(batch_g))){
+    batch_g = sample(1:g, 0.5*g)   # Apply batch on 50% of genes
+  }
+  
   if(ncol(b)!=k){
     warning("Wrong order selected. Simulating based on correct order")
     k=ncol(b)
@@ -110,17 +126,25 @@ simulate_data_g=function(n,k,g,init_pi,b,size_factors,distrib,phi=rep(0,times=g)
   if(distrib=="poisson"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        if(j %in% batch_g){
+          y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        }else{
+          y[j,i] = rpois( 1, lambda = size_factors[i]*2^(b[j,cl[i]]))
+        }
       }
     }
   } else if(distrib=="nb"){
     for(j in 1:g){
       for(i in 1:n){
-        y[j,i] = rnbinom( 1, size = 1/phi[j], mu = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        if(j %in% batch_g){
+          y[j,i] = rnbinom( 1, size = 1/phi[j], mu = size_factors[i]*2^(b[j,cl[i]] + batch_eff[i]))
+        } else{
+          y[j,i] = rnbinom( 1, size = 1/phi[j], mu = size_factors[i]*2^(b[j,cl[i]]))
+        }
       }
     }
   }
-  result<-list(y=y,z=z)
+  result<-list(y=y,z=z,batch_g=batch_g)
   return(result)
 }
 
@@ -258,7 +282,7 @@ sim.NB.MClust = function(y,K_search){
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
                  distrib,method="EM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
-                 disp="gene",fixed_parms=F, fixed_coef=6.5,fixed_phi=0.35,
+                 disp="gene",fixed_parms=F, fixed_coef=8,fixed_phi=0.35,
                  ncores=10,nsims=ncores,iCluster_compare=T,penalty=T,
                  sim_batch=F, p_batch=0.5, batch_coef=fold.change,
                  adj_batch=F){
@@ -281,7 +305,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_fixed_%f_%s_batch%f_sim%s_adj%s",true.K,n,g,fold.change,num.disc,distrib,fixed_coef,paste(fixed_phi,collapse="_"),p_batch,sim_batch,adj_batch)
     }
   }
-  dir.create(sprintf("Diagnostics/%s",dir_name))
+  ifelse(!dir.exists(sprintf("Diagnostics/%s",dir_name)),
+         dir.create(sprintf("Diagnostics/%s",dir_name)),
+         FALSE)
   
   # max n = 100, max #
   
@@ -361,6 +387,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       batch = rep(0,n)
     }
     
+    set.seed(2*ii)
     if(disp=="cluster"){    # check for whether init_phi is of dimension 1
       sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=init_size_factors,distrib=distrib,phi=init_phi,
                              batch_coef=batch_coef,batch=batch) # cluster-wise disp param
@@ -370,6 +397,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     }
     y<-sim.dat$y
     z<-sim.dat$z
+    batch_g = rep(FALSE,g)
+    batch_g[sim.dat$batch_g] <- TRUE
     true_clusters<-rep(0,times=n)
     for(i in 1:n){
       true_clusters[i]<-which(z[,i]==1)
@@ -407,12 +436,13 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     y=y[idx,]
     norm_y=norm_y[idx,]
     true_disc=true_disc[idx]
+    batch_g=batch_g[idx]
     
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,
                          size_factors=init_size_factors,
                          norm_y=norm_y,
-                         true_disc=true_disc, batch=batch
+                         true_disc=true_disc, batch=batch, batch_g=batch_g
                          ,gene_id=idx
                         )
   }
@@ -430,10 +460,11 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     filt_sens = sum(idx[1:tt])/tt
     filt_falsepos = sum(idx[(tt+1):g])/(g-tt)
     
-    norm_y = all_data[[ii]]$norm_y               # ACTUAL norm_y based on simulated size factors
-    size_factors = all_data[[ii]]$size_factors
+    true_norm_y = all_data[[ii]]$norm_y               # ACTUAL norm_y based on simulated size factors
+    true_size_factors = all_data[[ii]]$size_factors
     
     batch=all_data[[ii]]$batch
+    batch_g=all_data[[ii]]$batch_g
     
     if(adj_batch){
       X=matrix(batch,ncol=1)
@@ -441,10 +472,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       X=NA
     }
     
-    # fit=fit_DESeq_intercept(y,calc_vsd=F,calc_rld=F)       # ESTIMATE based on DESeq2
-    # size_factors=fit$size_factors
-    # norm_y=fit$norm_y
-    # rm(fit)
+    fit=fit_DESeq_intercept(y,calc_vsd=F,calc_rld=F)       # ESTIMATE based on DESeq2
+    size_factors=fit$size_factors
+    norm_y=fit$norm_y
+    rm(fit)
     
     sink(sprintf("Diagnostics/%s/progress%d_%s_%s.txt",dir_name,ii,method,disp))
     # Order selection
@@ -471,39 +502,39 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     max_k=list_BIC[which.min(list_BIC[,2]),1]
     unpen_BIC = min(list_BIC[,2])
     
-    sink(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.txt",dir_name,method,disp,ii))
-    cat(paste("True order:",true.K,"\n"))
-    cat(paste("Optimal order selected:",max_k,"\n"))
-    cat("RUN WITH CORRECT ORDER:\n")
-    MSE_coefs = sum((compare_res$coefs[,order(compare_res$coefs[1,])] - sim_coefs[idx,])^2)/(sum(idx)*true.K)
-    if(is.null(ncol(init_phi))){
-      MSE_phi = sum((init_phi[idx]-compare_res$phi)^2)/(sum(idx)*true.K) # test
-    } else{
-      MSE_phi = sum((init_phi[idx,]-compare_res$phi)^2)/(sum(idx)*true.K) # test
-    }
-    cat(paste("ARI:",adjustedRandIndex(compare_res$final_clusters,true_clusters),"\n"))
-    cat(paste("MSE of true vs discovered coefs:",MSE_coefs,"\n"))
-    cat(paste("MSE of true vs discovered phi:",MSE_phi,"\n"))
-    cat(paste("% of correctly ID'ed disc genes:",sum(!compare_res$nondiscriminatory==true_disc)/sum(true_disc),"\n"))
-    cat(paste("PPs (n x k):\n"))
-    write.table(t(compare_res$wts),quote=F,col.names=F)
-    
-    sink()
-    
-    pdf(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.pdf",dir_name,method,disp,ii))
-    for(c in 1:true.K){
-      cl_ids = true_clusters==c
-      for(cc in 1:true.K){
-        boxplot(compare_res$wts[cc,cl_ids],main=sprintf("Boxplot of PP for subjects of true cl%d being in cl%d",c,cc))
-      }
-    }
-    annotation_col = data.frame(cbind(true_clusters,compare_res$final_clusters))
-    colnames(annotation_col)=c("True","Derived")
-    rownames(annotation_col)=c(1:ncol(norm_y))
-    colnames(norm_y)=c(1:ncol(norm_y))
-    annotation_col2 = annotation_col[order(true_clusters),]
-    pheatmap(log(norm_y[,order(compare_res$final_clusters)]+0.1),cluster_cols = F,scale="row",annotation_col = annotation_col2)
-    dev.off()
+    # sink(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.txt",dir_name,method,disp,ii))
+    # cat(paste("True order:",true.K,"\n"))
+    # cat(paste("Optimal order selected:",max_k,"\n"))
+    # cat("RUN WITH CORRECT ORDER:\n")
+    # MSE_coefs = sum((compare_res$coefs[,order(compare_res$coefs[1,])] - sim_coefs[idx,])^2)/(sum(idx)*true.K)
+    # if(is.null(ncol(init_phi))){
+    #   MSE_phi = sum((init_phi[idx]-compare_res$phi)^2)/(sum(idx)*true.K) # test
+    # } else{
+    #   MSE_phi = sum((init_phi[idx,]-compare_res$phi)^2)/(sum(idx)*true.K) # test
+    # }
+    # cat(paste("ARI:",adjustedRandIndex(compare_res$final_clusters,true_clusters),"\n"))
+    # cat(paste("MSE of true vs discovered coefs:",MSE_coefs,"\n"))
+    # cat(paste("MSE of true vs discovered phi:",MSE_phi,"\n"))
+    # cat(paste("% of correctly ID'ed disc genes:",sum(!compare_res$nondiscriminatory==true_disc)/sum(true_disc),"\n"))
+    # cat(paste("PPs (n x k):\n"))
+    # write.table(t(compare_res$wts),quote=F,col.names=F)
+    # 
+    # sink()
+    # 
+    # pdf(file=sprintf("Diagnostics/%s/%s_%s_final%d_order.pdf",dir_name,method,disp,ii))
+    # for(c in 1:true.K){
+    #   cl_ids = true_clusters==c
+    #   for(cc in 1:true.K){
+    #     boxplot(compare_res$wts[cc,cl_ids],main=sprintf("Boxplot of PP for subjects of true cl%d being in cl%d",c,cc))
+    #   }
+    # }
+    # annotation_col = data.frame(cbind(true_clusters,compare_res$final_clusters))
+    # colnames(annotation_col)=c("True","Derived")
+    # rownames(annotation_col)=c(1:ncol(norm_y))
+    # colnames(norm_y)=c(1:ncol(norm_y))
+    # annotation_col2 = annotation_col[order(true_clusters),]
+    # pheatmap(log(norm_y[,order(compare_res$final_clusters)]+0.1),cluster_cols = F,scale="row",annotation_col = annotation_col2)
+    # dev.off()
     
     # Grid search
     
@@ -518,7 +549,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       print(paste("Dataset",ii,"Grid Search:"))    # track iteration
       
       #create matrix for grid search values
-      lambda_search=seq(0.25,3,0.25)
+      lambda_search=seq(0.05,1,0.05)
       alpha_search=seq(0,0.5,0.05)        # alpha can't = 1
       
       list_BIC=matrix(0,nrow=length(lambda_search)*length(alpha_search),ncol=3) # matrix of BIC's: one for each combination of penalty params 
@@ -627,12 +658,18 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
         batch_pred = rep(0,n_pred)
       }
       
+      if(adj_batch){
+        X_pred=matrix(batch_pred,ncol=1)
+      }else{
+        X_pred=NA
+      }
+      
       if(disp=="cluster"){    # check for whether init_phi is of dimension 1
         sim.dat<-simulate_data(n=n_pred,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=SF_pred,distrib=distrib,phi=init_phi,
-                               batch_coef=batch_coef,batch=batch_pred) # cluster-wise disp param
+                               batch_coef=batch_coef,batch=batch_pred,batch_g=batch_g) # cluster-wise disp param
       } else{
         sim.dat<-simulate_data_g(n=n_pred,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=SF_pred,distrib=distrib,phi=init_phi,
-                                 batch_coef=batch_coef,batch=batch_pred) # gene-specific disp param
+                                 batch_coef=batch_coef,batch=batch_pred,batch_g=batch_g) # gene-specific disp param
       }
       y_pred<-sim.dat$y
       z_pred<-sim.dat$z
@@ -660,7 +697,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       # true_clusters_pred=new_cl_ids[true_clusters_pred]
       
       
-      fit= sim.predict(X,res_pred,y_pred,SF_pred,true_clusters=true_clusters_pred)
+      fit= sim.predict(X_pred,res_pred,y_pred,SF_pred,true_clusters=true_clusters_pred)
       pred_acc=fit$pred_acc
     
     print("Prediction complete")
@@ -698,16 +735,25 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     cat(paste("K-med K: ",K_med, "\n"))
     
     cls_hc = cutree(hclust(as.dist(1-cor(norm_y, method="spearman")),method="average"),K_hc)
+    cat("cls_hc finished\n")
     cls_med = pam(t(log(norm_y+0.1)),K_med)$cluster
+    cat("cls_km finished\n")
     
     
     # NB.MClust
-    NBMB_fit = sim.NB.MClust(round(norm_y,0),2:7)
-    K_NBMB = NBMB_fit$max_k
-    cls_NBMB =NBMB_fit$cls
+    NBMB_fit=NA
+    K_NBMB=0
+    cls_NBMB=rep(0,n)
+    tryCatch({
+      NBMB_fit = sim.NB.MClust(round(norm_y,0),2:7)
+      K_NBMB = NBMB_fit$max_k
+      cls_NBMB =NBMB_fit$cls
     
-    cat(paste("NB.MClust K:",K_NBMB,"\n"))
-    cat("Finished NB.MClust\n")
+      cat(paste("NB.MClust K:",K_NBMB,"\n"))
+      cat("Finished NB.MClust\n")
+    },error=function(e){
+      cat("NB.MClust errored out (glm.nb fit did not converge). Excluding from analysis\n")
+    })
     
     # Mclust (log, variance-stabilizing, and rlog transforms)
     fit = fit_DESeq_intercept(y,calc_vsd=T,calc_rld=T)
@@ -751,13 +797,14 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     sink()
     
-    all_Ks = cbind(max_k,K_iClust,K_NBMB,K_log_mclust,K_vsd_mclust,K_rld_mclust,K_hc,K_med)
+    all_Ks = c(max_k,K_iClust,K_NBMB,K_log_mclust,K_vsd_mclust,K_rld_mclust,K_hc,K_med)
     names(all_Ks) = c("EM","iClust","NBMB","logMC","vsdMC","rldMC","HC","KM")
     all_cls = cbind(cls_EM,cls_iClust,cls_NBMB,
           cls_log_mclust,cls_vsd_mclust,cls_rld_mclust,
           cls_hc,cls_med)
     colnames(all_cls) = c("EM","iClust","NBMB","logMC","vsdMC","rldMC","HC","KM")
     
+    print("all_Ks and all_cls created")
     
     results=list(res=res,
                  max_k=max_k,
@@ -793,7 +840,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     library(NbClust)
     library(NB.MClust)
     library(Biobase)
-    sourceCpp("M_step2.cpp")
+    sourceCpp("M_step.cpp")
     })
   
   # Store all results in list par_sim_res
@@ -918,7 +965,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   K_iClust = mean(temp_K_iClust)         # range: 1:7
   K_HC = mean(temp_K_hc)                 # range: 1:7
   K_KM = mean(temp_K_med)                # range: 2:7
-  K_NBMB = mean(temp_K_NBMB)             # range: 2:7
+  K_NBMB = mean(temp_K_NBMB[temp_K_NBMB!=0])             # range: 2:7
   K_log_MC = mean(temp_K_log_mclust)     # range: 1:7
   K_vsd_MC = mean(temp_K_vsd_mclust)     # range: 1:7
   K_rld_MC = mean(temp_K_rld_mclust)     # range: 1:7
@@ -927,7 +974,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   ARI_iClust = mean(temp_ARI_iClust)
   ARI_HC = mean(temp_ARI_hc)
   ARI_KM = mean(temp_ARI_med)
-  ARI_NBMB = mean(temp_ARI_NBMB)
+  ARI_NBMB = mean(temp_ARI_NBMB[temp_ARI_NBMB!=0])
   ARI_log_MC = mean(temp_ARI_log_mclust)
   ARI_vsd_MC = mean(temp_ARI_vsd_mclust)
   ARI_rld_MC = mean(temp_ARI_rld_mclust)

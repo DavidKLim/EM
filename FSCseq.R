@@ -86,9 +86,10 @@ normalizations <- function(dat){
   return(res)
 }
 
-E_step<-function(X,pi,coefs,phi,cl_phi,CEM){
+E_step<-function(X,y,k,n,pi,coefs,phi,phi_g,cl_phi,offset,CEM,Tau,wts){
   k=length(pi)
   p=ncol(coefs)-k
+  covars=(p>0)
   
   l<-matrix(rep(0,times=k*n),nrow=k)
   for(i in 1:n){
@@ -170,7 +171,7 @@ E_step<-function(X,pi,coefs,phi,cl_phi,CEM){
   # Input in M step only samples with PP's > 0.001
   keep = (wts>0.001)^2      # matrix of 0's and 1's, dimensions k x n
   
-  return(list(wts=wts,keep=keep))
+  return(list(wts=wts,keep=keep,Tau=Tau))
 }
 
 
@@ -446,6 +447,8 @@ EM_run <- function(X=NA, y, k,
   all_temp_list = list()
   all_theta_list = list()
   
+  #gene_E_step=F   # performing E step after each gene's M step: unstable. T: on, F: off
+  
   ########### M / E STEPS #########
   for(a in 1:maxit_EM){
     EMstart= as.numeric(Sys.time())
@@ -484,6 +487,7 @@ EM_run <- function(X=NA, y, k,
         beta <- coefs[j,]
         theta<-matrix(rep(0,times=k^2),nrow=k)
         for(c in 1:k){
+          pi[c]=mean(cls==c)
           for(cc in 1:k){
             theta[c,cc]<-SCAD_soft_thresholding(beta[c]-beta[cc],lambda,alpha)
             #theta[c,cc]<-lasso_soft_thresholding(beta[c]-beta[cc],lambda*alpha)
@@ -506,7 +510,12 @@ EM_run <- function(X=NA, y, k,
                            k=k,theta=theta_list[[j]],coefs_j=coefs[j,],phi_j=phi[j,],cl_phi=cl_phi,phi_g=phi_g[j],est_phi=est_phi[j],est_covar=est_covar[j],
                            lambda=lambda,alpha=alpha,
                            IRLS_tol=IRLS_tol,maxit_IRLS=maxit_IRLS #,fixed_phi = phis
-      )
+                          )
+      # if(gene_E_step){          # gene_E_step toggle TRUE/FALSE
+      #   run_E_step=E_step(X,y,k,n,pi,coefs,phi,phi_g,cl_phi,offset,CEM,Tau,wts)
+      #   wts=run_E_step$wts
+      #   keep=run_E_step$keep
+      # }
     }
     Mend=as.numeric(Sys.time())
     cat(paste("M Step Time Elapsed:",Mend-Mstart,"seconds.\n"))

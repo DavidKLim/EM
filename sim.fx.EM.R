@@ -1,5 +1,5 @@
 run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
-                   distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,
+                   distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,
                    ncores=24,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none"),more_options=""){
   setwd("/pine/scr/d/e/deelim/out")
 
@@ -36,21 +36,21 @@ run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.
       cmd[3] = sprintf("save(X, file = '%s')", out2)
       cmdf = paste(cmd, collapse = "")
       write.table(cmdf, file = out, col.names = F, row.names = F, quote = F)
-      run = sprintf("sbatch -p general -N 1 -n %d --mem=%dg -t 7- -o /pine/scr/d/e/deelim/dump/%s.log -J %s --wrap='R CMD BATCH %s'", ncores,2*ncores,fname,fname,out)
+      run = sprintf("sbatch -p general -N 1 -n %d --mem=%dg -t 4- -o /pine/scr/d/e/deelim/dump/%s.log -J %s --wrap='R CMD BATCH %s'", ncores,2*ncores,fname,fname,out)
       Sys.sleep(1)
       system(run)
   }}}}}
 }
 
 collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
-                       distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=6.5,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
+                       distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n)
-  tab<-matrix(0,nrow=nsims,ncol=37)      # 3 conditions, 7 things to tabulate
+  tab<-matrix(0,nrow=nsims,ncol=38)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda","alpha","ARI",
                    "sens","false.pos","i_K","i_ARI","pred_acc","ARI_hc","ARI_med",
                    "K_HC","K_med","Order_Acc","Filt_sens","Filt_FP",
                    "K_NBMB","ARI_NBMB","K_log_MC","ARI_log_MC","K_vsd_MC","ARI_vsd_MC","K_rld_MC","ARI_rld_MC",
-                   "OA_iClust","OA_HC","OA_KM","OA_NBMB","OA_log_MC","OA_vsd_MC","OA_rld_MC")
+                   "OA_iClust","OA_HC","OA_KM","OA_NBMB","OA_log_MC","OA_vsd_MC","OA_rld_MC","true_order_pred_acc")
   ii=1
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n)){
       if(fixed_parms=="F"){
@@ -120,6 +120,9 @@ collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.
       tab[ii,35]<-mean(Ks_logMC == true_k[i])
       tab[ii,36]<-mean(Ks_vsdMC == true_k[i])
       tab[ii,37]<-mean(Ks_rldMC == true_k[i])
+      if(is.null(X$mean_order_pred_acc)){
+        tab[ii,38]=NA
+      } else{tab[ii,38]<-X$mean_order_pred_acc}
       ii=ii+1
   }}}}}
   if(fixed_parms=="F"){
