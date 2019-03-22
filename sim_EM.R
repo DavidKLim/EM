@@ -282,7 +282,7 @@ sim.NB.MClust = function(y,K_search){
 # Function to perform EM on simulated data
 sim.EM<-function(true.K, fold.change, num.disc, g, n, 
                  distrib,method="EM",filt_quant = 0.2,filt_method=c("pval","mad","none"),
-                 disp="gene",fixed_parms=F, fixed_coef=8,fixed_phi=0.35,
+                 sim_disp="gene",disp="gene",fixed_parms=F, fixed_coef=8,fixed_phi=0.35,
                  ncores=10,nsims=ncores,iCluster_compare=T,penalty=T,
                  sim_batch=F, p_batch=0.5, batch_coef=fold.change,
                  adj_batch=F){
@@ -297,12 +297,15 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   sim = nsims       # number of sims (set eq to number of cores for now)
   
   if(!fixed_parms){
-    dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_batch%f_sim%s_adj%s",true.K,n,g,fold.change,num.disc,distrib,p_batch,sim_batch,adj_batch)
+    dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_disp%s_batch%f_sim%s_adj%s",
+                       true.K,n,g,fold.change,num.disc,distrib,sim_disp,p_batch,sim_batch,adj_batch)
   } else{
     if(length(fixed_phi)==1){
-      dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_fixed_%f_%f_batch%f_sim%s_adj%s",true.K,n,g,fold.change,num.disc,distrib,fixed_coef,fixed_phi,p_batch,sim_batch,adj_batch)
+      dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_fixed_disp%s_%f_%f_batch%f_sim%s_adj%s",
+                         true.K,n,g,fold.change,num.disc,distrib,sim_disp,fixed_coef,fixed_phi,p_batch,sim_batch,adj_batch)
     }else{
-      dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_fixed_%f_%s_batch%f_sim%s_adj%s",true.K,n,g,fold.change,num.disc,distrib,fixed_coef,paste(fixed_phi,collapse="_"),p_batch,sim_batch,adj_batch)
+      dir_name = sprintf("Sim_%d_%d_%d_%f_%f_%s_fixed_disp%s_%f_%s_batch%f_sim%s_adj%s",
+                         true.K,n,g,fold.change,num.disc,distrib,sim_disp,fixed_coef,paste(fixed_phi,collapse="_"),p_batch,sim_batch,adj_batch)
     }
   }
   ifelse(!dir.exists(sprintf("Diagnostics/%s",dir_name)),
@@ -329,13 +332,13 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   # Unpenalized run to find initial cluster estimates based on K=k
   k=true.K
   if(!fixed_parms){
-    res_init<-FSCseq(y=init_y,k=k,lambda=0,alpha=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters,prefix="init",dir=dir_name,method=method,disp=disp)
+    res_init<-FSCseq(y=init_y,k=k,lambda=0,alpha=0,size_factors=init_size_factors,norm_y=init_norm_y,true_clusters=true_clusters,prefix="init",dir=dir_name,method=method,disp=sim_disp)
     init_coefs<-res_init$coefs              # save init estimates for coefs & pi
     init_phi<-res_init$phi
   } else{
     # fixed coefs and phi
     init_coefs <- matrix(fixed_coef,nrow=g,ncol=k)
-    if(disp=="gene"){
+    if(sim_disp=="gene"){
       init_phi <- rep(fixed_phi,g)
     } else{ init_phi <- matrix(fixed_phi,nrow=g,ncol=k,byrow=T) }
   }
@@ -388,7 +391,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     }
     
     set.seed(2*ii)
-    if(disp=="cluster"){    # check for whether init_phi is of dimension 1
+    if(sim_disp=="cluster"){    # check for whether init_phi is of dimension 1
       sim.dat<-simulate_data(n=n,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=init_size_factors,distrib=distrib,phi=init_phi,
                              batch_coef=batch_coef,batch=batch) # cluster-wise disp param
     } else{
@@ -664,7 +667,7 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
         X_pred=NA
       }
       
-      if(disp=="cluster"){    # check for whether init_phi is of dimension 1
+      if(sim_disp=="cluster"){    # check for whether init_phi is of dimension 1
         sim.dat<-simulate_data(n=n_pred,k=true.K,g=g,init_pi=sim_pi,b=sim_coefs,size_factors=SF_pred,distrib=distrib,phi=init_phi,
                                batch_coef=batch_coef,batch=batch_pred,batch_g=batch_g) # cluster-wise disp param
       } else{

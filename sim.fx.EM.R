@@ -1,5 +1,5 @@
 run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
-                   distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,
+                   distrib="nb",method="EM",sim_disp="gene",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,
                    ncores=24,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none"),more_options=""){
   setwd("/pine/scr/d/e/deelim/out")
 
@@ -8,27 +8,27 @@ run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.
       cmd[1] = "unlink('.RData') \n source('sim_EM.R') \n"
       if(length(fixed_phi)==1){
         cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d,
-                       distrib='%s', method='%s', filt_quant=%f, filt_method='%s',
+                       distrib='%s', method='%s', filt_quant=%f, filt_method='%s',sim_disp='%s',
                        disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=%f,
                        ncores=%d,nsims=%d,iCluster_compare=T%s)\n",
-                       true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,filt_quant,filt_method,disp,fixed_parms,fixed_coef,fixed_phi,ncores,nsims,more_options)
+                       true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,filt_quant,filt_method,sim_disp,disp,fixed_parms,fixed_coef,fixed_phi,ncores,nsims,more_options)
       } else{
         cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d,
-                       distrib='%s', method='%s', filt_quant=%f, filt_method='%s',
+                       distrib='%s', method='%s', filt_quant=%f, filt_method='%s',sim_disp='%s',
                        disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=c(%s),
                        ncores=%d,nsims=%d,iCluster_compare=T%s)\n",
-                         true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,filt_quant,filt_method,disp,fixed_parms,fixed_coef,paste(fixed_phi,collapse=","),ncores,nsims,more_options)
+                         true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,filt_quant,filt_method,sim_disp,disp,fixed_parms,fixed_coef,paste(fixed_phi,collapse=","),ncores,nsims,more_options)
       }
       if(fixed_parms=="F"){
-        fname = sprintf("run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d_filt_%s_%f",
-                        prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],filt_method,filt_quant)
+        fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_filt_%s_%f",
+                        prefix,distrib,method,sim_disp,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],filt_method,filt_quant)
       } else{
         if(length(fixed_phi)==1){
-          fname = sprintf("run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d_fixed_%f_%f_filt_%s_%f",
-                          prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,fixed_phi,filt_method,filt_quant)
+          fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_fixed_%f_%f_filt_%s_%f",
+                          prefix,distrib,method,sim_disp,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,fixed_phi,filt_method,filt_quant)
         } else{
-          fname = sprintf("run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d_fixed_%f_%s_filt_%s_%f",
-                          prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
+          fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_fixed_%f_%s_filt_%s_%f",
+                          prefix,distrib,method,sim_disp,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
         }
       }
       out = sprintf("/pine/scr/d/e/deelim/%s",fname)
@@ -43,7 +43,7 @@ run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.
 }
 
 collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
-                       distrib="nb",method="EM",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
+                       distrib="nb",method="EM",sim_disp="gene",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n)
   tab<-matrix(0,nrow=nsims,ncol=38)      # 3 conditions, 7 things to tabulate
   colnames(tab)<-c("n","g","log.fold.change","true.K","true.disc","K","disc","lambda","alpha","ARI",
@@ -54,15 +54,15 @@ collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.
   ii=1
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n)){
       if(fixed_parms=="F"){
-        fname = sprintf("run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d_filt_%s_%f",
-                        prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],filt_method,filt_quant)
+        fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_filt_%s_%f",
+                        prefix,distrib,method,sim_disp,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],filt_method,filt_quant)
       } else{
         if(length(fixed_phi)==1){
-          fname = sprintf("run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d_fixed_%f_%f_filt_%s_%f",
-                          prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,fixed_phi,filt_method,filt_quant)
+          fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_fixed_%f_%f_filt_%s_%f",
+                          prefix,distrib,method,sim_disp,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,fixed_phi,filt_method,filt_quant)
         } else{
-          fname = sprintf("run_sim_%s_%s_%s_%s_%d_%f_%f_%d_%d_fixed_%f_%s_filt_%s_%f",
-                          prefix,distrib,method,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
+          fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_fixed_%f_%s_filt_%s_%f",
+                          prefix,distrib,method,sim_disp,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
         }
       }
       out = sprintf("/pine/scr/d/e/deelim/%s",fname)
@@ -126,12 +126,12 @@ collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.
       ii=ii+1
   }}}}}
   if(fixed_parms=="F"){
-    final_results = sprintf("final_table_%s_%s_%s_%s_filt_%s_%f",prefix,distrib,method,disp,filt_method,filt_quant)
+    final_results = sprintf("final_table_%s_%s_%s_sim%s_%s_filt_%s_%f",prefix,distrib,method,sim_disp,disp,filt_method,filt_quant)
   } else{
     if(length(fixed_phi)==1){
-      final_results = sprintf("final_table_%s_%s_%s_%s_fixed_%f_%f_filt_%s_%f",prefix,distrib,method,disp,fixed_coef,fixed_phi,filt_method,filt_quant)
+      final_results = sprintf("final_table_%s_%s_%s_sim%s_%s_fixed_%f_%f_filt_%s_%f",prefix,distrib,method,sim_disp,disp,fixed_coef,fixed_phi,filt_method,filt_quant)
     } else{
-      final_results = sprintf("final_table_%s_%s_%s_%s_fixed_%f_%s_filt_%s_%f",prefix,distrib,method,disp,fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
+      final_results = sprintf("final_table_%s_%s_%s_sim%s_%s_fixed_%f_%s_filt_%s_%f",prefix,distrib,method,sim_disp,disp,fixed_coef,paste(fixed_phi,collapse="_"),filt_method,filt_quant)
     }
   }
   final_results2 = sprintf("%s.out",final_results)
