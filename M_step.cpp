@@ -337,20 +337,22 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		if(phi_g == 0 || a>1 || i>0){              /* don't estimate phi if glm.nb() was fit to initialize phi */
 			if(est_phi==1 && cl_phi==0 && continue_phi==1){
 			  phi_g = phi_ml_g(rep_y_j(ids),mu(ids),vec_wts(ids),10,0);
-			  /*if(phi_g>5){
-				  phi_g=5;
-			  }*/
+			  if(phi_g>100){
+					phi_g=100;
+				}
 			  for(int c=0; c<k; c++){
 				phi_j(c) = phi_g;
 			  }
 			}
 		}
+		/*if(i==0){
+			Rprintf("phi: %f\n",phi_g);
+		}*/
 		
 		if(i==TIME_ITER){
 			timer.step("est phi_g");
 		}
 		
-		/*Rprintf("IRLS iter %d\n phi: %f\n",i,phi_g);*/
 		
 		/* Calculate y_tilde and W matrix */
 		for(int cc=0; cc<k; cc++){
@@ -385,6 +387,11 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 				resid=y_tilde-Xpp*betapp;
 				
 				beta(pp) = accu(vec_W % X.col(pp) % resid)/accu(vec_W % pow(X.col(pp),2));
+				if(beta(pp)>100){
+					beta(pp)=100;
+				} else if(beta(pp)<-100){
+					beta(pp)=-100;
+				}   /* is this feasible to do? 2^100 is 1E30, 2^50 is 1.1E15 */
 			}
 		}
 		
@@ -426,6 +433,10 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
               } else {
 				  beta(c) = accu(vec_W_c % resid_c)/accu(vec_W_c);
               }
+			  
+			  /*if(i==0){
+				  Rprintf("cl%d: %f\n",c,beta(c));
+			  }*/
     
               if(beta(c) < (-100)){
                   /* Rprintf("Cluster %d, gene %d truncated at -100",c+1,j); */
