@@ -1,6 +1,6 @@
 run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
                    distrib="nb",method="EM",sim_disp="gene",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,
-                   ncores=24,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none"),more_options=""){
+                   ncores=25,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none"),more_options=""){
   setwd("/pine/scr/d/e/deelim/out")
 
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n)){
@@ -11,13 +11,19 @@ run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.
                        distrib='%s', method='%s', filt_quant=%f, filt_method='%s',sim_disp='%s',
                        disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=%f,
                        ncores=%d,nsims=%d,iCluster_compare=T%s)\n",
-                       true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,filt_quant,filt_method,sim_disp,disp,fixed_parms,fixed_coef,fixed_phi,ncores,nsims,more_options)
+                       true_k[i],fold_change[j],num_disc[k],g[l],n[m],
+                       distrib,method,filt_quant,filt_method,sim_disp,
+                       disp,fixed_parms,fixed_coef,fixed_phi,
+                       ncores,nsims,more_options)
       } else{
         cmd[2] = sprintf("X = sim.EM(true.K = %d, fold.change =%f, num.disc = %f, g = %d,n = %d,
                        distrib='%s', method='%s', filt_quant=%f, filt_method='%s',sim_disp='%s',
                        disp='%s', fixed_parms=%s, fixed_coef=%f, fixed_phi=c(%s),
                        ncores=%d,nsims=%d,iCluster_compare=T%s)\n",
-                         true_k[i],fold_change[j],num_disc[k],g[l],n[m],distrib,method,filt_quant,filt_method,sim_disp,disp,fixed_parms,fixed_coef,paste(fixed_phi,collapse=","),ncores,nsims,more_options)
+                         true_k[i],fold_change[j],num_disc[k],g[l],n[m],
+                         distrib,method,filt_quant,filt_method,sim_disp,
+                         disp,fixed_parms,fixed_coef,paste(fixed_phi,collapse=","),
+                         ncores,nsims,more_options)
       }
       if(fixed_parms=="F"){
         fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_filt_%s_%f",
@@ -36,7 +42,7 @@ run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.
       cmd[3] = sprintf("save(X, file = '%s')", out2)
       cmdf = paste(cmd, collapse = "")
       write.table(cmdf, file = out, col.names = F, row.names = F, quote = F)
-      run = sprintf("sbatch -p general -N 1 -n %d --mem=%dg -t 4- -o /pine/scr/d/e/deelim/dump/%s.log -J %s --wrap='R CMD BATCH %s'", ncores,2*ncores,fname,fname,out)
+      run = sprintf("sbatch -p general -N 1 -n %d --mem=%dg -t 2- -o /pine/scr/d/e/deelim/dump/%s.log -J %s --wrap='R CMD BATCH %s'", ncores,2*ncores,fname,fname,out)
       Sys.sleep(1)
       system(run)
   }}}}}

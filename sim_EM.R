@@ -344,11 +344,21 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   }
   
   sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
-  fold_change<-fold.change
-  nondisc_fold_change<-0         # fixed nondisc fold change
+  fold.change<-fold.change
+  nondisc.fold.change<-0         # fixed nondisc fold change
   tt<-floor(num.disc*g)
-  sim_coefs[1:tt,]<-matrix(rep( fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=tt),nrow=tt,byrow=TRUE)+sim_coefs[1:tt,]
-  #sim_coefs[(tt+1):g,]<-matrix(rep( nondisc_fold_change*(c(0:(k-1))+rep((1-k)/2,times=k)) ,times=(g-tt)),nrow=(g-tt),byrow=TRUE)+sim_coefs[(tt+1):g,]         # nondisc fold change = 0 so this doesn't get changed
+  
+  down_disc = sample(1:tt,floor(tt/2),replace=F)          # Randomly apply LFC up on half of the genes, and down on half of the genes
+  LFC_apply_mat =matrix(0,nrow=tt,ncol=k)
+  LFC_apply = fold.change*(c(0:(k-1))+rep((1-k)/2,times=k))
+  for(t in 1:tt){
+    if(t %in% down_disc){
+      LFC_apply_mat[t,]=-LFC_apply
+    } else{
+      LFC_apply_mat[t,]=LFC_apply
+    }
+  }
+  sim_coefs[1:tt,]=sim_coefs[1:tt,] + LFC_apply_mat
   sim_pi<-rep(1/true.K,times=true.K)
   
   
@@ -488,16 +498,16 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     print(paste("Dataset",ii,"Order Selection:"))
     list_res = list()
     
-    for(aa in 1:nrow(list_BIC)){
+    for(aa in K_search){
       pref = sprintf("order%d",ii)
       start=as.numeric(Sys.time())
       res<-FSCseq(X=X,y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,
             true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # alpha = 0: all L1. No penalty here
       end=as.numeric(Sys.time())
       list_BIC[aa,2]<-res$BIC
-      if(list_BIC[aa,1]==true.K){
-        compare_res = res
-      }
+      # if(list_BIC[aa,1]==true.K){
+      #   compare_res = res
+      # }
       print(list_BIC[aa,])
       print(paste("Time:",end-start,"seconds"))
       list_res[[aa]]=res

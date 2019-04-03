@@ -470,18 +470,18 @@ EM_run <- function(X=NA, y, k,
         if(!init_parms){
           tryCatch({
             fit=glm.nb(as.integer(rep(y[j,],k))[ids]~0+XX[ids,]+offset(rep(offset,k)[ids]),weights=c(t(wts))[ids])
-            coefs[j,] = fit$coefficients
+            coefs[j,] = log2(exp(fit$coefficients))         # change to log2 scale
             phi_g[j] = 1/fit$theta
             phi[j,] = rep(phi_g[j],k)
           },error= function(err){
             cat("Gene",j,"not converging with glm.nb(). Initializing with glm() Poisson instead.\n")
             fit=glm(as.integer(rep(y[j,],k))[ids]~0+XX[ids,]+offset(rep(offset,k)[ids]),family=poisson(),weights=c(t(wts))[ids])
-            coefs[j,] = fit$coefficients         # phi_g and phi are initialized to 0
+            coefs[j,] = log2(exp(fit$coefficients))         # phi_g and phi are initialized to 0. change to log2 scale
           })
           if(covars){
             for(c in (k+1):(k+p)){
               if(is.na(coefs[j,c])){coefs[j,c]=0}
-            }
+          }
           }
         }
         beta <- coefs[j,]
@@ -865,7 +865,7 @@ EM_run <- function(X=NA, y, k,
                Q=Q[1:a],
                BIC=BIC,
                nondiscriminatory=nondiscriminatory,
-               init_clusters=cls_init,
+               init_clusters=cls_init,init_coefs=init_coefs,init_phi=init_phi,
                final_clusters=final_clusters,
                phi=phi,
                logL=log_L,
@@ -875,7 +875,7 @@ EM_run <- function(X=NA, y, k,
                alpha=alpha,
                size_factors=size_factors,
                norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list
-               #,all_temp_list=all_temp_list,all_theta_list=all_theta_list
+               ,all_temp_list=all_temp_list,all_theta_list=all_theta_list
   )
   return(result)
   
