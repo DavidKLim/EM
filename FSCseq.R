@@ -389,7 +389,7 @@ EM_run <- function(X=NA, y, k,
   }
   
   # Stopping Criteria
-  IRLS_tol = 1E-6     # for phi/sum of beta/sum of covars
+  IRLS_tol = 1E-6     # phi/mean of beta/mean of covar effects
   maxit_IRLS = 50
   EM_tol = 1E-8
   
@@ -534,12 +534,12 @@ EM_run <- function(X=NA, y, k,
       }
       
       # Ad hoc averaging of cluster log means when nondiscriminatory
-      ids = list()
-      n_k = rowSums(wts)
-      for(c in 1:k){
-        ids[[c]]=which(theta_list[[j]][c,]==0)
-        coefs[j,ids[[c]]] = rep(sum(n_k[ids[[c]]]*coefs[j,ids[[c]]])/sum(n_k[ids[[c]]]),times=length(ids[[c]]))               # weighted (by # in each cl) average
-      }
+      # ids = list()
+      # n_k = rowSums(wts)
+      # for(c in 1:k){
+      #   ids[[c]]=which(theta_list[[j]][c,]==0)
+      #   coefs[j,ids[[c]]] = rep(sum(n_k[ids[[c]]]*coefs[j,ids[[c]]])/sum(n_k[ids[[c]]]),times=length(ids[[c]]))               # weighted (by # in each cl) average
+      # }
       
       # IF any coefs/phi unstable --> missing after M step, set them to initialized values from glm()/glm.nb()/input init values
       if(any(is.na(coefs[j,]))){
@@ -875,7 +875,7 @@ EM_run <- function(X=NA, y, k,
                alpha=alpha,
                size_factors=size_factors,
                norm_y=norm_y,DNC=DNC,LFCs=LFCs,disc_ids_list=disc_ids_list
-               ,all_temp_list=all_temp_list,all_theta_list=all_theta_list
+               #,all_temp_list=all_temp_list,all_theta_list=all_theta_list
   )
   return(result)
   

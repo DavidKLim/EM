@@ -290,6 +290,8 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 	/* PP filtering ids, gene */
 	arma::uvec ids = find(keep == 1);
 	/*arma::uvec ids = find(keep >= 0);*/   /* test: keep all samples */
+	
+	arma::uvec ids_c = find(keep==5);     /* just dummy initialization */
 
 	
     /* IRLS */
@@ -401,11 +403,36 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 		
         /* CDA */
         for(int c=0; c<k; c++){
-			arma::uvec ids_c = find(X.col(c) % keep == 1);
+			beta_cls(c) = beta(c);
+			arma::uvec fused_ids = find(theta.row(c) == 0);
+			int num_fused_cls = fused_ids.n_elem;
+			/*Rprintf("%d\n",fused_ids.n_elem);*/
+
+			if(num_fused_cls<=1){
+				ids_c = find(X.col(c) % keep == 1);
+				/*if(c==0){ids_c.print("ids2");}*/
+			} else{
+				int min_fused_id = fused_ids.index_min();
+				int min_fused_cl = fused_ids(min_fused_id);
+				/*Rprintf("min:%d,cl%d",min_fused_cl,c);*/
+				if(c > min_fused_cl){
+					beta(c) = beta(min_fused_cl);
+					if(cl_phi==1 && est_phi==1 && continue_phi==1){
+						phi_j(c) = phi_j(min_fused_cl);
+					}
+					/*Rprintf("Set beta%d and phi_j%d equal to beta%d and phi_j%d\n",c,c,min_fused_cl,min_fused_cl);*/
+				}
+				arma::mat arma_Xsum = X.cols(fused_ids);
+				NumericMatrix Xsum = wrap(arma_Xsum);
+				NumericVector Xfused = rowSums(Xsum);
+				arma::vec arma_Xfused = as<arma::vec>(Xfused);
+				ids_c = find(arma_Xfused % keep == 1);
+				/*if(c==0){ids_c.print("ids1");}*/
+			}
 			arma::vec resid_c(ids_c.n_elem);
             
-            /* Testing gene-wise phi (ADD TO INPUT IN RCPP "arma::vec fixed_phi" AND FUNCTION & LogLike IN R AS WELL) */
-            /* phi_j(c) = fixed_phi(j-1); */
+			/*if(c==0){ids_c.print();}*/
+			
 			if(p==0){
 				resid_c=y_tilde(ids_c);       		/* if no covars: resid = y-Xb^(-1) = y */
 			} else{
@@ -416,17 +443,12 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 				resid_c=y_tilde(ids_c)-Xc*betac;	
 			}
 
-			beta_cls(c) = beta(c);
+			
 			arma::vec vec_W_c = vec_W(ids_c);
 			
             /* Update beta */
             if(continue_beta==1){
-              /*if((1-alpha)*lambda != 0){
-                  beta(c) = ((1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W % X.col(c) % resid)/(n_k(c)) )  /
-				  ((1-alpha)*lambda*(k-1) + accu(vec_W % pow(X.col(c),2))/(n_k(c)) );
-              } else {
-				  beta(c) = accu(vec_W % X.col(c) % resid)/accu(vec_W % pow(X.col(c),2));
-              }*/
+				
 			  if((1-alpha)*lambda != 0){
                   beta(c) = ((1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W_c % resid_c)/(n_k(c)) )  /
 				  ((1-alpha)*lambda*(k-1) + accu(vec_W_c)/(n_k(c)) );
@@ -478,27 +500,34 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			timer.step("Theta");
 		}
         
-        if(i>1){
-            double SSE_beta=0;
-			double SSE_gamma=0;
-            double SSE_phi=0;
+        if(i>2){
+            double diff_beta=0;
+			double diff_gamma=0;
+            double diff_phi=0;
             for(int cc=0; cc<k; cc++){
-              SSE_beta += pow(temp_beta(i,cc)-temp_beta(i-1,cc),2);
-              SSE_phi += pow(temp_phi(i,cc)-temp_phi(i-1,cc),2);
+              diff_beta += fabs(temp_beta(i,cc)-temp_beta(i-1,cc))/fabs(temp_beta(i-1,cc)*k);
+			  if(cl_phi==1){
+				diff_phi += fabs(temp_phi(i,cc)-temp_phi(i-1,cc))/fabs(temp_phi(i-1,cc)*k);
+			  } else{
+				diff_phi = fabs(temp_phi(i,cc)-temp_phi(i-1,cc))/fabs(temp_phi(i-1,cc));
+			  }
             }
 			for(int cc=k; cc<(k+p); cc++){
-				SSE_gamma += pow(temp_beta(i,cc)-temp_beta(i-1,cc),2);
+				if(p>0){
+					diff_gamma += fabs(temp_beta(i,cc)-temp_beta(i-1,cc))/fabs(temp_beta(i-1,cc)*p);
+				}
 			}
-            /* Rprintf("SSE beta: %f, SSE phi: %f\n",SSE_beta,SSE_phi); */
-            if(SSE_beta/k<IRLS_tol){
+            /*Rprintf("diff beta: %f, diff phi: %f\n, diff gamma: %f\n",diff_beta,diff_phi,diff_gamma);*/
+			
+            if(diff_beta<IRLS_tol){
               continue_beta=0;
             }
 			if(p>0){
-				if(SSE_gamma/p<IRLS_tol){
+				if(diff_gamma<IRLS_tol){
 					continue_gamma=0;
 				}
-			}
-            if(SSE_phi<IRLS_tol){
+			} else{continue_gamma=0;}
+            if(diff_phi<IRLS_tol){
               continue_phi=0;
             }
         }
