@@ -185,6 +185,7 @@ FSCseq<-function(X=NA, y, k,
                  init_coefs=matrix(0,nrow=nrow(y),ncol=k),
                  init_phi=matrix(0,nrow=nrow(y),ncol=k),
                  init_cls=NA, n_rinits=50, maxit_inits=15,
+                 maxit_EM=100,maxit_IRLS=50,EM_tol=1E-8,IRLS_tol=1E-6,
                  disp=c("gene","cluster"),
                  method=c("EM","CEM"),
                  prefix="", dir="NA"){
@@ -314,7 +315,8 @@ FSCseq<-function(X=NA, y, k,
       
       fit = EM_run(X,y,k,lambda,alpha,size_factors,norm_y,offsets,true_clusters,true_disc,
                    init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                   cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,maxit_EM=maxit_inits)
+                   cls_init=all_init_cls[,i], CEM=CEM,init_Tau=init_Tau,maxit_EM=maxit_inits,
+                   maxit_IRLS=maxit_IRLS,EM_tol=EM_tol,IRLS_tol=IRLS_tol)
       all_fits [[i]] = fit
       init_cls_BIC[i] <- fit$BIC
     }
@@ -332,7 +334,8 @@ FSCseq<-function(X=NA, y, k,
   
   results=EM_run(X,y,k,lambda,alpha,size_factors,norm_y,offsets,true_clusters,true_disc,
                  init_parms=init_parms,init_coefs=init_coefs,init_phi=init_phi,disp=disp,
-                 cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,maxit_EM=100)
+                 cls_init=init_cls, CEM=CEM,init_Tau=init_Tau,maxit_EM=maxit_EM,maxit_IRLS=maxit_IRLS,
+                 EM_tol=EM_tol,IRLS_tol=IRLS_tol)
   
   sink()
   return(results)
@@ -353,7 +356,7 @@ EM_run <- function(X=NA, y, k,
                    init_phi=matrix(0,nrow=nrow(y),ncol=k),
                    disp,cls_init,
                    CEM=F,init_Tau=1,
-                   maxit_EM=100){
+                   maxit_EM=100,maxit_IRLS = 50,EM_tol = 1E-8,IRLS_tol = 1E-6){
   
   start_time <- Sys.time()
   
@@ -387,11 +390,6 @@ EM_run <- function(X=NA, y, k,
   } else if(disp=="cluster"){
     cl_phi=1
   }
-  
-  # Stopping Criteria
-  IRLS_tol = 1E-6     # phi/mean of beta/mean of covar effects
-  maxit_IRLS = 50
-  EM_tol = 1E-8
   
   # Initialize parameters
   finalwts<-matrix(rep(0,times=k*ncol(y)),nrow=k)

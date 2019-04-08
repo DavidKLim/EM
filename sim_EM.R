@@ -573,7 +573,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       #list_pen_res = list()
       
       #search for optimal penalty parameters
-      ##################################################### figure out why higher penalty errors out (lambda=.75, alpha=.5) but lower is fine (lambda=.75, alpha=.45)####
       for(aa in 1:nrow(list_BIC)){
         pref = sprintf("grid%d",ii)
         start = as.numeric(Sys.time())
@@ -855,7 +854,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     library(Biobase)
     sourceCpp("M_step.cpp")
     })
-  
   # Store all results in list par_sim_res
   par_sim_res=list(list())
   par_sim_res<-parLapply(cl, 1:sim, sim.run)
