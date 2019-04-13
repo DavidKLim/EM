@@ -410,6 +410,7 @@ EM_run <- function(X=NA, y, k,
   Q<-rep(0,times=maxit_EM)
   
   cls=cls_init
+  current_clusters<-cls
   
   # Initialize weights
   wts<-matrix(rep(0,times=k*ncol(y)),nrow=k)
@@ -444,6 +445,8 @@ EM_run <- function(X=NA, y, k,
   
   all_temp_list = list()
   all_theta_list = list()
+  
+  lower_K=FALSE
   
   #gene_E_step=F   # performing E step after each gene's M step: unstable. T: on, F: off
   
@@ -737,9 +740,15 @@ EM_run <- function(X=NA, y, k,
     
     
     # Diagnostics Tracking
-    current_clusters<-rep(0,times=n)
     for(i in 1:n){
       current_clusters[i]<-which.max(wts[,i])
+    }
+    
+    if(length(unique(current_clusters)<k) & length(unique(prev_clusters))<k){
+      finalwts=wts
+      lower_K=TRUE
+      warning(sprintf("EM iteration ended at iter%d, suboptimal order (choose higher K)",a))
+      break
     }
     
     #print(current_clusters)
@@ -813,13 +822,24 @@ EM_run <- function(X=NA, y, k,
   num_est_coefs = sum(m)
   num_est_params = 
     if(cl_phi==1){
-      2*sum(m)+(k-1)+p*g                      # p*g for covariates
-    } else{ sum(m)+(k-1)+g+p*g }            # 2*sum(m) for coef/phi for each discriminatory clusters (cl_phi=1). sum(m) >= g
+      sum(m)+(k-1)+2*p*g                    # p*g for cluster means
+    } else{ sum(m)+(k-1)+g+p*g }            # sum(m) for coef for each discriminatory clusters (cl_phi=1). sum(m) >= g
   # sum(m)+g for coef/phi (cl_phi=0)
   # (k-1) for mixture proportions
   
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
   BIC = -2*log_L + log(n)*num_est_params
+  
+  if(lower_K){
+    BIC=.Machine$double.xmax
+    print("Choose lower K. Only 3 clusters identified: cls")
+    print(unique(current_clusters))
+  }
+  
+  P=(k-1)*g
+  kap=log(P)/log(n)
+  gamma=1-1/(2*kap)
+  eBIC = BIC + gamma*choose(P,sum(m)-g)     # just looking at extra baselines estimated
   
   cat(paste("total # coefs estimated =",num_est_coefs,"\n"))
   cat(paste("total # params estimated =",num_est_params,"\n"))
@@ -861,7 +881,7 @@ EM_run <- function(X=NA, y, k,
                pi=pi,
                coefs=coefs,
                Q=Q[1:a],
-               BIC=BIC,
+               BIC=BIC,eBIC=eBIC,
                nondiscriminatory=nondiscriminatory,
                init_clusters=cls_init,init_coefs=init_coefs,init_phi=init_phi,
                final_clusters=final_clusters,
