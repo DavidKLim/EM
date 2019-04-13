@@ -344,18 +344,18 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
   }
   
   sim_coefs<-matrix(rep(rowSums(init_coefs)/k,times=k),ncol=k)
-  fold.change<-fold.change
-  nondisc.fold.change<-0         # fixed nondisc fold change
+  #nondisc.fold.change<-0         # fixed nondisc fold change
   tt<-floor(num.disc*g)
   
   down_disc = sample(1:tt,floor(tt/2),replace=F)          # Randomly apply LFC up on half of the genes, and down on half of the genes
   LFC_apply_mat =matrix(0,nrow=tt,ncol=k)
-  LFC_apply = fold.change*(c(0:(k-1))+rep((1-k)/2,times=k))
+  #LFC_apply = fold.change*(c(0:(k-1))+rep((1-k)/2,times=k))
   for(t in 1:tt){
+    sel_cl=sample(1:k,1)    # sample one cluster to apply LFC on
     if(t %in% down_disc){
-      LFC_apply_mat[t,]=-LFC_apply
+      LFC_apply_mat[t,sel_cl]=-fold.change
     } else{
-      LFC_apply_mat[t,]=LFC_apply
+      LFC_apply_mat[t,sel_cl]=fold.change
     }
   }
   sim_coefs[1:tt,]=sim_coefs[1:tt,] + LFC_apply_mat
@@ -416,17 +416,16 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     for(i in 1:n){
       true_clusters[i]<-which(z[,i]==1)
     }
-    norm_y = y
+    true_norm_y = y
     for(i in 1:n){
-      norm_y[,i] = y[,i]/init_size_factors[i]
+      true_norm_y[,i] = y[,i]/init_size_factors[i]
     }
     true_disc=c(rep(TRUE,tt),rep(FALSE,(g-tt)))
     
-    # # Filtering
-    # idx <- rowMedians(norm_y) >= 20
-    # y <- y[idx,]
-    # norm_y <- norm_y[idx,]
-    # true_disc <- true_disc[idx]
+    fit=fit_DESeq_intercept(y,calc_vsd=F,calc_rld=F)       # ESTIMATE based on DESeq2
+    size_factors=fit$size_factors
+    norm_y=fit$norm_y
+    rm(fit)
     
     # No filtering
     filt_ids = rep(T,g) # No filtering
@@ -438,9 +437,21 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       #filt_ids = (pvals <= pval_thresh)
       filt_ids = pvals <= quantile(pvals,filt_quant)
     } else if(filt_method=="mad"){
+      ## test
+      if(adj_batch){
+        batch_effs = rep(0,nrow(y))
+        for(j in 1:nrow(y)){
+          fit=glm.nb(y[j,]~1+matrix(batch,ncol=1)+offset(log2(size_factors)))
+          batch_effs[j]=log2(exp(fit$coefficients[2]))
+        }
+        MAD_batch_adj = 2^(batch_effs %*% t(batch))   # effect of batch given glm.nb() one cluster (intercept+batch)
+      }
+      ##
       mads = rep(0,g)
       for(j in 1:g){
-        mads[j] = mad(log(norm_y[j,]+0.1))
+        mads[j] = if(!adj_batch){
+          mad(log(norm_y[j,]+0.1))
+          } else {mad(log(norm_y[j,]/MAD_batch_adj+0.1))}      # adjust norm_y for MAD naively
       }
       filt_ids = mads >= quantile(mads,1-filt_quant)
     }
@@ -453,7 +464,9 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     all_data[[ii]]<-list(y=y,
                          true_clusters=true_clusters,
-                         size_factors=init_size_factors,
+                         true_size_factors=init_size_factors,
+                         true_norm_y=true_norm_y,
+                         size_factors=size_factors,
                          norm_y=norm_y,
                          true_disc=true_disc, batch=batch, batch_g=batch_g
                          ,gene_id=idx
@@ -473,8 +486,10 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     filt_sens = sum(idx[1:tt])/tt
     filt_falsepos = sum(idx[(tt+1):g])/(g-tt)
     
-    true_norm_y = all_data[[ii]]$norm_y               # ACTUAL norm_y based on simulated size factors
-    true_size_factors = all_data[[ii]]$size_factors
+    true_norm_y = all_data[[ii]]$true_norm_y               # ACTUAL norm_y based on simulated size factors
+    true_size_factors = all_data[[ii]]$true_size_factors
+    norm_y=all_data[[ii]]$norm_y
+    size_factors=all_data[[ii]]$size_factors
     
     batch=all_data[[ii]]$batch
     batch_g=all_data[[ii]]$batch_g
@@ -485,11 +500,6 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       X=NA
     }
     
-    fit=fit_DESeq_intercept(y,calc_vsd=F,calc_rld=F)       # ESTIMATE based on DESeq2
-    size_factors=fit$size_factors
-    norm_y=fit$norm_y
-    rm(fit)
-    
     sink(sprintf("Diagnostics/%s/progress%d_%s_%s.txt",dir_name,ii,method,disp))
     # Order selection
     K_search=c(1:7)
@@ -498,17 +508,23 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     print(paste("Dataset",ii,"Order Selection:"))
     list_res = list()
     
+    lambda0=0.05      # small lambda0 causes instability when initial param ests bad
+    alpha0=0.01
+    
     for(aa in K_search){
       pref = sprintf("order%d",ii)
       start=as.numeric(Sys.time())
-      res<-FSCseq(X=X,y=y,k=list_BIC[aa,1],lambda=0,alpha=0,size_factors=size_factors,norm_y=norm_y,
-            true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp)  # alpha = 0: all L1. No penalty here
+      res<-FSCseq(X=X,y=y,k=list_BIC[aa,1],lambda=lambda0,alpha=alpha0,size_factors=size_factors,norm_y=norm_y,
+            true_clusters=true_clusters,true_disc=true_disc,prefix=pref,dir=dir_name,method=method,disp=disp
+            #,n_rinits=5   #comment this out
+            )  # small penalty
       end=as.numeric(Sys.time())
       list_BIC[aa,2]<-res$BIC
       # if(list_BIC[aa,1]==true.K){
       #   compare_res = res
       # }
       print(list_BIC[aa,])
+      #print(paste("eBIC:", res$eBIC))
       print(paste("Time:",end-start,"seconds"))
       list_res[[aa]]=res
     }
@@ -551,19 +567,12 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
     
     # Grid search
     
-    # # Use prefiltering just on the order selection step? This will reset all genes
-    # y = all_data[[ii]]$y
-    # true_clusters = all_data[[ii]]$true_clusters
-    # norm_y = all_data[[ii]]$norm_y
-    # true_disc = all_data[[ii]]$true_disc
-    # idx = rep(T,nrow(y))
-    
     if(penalty){
       print(paste("Dataset",ii,"Grid Search:"))    # track iteration
       
       #create matrix for grid search values
       lambda_search=seq(0.05,1,0.05)
-      alpha_search=seq(0,0.5,0.05)        # alpha can't = 1
+      alpha_search=seq(0.05,0.5,0.05)        # alpha can't = 1
       
       list_BIC=matrix(0,nrow=length(lambda_search)*length(alpha_search),ncol=3) # matrix of BIC's: one for each combination of penalty params 
       
