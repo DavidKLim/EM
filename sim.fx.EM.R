@@ -1,4 +1,4 @@
-run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
+run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2,3),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
                    distrib="nb",method="EM",sim_disp="gene",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,
                    ncores=25,nsims=ncores,filt_quant=0.2,filt_method=c("mad","pval","none"),more_options=""){
   setwd("/pine/scr/d/e/deelim/out")
