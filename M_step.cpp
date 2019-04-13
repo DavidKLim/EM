@@ -347,9 +347,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			  }
 			}
 		}
-		/*if(i==0){
-			Rprintf("phi: %f\n",phi_g);
-		}*/
+		/*Rprintf("phi iter%d: %f\n",i,phi_g);*/
 		
 		if(i==TIME_ITER){
 			timer.step("est phi_g");
@@ -388,7 +386,14 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 				betapp.shed_row(pp);			
 				resid=y_tilde-Xpp*betapp;
 				
-				beta(pp) = accu(vec_W % X.col(pp) % resid)/accu(vec_W % pow(X.col(pp),2));
+				arma::vec subs_vec_W=vec_W(ids);
+				arma::vec Xcolpp=X.col(pp);
+				arma::vec subs_Xcolpp=Xcolpp(ids);
+				arma::vec subs_resid=resid(ids);             /* subsetting just PP >0.001 */
+				
+				beta(pp) = accu(subs_vec_W % subs_Xcolpp % subs_resid)/accu(subs_vec_W % pow(subs_Xcolpp,2));
+				
+				/*Rprintf("covar iter%d gamma=%f, top=%f, bottom=%f\n",i,beta(pp),accu(subs_vec_W % subs_Xcolpp % subs_resid),accu(subs_vec_W % pow(subs_Xcolpp,2)));*/
 				if(beta(pp)>100){
 					beta(pp)=100;
 				} else if(beta(pp)<-100){
@@ -404,29 +409,31 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
         /* CDA */
         for(int c=0; c<k; c++){
 			beta_cls(c) = beta(c);
-			arma::uvec fused_ids = find(theta.row(c) == 0);
-			int num_fused_cls = fused_ids.n_elem;
+			arma::uvec fused_ids = find(theta.row(c) == 0);        /* fused cluster labels */
+			arma::uvec not_fused_ids = find(theta.row(c) != 0);
+			int fused_n_k=accu(n_k(fused_ids));                   /* n_k = number of samples in fused cluster (if fused) */
+			int num_fused_cls = fused_ids.n_elem;                 /* tracks number of clusters that are fused with current cl c */
 			/*Rprintf("%d\n",fused_ids.n_elem);*/
 
 			if(num_fused_cls<=1){
-				ids_c = find(X.col(c) % keep == 1);
+				ids_c = find(X.col(c) % keep == 1);             /* if no fused cluster, subset to just PP > 0.001 samples in cl c */
 				/*if(c==0){ids_c.print("ids2");}*/
 			} else{
-				int min_fused_id = fused_ids.index_min();
-				int min_fused_cl = fused_ids(min_fused_id);
+				int min_fused_id = fused_ids.index_min();       /* determine which of the fused clusters has the smallest label */
+				int min_fused_cl = fused_ids(min_fused_id);     
 				/*Rprintf("min:%d,cl%d",min_fused_cl,c);*/
-				if(c > min_fused_cl){
-					beta(c) = beta(min_fused_cl);
-					if(cl_phi==1 && est_phi==1 && continue_phi==1){
+				if(c > min_fused_cl){                           /* if current cl c is fused w/ a previous cl, then take the prev ests. just beta? */
+					beta(c) = beta(min_fused_cl); 
+					/*if(cl_phi==1 && est_phi==1 && continue_phi==1){
 						phi_j(c) = phi_j(min_fused_cl);
-					}
+					}*/
 					/*Rprintf("Set beta%d and phi_j%d equal to beta%d and phi_j%d\n",c,c,min_fused_cl,min_fused_cl);*/
 				}
 				arma::mat arma_Xsum = X.cols(fused_ids);
 				NumericMatrix Xsum = wrap(arma_Xsum);
 				NumericVector Xfused = rowSums(Xsum);
-				arma::vec arma_Xfused = as<arma::vec>(Xfused);
-				ids_c = find(arma_Xfused % keep == 1);
+				arma::vec arma_Xfused = as<arma::vec>(Xfused);      /* sum manipulations: essentially combine X matrix of fused cls by rowSumming */
+				ids_c = find(arma_Xfused % keep == 1);             /* PP filt >0.001 on new sample size of combined cls */
 				/*if(c==0){ids_c.print("ids1");}*/
 			}
 			arma::vec resid_c(ids_c.n_elem);
@@ -438,8 +445,13 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			} else{
 				arma::mat Xc=X.rows(ids_c);
 				arma::vec betac=beta;
-				Xc.shed_col(c);
-				betac.shed_row(c);
+				if(num_fused_cls<=1){
+					Xc.shed_col(c);
+					betac.shed_row(c);
+				} else{                             /* if fused clusters, then remove in Xc*betac both cluster samples */
+					Xc=Xc.cols(not_fused_ids);
+					betac=betac.rows(not_fused_ids);
+				}
 				resid_c=y_tilde(ids_c)-Xc*betac;	
 			}
 
@@ -450,15 +462,14 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             if(continue_beta==1){
 				
 			  if((1-alpha)*lambda != 0){
-                  beta(c) = ((1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W_c % resid_c)/(n_k(c)) )  /
-				  ((1-alpha)*lambda*(k-1) + accu(vec_W_c)/(n_k(c)) );
+                  beta(c) = ((1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))) + accu(vec_W_c % resid_c)/(fused_n_k) )  /
+				  ((1-alpha)*lambda*(k-1) + accu(vec_W_c)/(fused_n_k) );
               } else {
 				  beta(c) = accu(vec_W_c % resid_c)/accu(vec_W_c);
               }
 			  
-			  /*if(i==0){
-				  Rprintf("cl%d: %f\n",c,beta(c));
-			  }*/
+				  /*Rprintf("Iter%d cl%d:%f, 1=%f, 2=%f, 3=%f, 4=%f\n",i,c,beta(c),
+				  (1-alpha)*lambda*((accu(beta_cls)-beta(c))+(accu(theta.row(c))-theta(c,c))),accu(vec_W_c % resid_c)/(n_k(c)),(1-alpha)*lambda*(k-1),accu(vec_W_c)/(n_k(c)));*/
     
               if(beta(c) < (-100)){
                   /* Rprintf("Cluster %d, gene %d truncated at -100",c+1,j); */
