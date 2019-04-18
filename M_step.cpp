@@ -415,8 +415,9 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
 			int num_fused_cls = fused_ids.n_elem;                 /* tracks number of clusters that are fused with current cl c */
 			/*Rprintf("%d\n",fused_ids.n_elem);*/
 
+			uvec ids_PP_c = find(X.col(c) % keep == 1);
 			if(num_fused_cls<=1){
-				ids_c = find(X.col(c) % keep == 1);             /* if no fused cluster, subset to just PP > 0.001 samples in cl c */
+				ids_c = ids_PP_c;             /* if no fused cluster, subset to just PP > 0.001 samples in cl c */
 				/*if(c==0){ids_c.print("ids2");}*/
 			} else{
 				int min_fused_id = fused_ids.index_min();       /* determine which of the fused clusters has the smallest label */
@@ -488,7 +489,7 @@ List M_step(arma::mat X, int p, int j, int a, arma::vec y_j, arma::mat all_wts, 
             /* Estimate phi */
             /*Rprintf("phi.ml iter %d, cluster %d \n",i,c);*/
             if(cl_phi==1 && est_phi==1 && continue_phi==1){
-				phi_j(c) = phi_ml(rep_y_j(ids_c),mu(ids_c),vec_wts(ids_c),10,0);
+				phi_j(c) = phi_ml(rep_y_j(ids_PP_c),mu(ids_PP_c),vec_wts(ids_PP_c),10,0);
             }
 			
             
