@@ -612,8 +612,8 @@ sim.EM<-function(true.K, fold.change, num.disc, g, n,
       pen_BIC = min(list_BIC[,3])
       
       if(pen_BIC>=unpen_BIC){
-        max_lambda=0
-        max_alpha=0
+        max_lambda=lambda0
+        max_alpha=alpha0
         print("Algorithm selected unpenalized model")
       } else{
         print(paste("Penalized model with lambda=",max_lambda,"and alpha=",max_alpha))
