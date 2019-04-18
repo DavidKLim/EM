@@ -37,15 +37,26 @@ fit_DESeq_intercept=function(y,calc_vsd=F,calc_rld=F){
   
   dds=tryCatch({
     dds<-DESeq(dds)
-  },error=function(err){
-    tryCatch({
-    print("All genes contain a 0. Using alternate size factor estimation")
-    dds<-DESeq(dds, sfType = "iterate")
-    return(dds)
-    },error=function(err){
-      print("Alternate SF estimation didn't converge. Trying zero-inflated model")
-      dds<-DESeq(dds, sfType = "poscounts", useT=T, minmu=1e-6,minReplicatesForReplace = Inf)
-      return(dds)
+      },error=function(err){
+      tryCatch({
+        cat(paste("Error:",err))
+        print("Error1. Using sfType='iterate'")
+        dds<-DESeq(dds, sfType = "iterate")
+        return(dds)
+      },error=function(err){
+        tryCatch({
+          cat(paste("Error:",err))
+          print("Error2. Trying zero-inflated model sfType='poscounts'")
+          dds<-DESeq(dds, sfType = "poscounts", useT=T, minmu=1e-6,minReplicatesForReplace = Inf)
+          return(dds)
+        },error=function(err){
+          tryCatch({
+            cat(paste("Error:",err))
+            print("Error3. Trying last ditch: fitType='mean'")
+            dds<-DESeq(dds, fitType="mean")
+            return(dds)
+        })
+      })
     })
   })
   
