@@ -822,9 +822,9 @@ EM_run <- function(X=NA, y, k,
   num_est_coefs = sum(m)
   num_est_params = 
     if(cl_phi==1){
-      sum(m)+(k-1)+2*p*g                    # p*g for cluster means
+      sum(m)+(k-1)+p*g + k*g                # p*g for covariates, sum(m) for coefs, k*g for cluster phis, k-1 for mixture proportions 
     } else{ sum(m)+(k-1)+g+p*g }            # sum(m) for coef for each discriminatory clusters (cl_phi=1). sum(m) >= g
-  # sum(m)+g for coef/phi (cl_phi=0)
+  # sum(m)+g for #coef+#phi (cl_phi=0)
   # (k-1) for mixture proportions
   
   log_L<-sum(apply(log(pi) + l, 2, logsumexpc))
