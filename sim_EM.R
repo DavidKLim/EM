@@ -35,30 +35,59 @@ fit_DESeq_intercept=function(y,calc_vsd=F,calc_rld=F){
   size_factors=NA
   norm_y=NA
   
-  dds=tryCatch({
-    dds<-DESeq(dds)
-      },error=function(err){
-      tryCatch({
-        cat(paste("Error:",err))
-        print("Error1. Using sfType='iterate'")
-        dds<-DESeq(dds, sfType = "iterate")
-        return(dds)
-      },error=function(err){
-        tryCatch({
-          cat(paste("Error:",err))
-          print("Error2. Trying zero-inflated model sfType='poscounts'")
-          dds<-DESeq(dds, sfType = "poscounts", useT=T, minmu=1e-6,minReplicatesForReplace = Inf)
-          return(dds)
-        },error=function(err){
-          tryCatch({
-            cat(paste("Error:",err))
-            print("Error3. Trying last ditch: fitType='mean'")
-            dds<-DESeq(dds, fitType="mean")
-            return(dds)
-        })
+  tryCatch({
+    print("Default sfType='ratio'")
+    dds = estimateSizeFactors(dds,type="ratio")
+  },error=function(err){
+    tryCatch({
+      cat(paste("Error:",err))
+      print("Trying sfType='poscounts'")
+      dds <<- estimateSizeFactors(dds,type="poscounts")
+      },error=function(err2){
+        cat(paste("Error:",err2))
+        print("Trying sfType='iterate'")
+        dds <<- estimateSizeFactors(dds,type="iterate")
       })
     })
+  tryCatch({
+    print("Default fitType='parametric'")
+    dds = estimateDispersions(dds,fitType="parametric")
+  },error=function(err){
+    tryCatch({
+      cat(paste("Error:",err))
+      print("Trying fitType='local'")
+      dds <<- estimateDispersions(dds,fitType="local")
+      },error=function(err2){
+        cat(paste("Error:",err2))
+        print("Trying sfType='mean'")
+        dds <<- estimateDispersions(dds,fitType="mean")
+      })
   })
+  
+  # dds=tryCatch({
+  #   dds<-DESeq(dds)
+  #     },error=function(err){
+  #     tryCatch({
+  #       cat(paste("Error:",err))
+  #       print("Error1. Using sfType='iterate'")
+  #       dds<-DESeq(dds, sfType = "iterate")
+  #       return(dds)
+  #     },error=function(err){
+  #       tryCatch({
+  #         cat(paste("Error:",err))
+  #         print("Error2. Trying zero-inflated model sfType='poscounts'")
+  #         dds<-DESeq(dds, sfType = "poscounts", useT=T, minmu=1e-6,minReplicatesForReplace = Inf)
+  #         return(dds)
+  #       },error=function(err){
+  #         tryCatch({
+  #           cat(paste("Error:",err))
+  #           print("Error3. Trying last ditch: fitType='mean'")
+  #           dds<-DESeq(dds, fitType="mean")
+  #           return(dds)
+  #       })
+  #     })
+  #   })
+  # })
   
   if(!is.na(dds)){
     if(calc_vsd){

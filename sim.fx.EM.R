@@ -48,7 +48,7 @@ run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2,3),num_disc=c(.05
   }}}}}
 }
 
-collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
+collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2,3),num_disc=c(.05,.1),g=c(2000),n=c(100,200),
                        distrib="nb",method="EM",sim_disp="gene",disp="gene",fixed_parms="F", fixed_coef=8,fixed_phi=0.35,filt_quant=0.2,filt_method=c("mad","pval","none")){
   nsims=length(true_k)*length(fold_change)*length(num_disc)*length(g)*length(n)
   tab<-matrix(0,nrow=nsims,ncol=38)      # 3 conditions, 7 things to tabulate
