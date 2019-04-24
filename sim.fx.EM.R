@@ -42,7 +42,7 @@ run.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2,3),num_disc=c(.05
       cmd[3] = sprintf("save(X, file = '%s')", out2)
       cmdf = paste(cmd, collapse = "")
       write.table(cmdf, file = out, col.names = F, row.names = F, quote = F)
-      run = sprintf("sbatch -p general -N 1 -n %d --mem=%dg -t 2- -o /pine/scr/d/e/deelim/dump/%s.log -J %s --wrap='R CMD BATCH %s'", ncores,2*ncores,fname,fname,out)
+      run = sprintf("sbatch -p general -N 1 -n %d --mem=%dg -t 16:00:00 -o /pine/scr/d/e/deelim/dump/%s.log -J %s --wrap='R CMD BATCH %s'", ncores,2*ncores,fname,fname,out)
       Sys.sleep(1)
       system(run)
   }}}}}
@@ -57,8 +57,10 @@ collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2,3),num_disc=c
                    "K_HC","K_med","Order_Acc","Filt_sens","Filt_FP",
                    "K_NBMB","ARI_NBMB","K_log_MC","ARI_log_MC","K_vsd_MC","ARI_vsd_MC","K_rld_MC","ARI_rld_MC",
                    "OA_iClust","OA_HC","OA_KM","OA_NBMB","OA_log_MC","OA_vsd_MC","OA_rld_MC","true_order_pred_acc")
-  ii=1
+  ii=0
   for(i in 1:length(true_k)){for(j in 1:length(fold_change)){for(k in 1:length(num_disc)){for(l in 1:length(g)){for(m in 1:length(n)){
+      ii=ii+1
+      tab[ii,1:5]<-c(n[m],g[l],fold_change[j],true_k[i],num_disc[k])  # store the simulation parameters even if not done
       if(fixed_parms=="F"){
         fname = sprintf("run_sim_%s_%s_%s_sim%s_%s_%d_%f_%f_%d_%d_filt_%s_%f",
                         prefix,distrib,method,sim_disp,disp,true_k[i],fold_change[j],num_disc[k],g[l],n[m],filt_method,filt_quant)
@@ -77,7 +79,6 @@ collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2,3),num_disc=c
       if(!file.exists(out2)) next
       print(out)
       load(out2)
-      tab[ii,1:5]<-c(n[m],g[l],fold_change[j],true_k[i],num_disc[k])
       tab[ii,6]<-X$K
       tab[ii,7]<-X$disc
       tab[ii,8]<-mean(X$all_lambda)
@@ -129,7 +130,6 @@ collect.sim = function(prefix="",true_k=c(2,4,6),fold_change=c(1,2,3),num_disc=c
       if(is.null(X$mean_order_pred_acc)){
         tab[ii,38]=NA
       } else{tab[ii,38]<-X$mean_order_pred_acc}
-      ii=ii+1
   }}}}}
   if(fixed_parms=="F"){
     final_results = sprintf("final_table_%s_%s_%s_sim%s_%s_filt_%s_%f",prefix,distrib,method,sim_disp,disp,filt_method,filt_quant)
